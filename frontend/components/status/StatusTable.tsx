@@ -39,7 +39,7 @@ export default function StatusTable({ data = [] }: StatusTableProps) {
                 
                 {/* Tombol Lihat Gambar */}
                 <button className="absolute bottom-10 left-10 border border-black px-2 py-1 flex items-center gap-2 text-[10px] bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <span>🖼️</span> Lihat Gambar
+                  <span>🖼️</span> Lihat Dokumen Pendukung
                 </button>
               </div>
             </div>
