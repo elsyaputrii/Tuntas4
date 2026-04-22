@@ -1,6 +1,6 @@
 export default function HeroSection() {
   return (
-    <div className="bg-[#4d5e71] p-8 text-white mb-6 shadow-md">
+    <div className="bg-dark-header p-8 text-white mb-6 shadow-md">
       <h1 className="text-2xl font-bold leading-tight mb-3">
       Aplikasi Transformasi Tata Kelola <br />
         Organisasi: Aplikasi Pengelolaan Ketidaksesuaian Polibatam
