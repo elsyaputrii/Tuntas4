@@ -1,17 +1,17 @@
--- ================================================================
+-- ===============================================================
 -- FILE: database/schema.sql
 -- Tujuan: Membuat semua tabel database TUNTAS dari awal (fresh)
 -- Cara pakai: mysql -u root -p < database/schema.sql
 -- ================================================================
-
+ 
 -- Buat database jika belum ada
 CREATE DATABASE IF NOT EXISTS tuntas4
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
-
+ 
 -- Gunakan database ini
 USE tuntas4;
-
+ 
 -- ================================================================
 -- TABEL 1: pengguna
 -- Menyimpan semua akun user dari semua role/jabatan
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS pengguna (
   created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-
+ 
 -- ================================================================
 -- TABEL 2: civitas_akademika
 -- Detail profil untuk user dengan role = 'civitas'
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS civitas_akademika (
   -- Relasi: hapus civitas jika pengguna dihapus
   FOREIGN KEY (id_pengguna) REFERENCES pengguna(id_pengguna) ON DELETE CASCADE
 );
-
+ 
 -- ================================================================
 -- TABEL 3: staf_p4m
 -- Detail profil untuk user dengan role = 'staf_p4m'
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS staf_p4m (
   updated_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (id_pengguna) REFERENCES pengguna(id_pengguna) ON DELETE CASCADE
 );
-
+ 
 -- ================================================================
 -- TABEL 4: ka_p4m
 -- Detail profil untuk Kepala P4M (role = 'ka_p4m')
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS ka_p4m (
   updated_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (id_pengguna) REFERENCES pengguna(id_pengguna) ON DELETE CASCADE
 );
-
+ 
 -- ================================================================
 -- TABEL 5: kepala_unit
 -- Detail profil untuk Kepala Unit (role = 'kepala_unit')
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS kepala_unit (
   updated_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (id_pengguna) REFERENCES pengguna(id_pengguna) ON DELETE CASCADE
 );
-
+ 
 -- ================================================================
 -- TABEL 6: ekadar_standar_referensi
 -- Standar/prosedur referensi yang digunakan P4M
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS ekadar_standar_referensi (
   proses        VARCHAR(100)  NOT NULL COMMENT 'Nama proses yang dicakup',
   created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );
-
+ 
 -- ================================================================
 -- TABEL 7: laporan_ketidaksesuaian
 -- Laporan yang dikirim oleh Civitas Akademika
@@ -120,26 +120,35 @@ CREATE TABLE IF NOT EXISTS ekadar_standar_referensi (
 -- ================================================================
 CREATE TABLE IF NOT EXISTS laporan_ketidaksesuaian (
   id_laporan    INT           AUTO_INCREMENT PRIMARY KEY,
-  id_civitas    INT           NOT NULL    COMMENT 'Siapa yang melapor',
+  -- id_civitas NULL karena civitas tidak perlu login
+  id_civitas    INT           NULL        COMMENT 'FK ke civitas jika pakai akun, NULL jika tanpa login',
+  -- Kolom untuk civitas tanpa login (langsung isi nama & status)
+  nama_pelapor  VARCHAR(100)  NOT NULL    COMMENT 'Nama lengkap pelapor',
+  status_pelapor ENUM(
+                  'mahasiswa',
+                  'dosen',
+                  'tendik',
+                  'masyarakat'
+                )             NOT NULL    COMMENT 'Status civitas',
   jenis_laporan ENUM(
                   'masukan',
                   'kritik',
-                  'pengaduan',
-                  'saran'
+                  'pengaduan'
                 )             NOT NULL DEFAULT 'pengaduan',
-  deskripsi     TEXT          NOT NULL COMMENT 'Isi laporan',
-  lampiran      VARCHAR(255)  NULL     COMMENT 'Nama file lampiran yang disimpan di folder uploads/',
+  deskripsi     TEXT          NOT NULL    COMMENT 'Isi laporan',
+  lampiran      VARCHAR(255)  NULL        COMMENT 'Nama file di folder uploads/',
   status        ENUM(
-                  'menunggu',   -- baru dikirim, belum diproses
-                  'diproses',   -- sedang ditangani
-                  'selesai',    -- sudah tuntas
-                  'ditolak'     -- ditolak oleh P4M
+                  'menunggu',
+                  'diproses',
+                  'selesai',
+                  'ditolak'
                 )             NOT NULL DEFAULT 'menunggu',
   created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (id_civitas) REFERENCES civitas_akademika(id_civitas) ON DELETE CASCADE
+  -- ON DELETE SET NULL karena id_civitas boleh NULL
+  FOREIGN KEY (id_civitas) REFERENCES civitas_akademika(id_civitas) ON DELETE SET NULL
 );
-
+ 
 -- ================================================================
 -- TABEL 8: boxing_ketidaksesuaian
 -- Proses distribusi/penugasan laporan ke Kepala Unit oleh Staf P4M
@@ -162,7 +171,7 @@ CREATE TABLE IF NOT EXISTS boxing_ketidaksesuaian (
   FOREIGN KEY (id_kepala)  REFERENCES kepala_unit(id_kepala),
   FOREIGN KEY (id_standar) REFERENCES ekadar_standar_referensi(id_standar) ON DELETE SET NULL
 );
-
+ 
 -- ================================================================
 -- TABEL 9: rancangan_tindakan
 -- Rencana tindak lanjut yang dibuat oleh Kepala Unit
@@ -183,7 +192,7 @@ CREATE TABLE IF NOT EXISTS rancangan_tindakan (
   updated_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (id_boxing) REFERENCES boxing_ketidaksesuaian(id_boxing) ON DELETE CASCADE
 );
-
+ 
 -- ================================================================
 -- TABEL 10: review_tindakan
 -- Review/persetujuan rancangan oleh Ka P4M
@@ -202,7 +211,7 @@ CREATE TABLE IF NOT EXISTS review_tindakan (
   FOREIGN KEY (id_rancangan) REFERENCES rancangan_tindakan(id_rancangan) ON DELETE CASCADE,
   FOREIGN KEY (id_ka)        REFERENCES ka_p4m(id_ka)
 );
-
+ 
 -- ================================================================
 -- TABEL 11: pelaksanaan_tindakan
 -- Hasil nyata pelaksanaan tindakan oleh Kepala Unit
@@ -219,7 +228,7 @@ CREATE TABLE IF NOT EXISTS pelaksanaan_tindakan (
   FOREIGN KEY (id_boxing)  REFERENCES boxing_ketidaksesuaian(id_boxing) ON DELETE CASCADE,
   FOREIGN KEY (id_kepala)  REFERENCES kepala_unit(id_kepala)
 );
-
+ 
 -- ================================================================
 -- TABEL 12: pemantauan
 -- Pemantauan progres pelaksanaan oleh Staf P4M
@@ -236,7 +245,7 @@ CREATE TABLE IF NOT EXISTS pemantauan (
   FOREIGN KEY (id_pelaksanaan) REFERENCES pelaksanaan_tindakan(id_pelaksanaan) ON DELETE CASCADE,
   FOREIGN KEY (id_staf)        REFERENCES staf_p4m(id_staf)
 );
-
+ 
 -- ================================================================
 -- TABEL 13: laporan_pemantauan
 -- Laporan resmi hasil pemantauan yang dibuat Staf P4M
@@ -253,7 +262,7 @@ CREATE TABLE IF NOT EXISTS laporan_pemantauan (
   FOREIGN KEY (id_pemantauan) REFERENCES pemantauan(id_pemantauan) ON DELETE CASCADE,
   FOREIGN KEY (id_boxing)     REFERENCES boxing_ketidaksesuaian(id_boxing)
 );
-
+ 
 -- ================================================================
 -- TABEL 14: verifikasi
 -- Verifikasi akhir oleh Ka P4M sebelum laporan dinyatakan selesai
@@ -278,7 +287,7 @@ CREATE TABLE IF NOT EXISTS verifikasi (
   FOREIGN KEY (id_laporan_amp) REFERENCES laporan_pemantauan(id_laporan_amp) ON DELETE CASCADE,
   FOREIGN KEY (id_ka)          REFERENCES ka_p4m(id_ka)
 );
-
+ 
 -- ================================================================
 -- TABEL 15: notifikasi
 -- Notifikasi sistem untuk semua user
@@ -293,53 +302,60 @@ CREATE TABLE IF NOT EXISTS notifikasi (
   FOREIGN KEY (id_pengguna) REFERENCES pengguna(id_pengguna) ON DELETE CASCADE,
   FOREIGN KEY (id_laporan)  REFERENCES laporan_ketidaksesuaian(id_laporan) ON DELETE SET NULL
 );
-
+ 
 -- ================================================================
 -- DATA AWAL (SEED) — untuk keperluan testing
 -- Default password semua akun: Password123!
 -- Hash bcrypt dari: Password123!
 -- ================================================================
-
+ 
 INSERT INTO pengguna (nama, email, password, role, nip) VALUES
   -- Staf P4M
   ('Admin Staf P4M', 'staf@polibatam.ac.id',
    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeKU4fATBDoHbD8Oy',
    'staf_p4m', '198501012010011001'),
-
+ 
   -- Ka P4M
   ('Dr. Kepala P4M', 'kap4m@polibatam.ac.id',
    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeKU4fATBDoHbD8Oy',
    'ka_p4m', '197803152005011002'),
-
+ 
   -- Kepala Unit
   ('Kepala Unit SBAK', 'kaunit@polibatam.ac.id',
    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeKU4fATBDoHbD8Oy',
    'kepala_unit', '198205201998031003'),
-
+ 
   -- Civitas (Mahasiswa)
   ('Budi Santoso', 'budi@mhs.polibatam.ac.id',
    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeKU4fATBDoHbD8Oy',
    'civitas', NULL);
-
+ 
 -- Profil Staf P4M
 INSERT INTO staf_p4m (id_pengguna, nama, nip, email)
   VALUES (1, 'Admin Staf P4M', '198501012010011001', 'staf@polibatam.ac.id');
-
+ 
 -- Profil Ka P4M
 INSERT INTO ka_p4m (id_pengguna, nama, nip)
   VALUES (2, 'Dr. Kepala P4M', '197803152005011002');
-
+ 
 -- Profil Kepala Unit
 INSERT INTO kepala_unit (id_pengguna, nama, nip, unit)
   VALUES (3, 'Kepala Unit SBAK', '198205201998031003', 'SBAK');
-
+ 
 -- Profil Civitas (Mahasiswa)
 INSERT INTO civitas_akademika (id_pengguna, nama, status, email, oid)
   VALUES (4, 'Budi Santoso', 'mahasiswa', 'budi@mhs.polibatam.ac.id', '4311901001');
-
+ 
 -- Data Standar Referensi
 INSERT INTO ekadar_standar_referensi (kp_standar, nilai_standar, proses) VALUES
   ('SOP-AKD-001', 'Standar Pelayanan Akademik Polibatam', 'Pelayanan Akademik'),
   ('SOP-FAK-002', 'Standar Pengelolaan Fasilitas Kampus',  'Pengelolaan Fasilitas'),
   ('SOP-ADM-003', 'Standar Administrasi dan Tata Kelola', 'Administrasi Umum'),
   ('SOP-KMH-004', 'Standar Pelayanan Kemahasiswaan',      'Kemahasiswaan');
+ 
+
+
+
+
+
+
