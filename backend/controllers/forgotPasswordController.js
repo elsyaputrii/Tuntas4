@@ -1,22 +1,36 @@
 // FILE: backend/controllers/forgotPasswordController.js
-// Menangani alur lupa password:
-//   1. requestReset  → user input email → generate token
-//   2. resetPassword → user input password baru dengan token
+// Menangani 2 fungsi:
+//   1. requestReset  → kirim link reset ke email user
+//   2. resetPassword → validasi token & update password baru
 
-const bcrypt   = require("bcryptjs");
-const crypto   = require("crypto"); // built-in Node.js, tidak perlu install
-const { pool } = require("../config/db");
+const crypto     = require("crypto");
+const nodemailer = require("nodemailer");
+const bcrypt     = require("bcryptjs");
+const { pool }   = require("../config/db");
 
 // ============================================================
-// 1. REQUEST RESET PASSWORD
-//    POST /api/forgot-password/request
+// SETUP NODEMAILER (pengirim email)
+// Gunakan Gmail dengan App Password
+// ============================================================
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// Mapping role DB → bagian URL frontend
+const roleToUrlMap = {
+  staf_p4m:    "staff-p4m",
+  ka_p4m:      "ka-p4m",
+  kepala_unit: "kepala-unit",
+};
+
+// ============================================================
+// 1. REQUEST RESET — POST /api/auth/forgot-password
+//    User kirim email + role → sistem cek, buat token, kirim email
 //    Body: { email, role }
-//
-//    Alur:
-//      a. Cek email ada di DB dan rolenya cocok
-//      b. Generate token acak
-//      c. Simpan token + waktu kadaluarsa (1 jam) ke DB
-//      d. Return reset link (di production: kirim via email)
 // ============================================================
 async function requestReset(req, res) {
   const { email, role } = req.body;
@@ -28,8 +42,16 @@ async function requestReset(req, res) {
     });
   }
 
+  const roleValid = ["staf_p4m", "ka_p4m", "kepala_unit"];
+  if (!roleValid.includes(role)) {
+    return res.status(400).json({
+      success: false,
+      message: "Role tidak valid.",
+    });
+  }
+
   try {
-    // Cek apakah email ada dan rolenya sesuai
+    // Cari user berdasarkan email + role (keamanan: role harus cocok)
     const [rows] = await pool.query(
       `SELECT id_pengguna, nama, email, role
        FROM pengguna
@@ -38,185 +60,182 @@ async function requestReset(req, res) {
       [email, role]
     );
 
-    // Selalu return success meskipun email tidak ada
-    // (untuk keamanan — tidak memberitahu apakah email terdaftar)
+    // Selalu jawab sukses meski email tidak ditemukan
+    // → mencegah orang tahu apakah email terdaftar atau tidak
     if (rows.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "Jika email terdaftar, link reset akan dikirimkan.",
+        message: "Jika email terdaftar, link reset akan dikirim.",
       });
     }
 
     const user = rows[0];
 
-    // Generate token acak 32 byte → ubah ke hex string (64 karakter)
-    const token   = crypto.randomBytes(32).toString("hex");
+    // Buat token acak 32 byte → 64 karakter hex
+    const token     = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 jam
 
-    // Token berlaku 1 jam dari sekarang
-    const expires = new Date(Date.now() + 60 * 60 * 1000);
-
-    // Simpan token ke database
+    // Hapus token lama milik user ini (kalau ada)
     await pool.query(
-      `UPDATE pengguna
-       SET reset_token = ?, reset_token_expires = ?
-       WHERE id_pengguna = ?`,
-      [token, expires, user.id_pengguna]
+      `DELETE FROM password_reset_tokens WHERE id_pengguna = ?`,
+      [user.id_pengguna]
     );
 
-    // URL reset — di production kirim via email
-    // Di sini kita return langsung untuk testing
-    const resetUrl = `http://localhost:3000/staff-p4m/reset-password?token=${token}`;
+    // Simpan token baru ke database
+    await pool.query(
+      `INSERT INTO password_reset_tokens (id_pengguna, token, expires_at)
+       VALUES (?, ?, ?)`,
+      [user.id_pengguna, token, expiresAt]
+    );
+
+    // Buat URL reset sesuai role
+    const roleUrl  = roleToUrlMap[role] || "staff-p4m";
+    const resetUrl = `${process.env.FRONTEND_URL}/${roleUrl}/reset-password?token=${token}`;
+
+    // Kirim email
+    await transporter.sendMail({
+      from:    `"TUNTAS Polibatam" <${process.env.EMAIL_USER}>`,
+      to:      email,
+      subject: "Reset Password — TUNTAS Polibatam",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+          <div style="background-color: #4d5e71; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h2 style="color: white; margin: 0; font-size: 22px;">
+              Reset Password TUNTAS Polibatam
+            </h2>
+          </div>
+          <div style="background-color: #f9f9f9; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0;">
+            <p style="color: #333; font-size: 15px;">Halo, <strong>${user.nama}</strong></p>
+            <p style="color: #555; font-size: 14px;">
+              Kami menerima permintaan reset password untuk akun Anda.
+              Klik tombol di bawah ini untuk membuat password baru:
+            </p>
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="${resetUrl}"
+                 style="background-color: #5da0dd; color: white; padding: 13px 32px;
+                        text-decoration: none; border-radius: 25px; font-weight: bold;
+                        font-size: 15px; display: inline-block;">
+                Reset Password
+              </a>
+            </div>
+            <p style="color: #888; font-size: 13px;">
+              Link ini akan kadaluwarsa dalam <strong>1 jam</strong>.
+            </p>
+            <p style="color: #888; font-size: 13px;">
+              Jika Anda tidak merasa meminta reset password, abaikan email ini.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+            <p style="color: #aaa; font-size: 12px; margin: 0;">
+              Tim TUNTAS — Politeknik Negeri Batam
+            </p>
+          </div>
+        </div>
+      `,
+    });
 
     return res.status(200).json({
       success: true,
-      message: "Link reset password berhasil dibuat.",
-      // Di production hapus reset_url dari response — kirim via email
-      // Untuk development/testing, tampilkan di sini
-      data: {
-        reset_url: resetUrl,
-        nama:      user.nama,
-        expires:   expires,
-      },
+      message: "Link reset password berhasil dikirim. Cek email Anda.",
     });
   } catch (error) {
     console.error("Error requestReset:", error);
     return res.status(500).json({
       success: false,
-      message: "Terjadi kesalahan server.",
+      message: "Gagal mengirim email. Coba lagi nanti.",
     });
   }
 }
 
 // ============================================================
-// 2. RESET PASSWORD
-//    POST /api/forgot-password/reset
-//    Body: { token, password_baru, konfirmasi_password }
-//
-//    Alur:
-//      a. Cek token valid dan belum kadaluarsa
-//      b. Hash password baru
-//      c. Update password di DB
-//      d. Hapus token dari DB
+// 2. RESET PASSWORD — POST /api/auth/reset-password
+//    User kirim token + password baru → validasi & update
+//    Body: { token, newPassword, confirmPassword }
 // ============================================================
 async function resetPassword(req, res) {
-  const { token, password_baru, konfirmasi_password } = req.body;
+  const { token, newPassword, confirmPassword } = req.body;
 
-  if (!token || !password_baru || !konfirmasi_password) {
+  if (!token || !newPassword || !confirmPassword) {
     return res.status(400).json({
       success: false,
-      message: "Token, password baru, dan konfirmasi password wajib diisi.",
+      message: "Token dan password baru wajib diisi.",
     });
   }
 
-  // Validasi password sama
-  if (password_baru !== konfirmasi_password) {
+  if (newPassword !== confirmPassword) {
     return res.status(400).json({
       success: false,
-      message: "Password baru dan konfirmasi password tidak sama.",
+      message: "Konfirmasi password tidak cocok.",
     });
   }
 
-  // Validasi panjang password minimal 6 karakter
-  if (password_baru.length < 6) {
+  if (newPassword.length < 8) {
     return res.status(400).json({
       success: false,
-      message: "Password minimal 6 karakter.",
+      message: "Password minimal 8 karakter.",
     });
   }
 
   try {
-    // Cari user berdasarkan token yang belum kadaluarsa
+    // Cari token di database
     const [rows] = await pool.query(
-      `SELECT id_pengguna, nama, reset_token_expires
-       FROM pengguna
-       WHERE reset_token = ?
+      `SELECT id, id_pengguna, expires_at, used
+       FROM password_reset_tokens
+       WHERE token = ?
        LIMIT 1`,
       [token]
     );
 
-    // Token tidak ditemukan
     if (rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Token tidak valid. Silakan minta link reset baru.",
+        message: "Token tidak valid atau sudah dihapus.",
       });
     }
 
-    const user = rows[0];
+    const resetToken = rows[0];
 
-    // Cek apakah token sudah kadaluarsa
-    const sekarang = new Date();
-    const expires  = new Date(user.reset_token_expires);
-
-    if (sekarang > expires) {
+    // Cek sudah dipakai
+    if (resetToken.used) {
       return res.status(400).json({
         success: false,
-        message: "Token sudah kadaluarsa. Silakan minta link reset baru.",
+        message: "Token sudah pernah digunakan.",
+      });
+    }
+
+    // Cek kadaluwarsa
+    if (new Date() > new Date(resetToken.expires_at)) {
+      return res.status(400).json({
+        success: false,
+        message: "Token sudah kadaluwarsa. Silakan minta link baru.",
       });
     }
 
     // Hash password baru
-    const hashedPassword = await bcrypt.hash(password_baru, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    // Update password + hapus token
+    // Update password di tabel pengguna
     await pool.query(
-      `UPDATE pengguna
-       SET password            = ?,
-           reset_token         = NULL,
-           reset_token_expires = NULL
-       WHERE id_pengguna = ?`,
-      [hashedPassword, user.id_pengguna]
+      `UPDATE pengguna SET password = ? WHERE id_pengguna = ?`,
+      [hashedPassword, resetToken.id_pengguna]
+    );
+
+    // Tandai token sebagai sudah digunakan
+    await pool.query(
+      `UPDATE password_reset_tokens SET used = 1 WHERE token = ?`,
+      [token]
     );
 
     return res.status(200).json({
       success: true,
-      message: "Password berhasil diubah! Silakan login dengan password baru.",
+      message: "Password berhasil diubah! Silakan login.",
     });
   } catch (error) {
     console.error("Error resetPassword:", error);
     return res.status(500).json({
       success: false,
-      message: "Terjadi kesalahan server.",
+      message: "Gagal mengubah password. Coba lagi.",
     });
   }
 }
 
-// ============================================================
-// 3. CEK TOKEN VALID (opsional — dipakai frontend sebelum tampil form)
-//    GET /api/forgot-password/cek-token?token=xxx
-// ============================================================
-async function cekToken(req, res) {
-  const { token } = req.query;
-
-  if (!token) {
-    return res.status(400).json({ success: false, message: "Token wajib diisi." });
-  }
-
-  try {
-    const [rows] = await pool.query(
-      `SELECT id_pengguna, reset_token_expires
-       FROM pengguna
-       WHERE reset_token = ?
-       LIMIT 1`,
-      [token]
-    );
-
-    if (rows.length === 0) {
-      return res.status(400).json({ success: false, message: "Token tidak valid." });
-    }
-
-    const expires  = new Date(rows[0].reset_token_expires);
-    const sekarang = new Date();
-
-    if (sekarang > expires) {
-      return res.status(400).json({ success: false, message: "Token sudah kadaluarsa." });
-    }
-
-    return res.status(200).json({ success: true, message: "Token valid." });
-  } catch (error) {
-    console.error("Error cekToken:", error);
-    return res.status(500).json({ success: false, message: "Terjadi kesalahan server." });
-  }
-}
-
-module.exports = { requestReset, resetPassword, cekToken };
+module.exports = { requestReset, resetPassword };

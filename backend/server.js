@@ -8,10 +8,10 @@ require("dotenv").config();
 const { testConnection } = require("./config/db");
 
 // Import semua router
-const civitasRoutes = require("./routes/civitasRoutes");
-const authRoutes    = require("./routes/authRoutes");
-const stafRoutes    = require("./routes/stafRoutes");
-const forgotPasswordRoutes = require("./routes/forgotPasswordRoutes");
+const civitasRoutes       = require("./routes/civitasRoutes");
+const authRoutes          = require("./routes/authRoutes");
+const stafRoutes          = require("./routes/stafRoutes");
+const forgotPasswordRoutes = require("./routes/forgotPasswordRoutes"); // ← BARU
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -29,10 +29,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ── ROUTES ───────────────────────────────────────────────
-app.use("/api/civitas", civitasRoutes); // tanpa login (anonim)
-app.use("/api/auth",    authRoutes);    // login per role
-app.use("/api/staf",    stafRoutes);    // khusus staf_p4m, wajib login
-app.use("/api/forgot-password", forgotPasswordRoutes);
+app.use("/api/civitas", civitasRoutes);          // tanpa login (anonim)
+app.use("/api/auth",    authRoutes);             // login per role
+app.use("/api/auth",    forgotPasswordRoutes);   // forgot & reset password ← BARU
+app.use("/api/staf",    stafRoutes);             // khusus staf_p4m, wajib login
 
 // Health check
 app.get("/", (req, res) => {

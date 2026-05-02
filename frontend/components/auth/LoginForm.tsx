@@ -1,58 +1,116 @@
+// FILE: frontend/components/auth/LoginForm.tsx
+// DIPERBAIKI:
+//   - Input email (bukan username)
+//   - Tombol Login memanggil API sesuai role
+//   - Tombol "lupa password?" navigasi ke halaman forgot password
+
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { authApi } from "@/lib/api";
 
-export default function LoginForm() {
-  const [username, setUsername] = useState("");
+interface LoginFormProps {
+  role: "staf_p4m" | "ka_p4m" | "kepala_unit";
+  forgotPasswordPath: string; // contoh: "/staff-p4m/forgot-password"
+  redirectAfterLogin: string; // contoh: "/staff-p4m"
+}
+
+export default function LoginForm({
+  role,
+  forgotPasswordPath,
+  redirectAfterLogin,
+}: LoginFormProps) {
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const router = useRouter();
+
+  async function handleLogin() {
+    if (!email || !password) {
+      setError("Email dan password wajib diisi.");
+      return;
+    }
+    setError("");
+
+    try {
+      setLoading(true);
+
+      let res;
+      if (role === "staf_p4m") {
+        res = await authApi.loginStaf(email, password);
+      } else if (role === "ka_p4m") {
+        res = await authApi.loginKaP4M(email, password);
+      } else {
+        res = await authApi.loginKepalaUnit(email, password);
+      }
+
+      // Simpan token & data user ke localStorage
+      if (res?.data?.token) {
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+        router.push(redirectAfterLogin);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login gagal. Periksa email dan password.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
-      {/* Background Image dengan efek Blur */}
+      {/* Background blur */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/background-polibatam.jpg" // Lokasi di folder public
+          src="/poltek.jpg"
           alt="Polibatam Background"
           fill
-          className="object-cover blur-[4px] brightness-75" // Mengatur keburaman & kecerahan
+          className="object-cover blur-[4px] brightness-75"
           priority
         />
       </div>
 
-      {/* Login Card (Container Biru Abu-abu) */}
+      {/* Card Login */}
       <div className="relative z-10 w-full max-w-md bg-[#7C93A7] p-10 rounded-[30px] shadow-2xl mx-4">
         <div className="flex flex-col items-center">
-          {/* Logo Polibatam */}
+
+          {/* Logo */}
           <div className="mb-6">
-             <Image 
-                src="/logo-polibatam.png" 
-                alt="Logo" 
-                width={120} 
-                height={120} 
-                className="object-contain"
-             />
+            <Image
+              src="/logo-polibatam.png"
+              alt="Logo Polibatam"
+              width={120}
+              height={120}
+              className="object-contain"
+            />
           </div>
 
           <h2 className="text-white text-center font-bold text-sm mb-8 uppercase tracking-wider">
-            Aplikasi Pengelolaan Ketidaksesuaian <br /> Politeknik Negeri Batam
+          Pengelolaan Ketidaksesuaian <br /> Politeknik Negeri Batam
           </h2>
 
-          {/* Form Inputs */}
+          {/* Form */}
           <div className="w-full space-y-4">
+            {/* Email */}
             <div className="relative">
               <span className="absolute inset-y-0 left-4 flex items-center text-gray-600">
                 👤
               </span>
               <input
-                type="text"
-                placeholder="Enter Username"
+                type="email"
+                placeholder="Enter Email"
                 className="w-full pl-12 pr-4 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
 
+            {/* Password */}
             <div className="relative">
               <span className="absolute inset-y-0 left-4 flex items-center text-gray-600">
                 🔒
@@ -63,17 +121,31 @@ export default function LoginForm() {
                 className="w-full pl-12 pr-4 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
-            
-            <button className="text-[12px] text-blue-800 hover:underline block text-left w-full mt-1">
+
+            {/* Error message */}
+            {error && (
+              <p className="text-red-200 text-sm text-center">{error}</p>
+            )}
+
+            {/* Link lupa password */}
+            <Link
+              href={forgotPasswordPath}
+              className="text-[12px] text-blue-200 hover:underline block text-left w-full mt-1"
+            >
               lupa password?
-            </button>
+            </Link>
           </div>
 
-          {/* Login Button */}
-          <button className="mt-8 w-32 py-2 bg-white text-gray-800 font-bold rounded-full hover:bg-gray-100 transition-all shadow-md">
-            Login
+          {/* Tombol Login */}
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            className="mt-8 w-32 py-2 bg-white text-gray-800 font-bold rounded-full hover:bg-gray-100 transition-all shadow-md disabled:opacity-50"
+          >
+            {loading ? "Loading..." : "Login"}
           </button>
         </div>
       </div>

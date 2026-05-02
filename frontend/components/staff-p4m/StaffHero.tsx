@@ -1,33 +1,35 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function StaffHero() {
-  const router          = useRouter();
-  const routerRef       = useRef(router); // ← simpan router ke ref, bukan dependency
-  const [nama, setNama] = useState<string>("");
+  const router            = useRouter();
+  const [nama, setNama]   = useState<string>("");
 
   useEffect(() => {
     const raw = localStorage.getItem("user");
 
+    // Kalau tidak ada data → redirect ke login
     if (!raw) {
-      routerRef.current.push("/staff-p4m/login");
+      router.push("/staff-p4m/login");
       return;
     }
 
     try {
       const user = JSON.parse(raw) as { nama?: string; role?: string };
 
+      // Kalau role bukan staf_p4m → redirect
       if (user.role !== "staf_p4m") {
-        routerRef.current.push("/staff-p4m/login");
+        router.push("/staff-p4m/login");
         return;
       }
 
+      // Baru set nama setelah semua validasi lolos
       setNama(user.nama ?? "");
     } catch {
-      routerRef.current.push("/staff-p4m/login");
+      router.push("/staff-p4m/login");
     }
-  }, []); // ← dependency array kosong, hanya jalan sekali saat mount
+  }, [router]);
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -36,9 +38,9 @@ export default function StaffHero() {
   }
 
   return (
-    <div className="bg-[#4d5e71] p-8 text-white mb-6 flex items-center justify-between">
+    <div className="bg-dark-header p-8 text-white mb-6 flex items-center justify-between">
       <h1 className="text-2xl font-bold leading-tight">
-        Selamat Datang Di Transformasi Tata Kelola <br />
+        Transformasi Tata Kelola <br />
         Organisasi: Aplikasi Pengelolaan Ketidaksesuaian Polibatam
       </h1>
 
@@ -48,7 +50,7 @@ export default function StaffHero() {
         )}
         <button
           onClick={handleLogout}
-          className="text-xs bg-white text-[#4d5e71] font-bold px-4 py-1.5 rounded hover:bg-gray-100 transition-all"
+          className="text-xs bg-white text-dark-header font-bold px-4 py-1.5 rounded hover:bg-gray-100 transition-all"
         >
           Logout
         </button>

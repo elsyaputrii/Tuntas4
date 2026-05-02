@@ -52,7 +52,7 @@ export default function StafLoginForm() {
           src="/background-polibatam.jpg"
           alt="Polibatam Background"
           fill
-          className="object-cover blur-[4px] brightness-75"
+          className="object-cover blur-xs brightness-75"
           priority
         />
       </div>
@@ -137,14 +137,15 @@ export default function StafLoginForm() {
             </div>
 
             {/* Tombol Lupa Password — sekarang bisa diklik */}
-            <button
-              type="button"
-              onClick={handleLupaPassword}
-              className="text-[12px] text-blue-100 hover:text-white hover:underline block text-left w-full mt-1 transition-colors"
-            >
-              lupa password?
-            </button>
-          </div>
+            
+        <button
+        type="button"
+        onClick={() => router.push("/staff-p4m/forgot-password")}
+        className="text-[12px] text-blue-100 hover:text-white hover:underline block text-left w-full mt-1 transition-colors"
+>
+         lupa password?
+          </button>
+        </div>
 
           {/* Pesan error */}
           {error && (

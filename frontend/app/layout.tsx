@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "TUNTAS - Pengelolaan Ketidaksesuaian Polibatam",
-  description: "Aplikasi Transformasi Tata Kelola Organisasi Politeknik Negeri Batam",
+  description: "Transformasi Tata Kelola Organisasi Politeknik Negeri Batam",
 };
 
 export default function RootLayout({

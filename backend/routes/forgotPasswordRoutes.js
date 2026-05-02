@@ -1,21 +1,20 @@
 // FILE: backend/routes/forgotPasswordRoutes.js
-// Route untuk alur lupa password — tidak butuh login
+// Dua endpoint publik untuk reset password
+// Tidak butuh auth karena user belum bisa login
 
 const express = require("express");
 const router  = express.Router();
 const {
   requestReset,
   resetPassword,
-  cekToken,
 } = require("../controllers/forgotPasswordController");
 
-// POST /api/forgot-password/request   → minta link reset
-router.post("/request", requestReset);
+// POST /api/auth/forgot-password
+// → User kirim email, sistem kirim link reset
+router.post("/forgot-password", requestReset);
 
-// POST /api/forgot-password/reset     → simpan password baru
-router.post("/reset",   resetPassword);
-
-// GET  /api/forgot-password/cek-token → cek apakah token masih valid
-router.get("/cek-token", cekToken);
+// POST /api/auth/reset-password
+// → User kirim token + password baru
+router.post("/reset-password", resetPassword);
 
 module.exports = router;

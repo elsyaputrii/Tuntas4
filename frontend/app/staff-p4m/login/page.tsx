@@ -1,7 +1,12 @@
 // FILE: frontend/app/staff-p4m/login/page.tsx
-
-import StafLoginForm from "@/components/auth/StafLoginForm";
+import LoginForm from "@/components/auth/LoginForm";
 
 export default function Page() {
-  return <StafLoginForm />;
+  return (
+    <LoginForm
+      role="staf_p4m"
+      forgotPasswordPath="/staff-p4m/forgot-password"
+      redirectAfterLogin="/staff-p4m"
+    />
+  );
 }

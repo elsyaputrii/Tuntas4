@@ -86,7 +86,6 @@ export default function SubmissionForm() {
             <option value="">pilih status anda</option>
             <option value="dosen">Dosen</option>
             <option value="mahasiswa">Mahasiswa</option>
-            <option value="tendik">Tenaga Kependidikan</option>
             <option value="masyarakat">Masyarakat Umum</option>
           </select>
         </div>
@@ -119,7 +118,7 @@ export default function SubmissionForm() {
 
         {/* Row 3: Upload Dokumen */}
         <div className="flex flex-col md:flex-row gap-4">
-          <label className="w-40 font-bold text-sm">Tambahkan Gambar :</label>
+          <label className="w-40 font-bold text-sm">Tambahkan Dokumen Pendukung :</label>
           <div className="flex-1">
             <label className="flex items-center gap-2 border border-gray-500 px-4 py-2 w-max cursor-pointer text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
               <span>🖼️</span>
@@ -135,7 +134,7 @@ export default function SubmissionForm() {
               />
             </label>
             <p className="text-red-600 text-[10px] mt-2 italic font-bold">
-              *Gambar Hanya Mendukung : PDF, PNG, JPG
+              *Dokumen Hanya Mendukung : PDF, PNG, JPG
             </p>
           </div>
         </div>
