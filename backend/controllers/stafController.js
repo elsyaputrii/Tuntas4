@@ -69,27 +69,31 @@ async function getKepalaUnit(req, res) {
 
 // ============================================================
 // 3. DISTRIBUSI LAPORAN (BOXING)
-//    Staf P4M pilih laporan + kepala unit → simpan ke boxing
+//    Staf P4M pilih laporan + unit tujuan → simpan ke boxing
 //
 //    Alur:
 //      a. Validasi laporan ada dan masih 'menunggu'
-//      b. Insert ke boxing_ketidaksesuaian
+//      b. Insert ke boxing_ketidaksesuaian (1 row per unit)
 //      c. Update status laporan → 'diproses'
 //    Pakai transaction supaya atomik (kalau gagal, semua dibatalkan)
 //
-//    Body: { id_laporan, id_kepala, id_standar (opsional) }
+//    Body: { id_laporan, unit_tujuan: string[], id_standar (opsional) }
 //    id_staf diambil dari token JWT (lebih aman dari body)
+//    unit_tujuan = array nama unit, contoh: ["SBAK", "SPI", "P3M"]
 // ============================================================
 async function distribusiLaporan(req, res) {
-  const { id_laporan, id_kepala, id_standar } = req.body;
+  const { id_laporan, unit_tujuan, id_standar } = req.body;
   const id_pengguna = req.user.id; // dari token JWT
 
-  if (!id_laporan || !id_kepala) {
+  if (!id_laporan || !unit_tujuan || unit_tujuan.length === 0) {
     return res.status(400).json({
       success: false,
-      message: "id_laporan dan id_kepala wajib diisi.",
+      message: "id_laporan dan unit_tujuan wajib diisi.",
     });
   }
+
+  // Pastikan unit_tujuan selalu array
+  const unitArray = Array.isArray(unit_tujuan) ? unit_tujuan : [unit_tujuan];
 
   const conn = await pool.getConnection();
   try {
@@ -135,15 +139,19 @@ async function distribusiLaporan(req, res) {
     // Mulai transaction
     await conn.beginTransaction();
 
-    // Langkah 1: Insert ke boxing_ketidaksesuaian
-    const [result] = await conn.query(
-      `INSERT INTO boxing_ketidaksesuaian
-        (id_laporan, id_staf, id_kepala, id_standar, status)
-       VALUES (?, ?, ?, ?, 'terdistribusi')`,
-      [id_laporan, id_staf, id_kepala, id_standar || null]
-    );
+    // Buat 1 boxing per unit yang dipilih
+    const insertedIds = [];
+    for (const unit of unitArray) {
+      const [result] = await conn.query(
+        `INSERT INTO boxing_ketidaksesuaian
+          (id_laporan, id_staf, id_kepala, unit_tujuan, id_standar, status)
+         VALUES (?, ?, NULL, ?, ?, 'terdistribusi')`,
+        [id_laporan, id_staf, unit, id_standar || null]
+      );
+      insertedIds.push(result.insertId);
+    }
 
-    // Langkah 2: Update status laporan → 'diproses'
+    // Update status laporan → 'diproses'
     await conn.query(
       `UPDATE laporan_ketidaksesuaian
        SET status = 'diproses'
@@ -155,12 +163,11 @@ async function distribusiLaporan(req, res) {
 
     return res.status(201).json({
       success: true,
-      message: "Laporan berhasil didistribusikan ke Kepala Unit.",
+      message: `Laporan berhasil didistribusikan ke ${unitArray.length} unit.`,
       data: {
-        id_boxing:  result.insertId,
+        id_boxing:   insertedIds,
         id_laporan,
-        id_kepala,
-        status:     "terdistribusi",
+        unit_tujuan: unitArray,
       },
     });
   } catch (error) {
@@ -180,6 +187,7 @@ async function distribusiLaporan(req, res) {
 //    Tampilkan semua laporan yang sudah didistribusi
 //    beserta rancangan tindakan dan hasil pelaksanaan
 //    Dipakai di tab "Proses & Pantau"
+//    DIUPDATE: pakai unit_tujuan dari boxing, tidak JOIN kepala_unit
 // ============================================================
 async function getProsesMonitor(req, res) {
   try {
@@ -193,10 +201,8 @@ async function getProsesMonitor(req, res) {
         l.created_at,
 
         b.id_boxing,
+        b.unit_tujuan         AS nama_unit,
         b.status              AS status_boxing,
-
-        ku.nama               AS nama_kepala_unit,
-        ku.unit               AS nama_unit,
 
         r.penyebab,
         r.deskripsi           AS rencana_tindakan,
@@ -208,7 +214,6 @@ async function getProsesMonitor(req, res) {
         p.tanggal             AS tanggal_pelaksanaan
       FROM boxing_ketidaksesuaian b
       JOIN laporan_ketidaksesuaian l    ON l.id_laporan = b.id_laporan
-      JOIN kepala_unit ku               ON ku.id_kepala = b.id_kepala
       LEFT JOIN rancangan_tindakan r    ON r.id_boxing  = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p  ON p.id_boxing  = b.id_boxing
       ORDER BY l.created_at DESC`
@@ -348,6 +353,7 @@ async function setStatusLaporan(req, res) {
 // 7. GET REKAPITULASI
 //    Ringkasan semua laporan dari awal sampai selesai
 //    Dipakai di tab "Rekapitulasi"
+//    DIUPDATE: pakai unit_tujuan dari boxing, tidak JOIN kepala_unit
 // ============================================================
 async function getRekapitulasi(req, res) {
   try {
@@ -360,7 +366,7 @@ async function getRekapitulasi(req, res) {
         l.status              AS status_laporan,
         l.created_at,
 
-        ku.unit               AS nama_unit,
+        b.unit_tujuan         AS nama_unit,
 
         r.penyebab,
         r.deskripsi           AS rencana_tindakan,
@@ -371,7 +377,6 @@ async function getRekapitulasi(req, res) {
         p.tanggal             AS tanggal_pelaksanaan
       FROM laporan_ketidaksesuaian l
       LEFT JOIN boxing_ketidaksesuaian b   ON b.id_laporan = l.id_laporan
-      LEFT JOIN kepala_unit ku             ON ku.id_kepala = b.id_kepala
       LEFT JOIN rancangan_tindakan r       ON r.id_boxing  = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p     ON p.id_boxing  = b.id_boxing
       ORDER BY l.created_at DESC`

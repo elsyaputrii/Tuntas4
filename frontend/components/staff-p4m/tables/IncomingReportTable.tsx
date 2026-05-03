@@ -1,11 +1,67 @@
 // FILE: frontend/components/staff-p4m/tables/IncomingReportTable.tsx
 
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { stafApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
+import { ChevronDown, X, Search } from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
+
+// ── Daftar unit langsung dari PPTX ────────────────────────
+const DAFTAR_UNIT = [
+  // Umum
+  { grup: "Umum", unit: "MANAJEMEN" },
+  { grup: "Umum", unit: "P4M" },
+  { grup: "Umum", unit: "P3M" },
+  { grup: "Umum", unit: "SPI" },
+  { grup: "Umum", unit: "UPA-PERPUS" },
+  { grup: "Umum", unit: "UPA-PKK" },
+  { grup: "Umum", unit: "UPA-PP" },
+  { grup: "Umum", unit: "UPA-TIK" },
+  { grup: "Umum", unit: "SHILAU" },
+  { grup: "Umum", unit: "SBAK" },
+  { grup: "Umum", unit: "SBUM" },
+  { grup: "Umum", unit: "Pokja BMN dan Pengadaan" },
+  { grup: "Umum", unit: "Pokja Humas dan Kerjasama" },
+  { grup: "Umum", unit: "Pokja Kemahasiswaan" },
+  { grup: "Umum", unit: "Pokja Keuangan" },
+  { grup: "Umum", unit: "Pokja Organisasi SDM" },
+  { grup: "Umum", unit: "Pokja Perencanaan" },
+  // Jur. MB
+  { grup: "Jur. MB", unit: "Jur. MB" },
+  { grup: "Jur. MB", unit: "Prodi ABT" },
+  { grup: "Jur. MB", unit: "Prodi AK" },
+  { grup: "Jur. MB", unit: "Prodi AM" },
+  { grup: "Jur. MB", unit: "Prodi LPI" },
+  { grup: "Jur. MB", unit: "Prodi DB" },
+  // Jur. IF
+  { grup: "Jur. IF", unit: "Jur. IF" },
+  { grup: "Jur. IF", unit: "Prodi AN" },
+  { grup: "Jur. IF", unit: "Prodi GM" },
+  { grup: "Jur. IF", unit: "Prodi IF" },
+  { grup: "Jur. IF", unit: "Prodi TRM" },
+  { grup: "Jur. IF", unit: "Prodi RKS" },
+  { grup: "Jur. IF", unit: "Prodi TRPL" },
+  { grup: "Jur. IF", unit: "Prodi TP" },
+  { grup: "Jur. IF", unit: "Prodi TKO" },
+  // Jur. MS
+  { grup: "Jur. MS", unit: "Jur. MS" },
+  { grup: "Jur. MS", unit: "Prodi TRKP" },
+  { grup: "Jur. MS", unit: "Prodi TRPF" },
+  { grup: "Jur. MS", unit: "Prodi MS" },
+  { grup: "Jur. MS", unit: "Prodi PPI" },
+  { grup: "Jur. MS", unit: "Prodi TPPU" },
+  { grup: "Jur. MS", unit: "Prodi MET" },
+  // Jur. EL
+  { grup: "Jur. EL", unit: "Jur. EL" },
+  { grup: "Jur. EL", unit: "Prodi TRE" },
+  { grup: "Jur. EL", unit: "Prodi EM" },
+  { grup: "Jur. EL", unit: "Prodi IN" },
+  { grup: "Jur. EL", unit: "Prodi MK" },
+  { grup: "Jur. EL", unit: "Prodi TRR" },
+  { grup: "Jur. EL", unit: "Prodi TRPE" },
+];
 
 interface LaporanMasuk {
   id_laporan:    number;
@@ -14,40 +70,174 @@ interface LaporanMasuk {
   deskripsi:     string;
   lampiran:      string | null;
   status:        string;
-  created_at:    string;
 }
 
-interface KepalaUnit {
-  id_kepala: number;
-  nama:      string;
-  unit:      string;
+// ── Multi Select Unit ─────────────────────────────────────
+function MultiSelectUnit({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (units: string[]) => void;
+}) {
+  const [open, setOpen]     = useState(false);
+  const [search, setSearch] = useState("");
+  const ref                 = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = DAFTAR_UNIT.filter((d) =>
+    d.unit.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Kelompokkan hasil filter berdasarkan grup
+  const grouped = filtered.reduce<Record<string, string[]>>((acc, d) => {
+    if (!acc[d.grup]) acc[d.grup] = [];
+    acc[d.grup].push(d.unit);
+    return acc;
+  }, {});
+
+  function toggle(unit: string) {
+    if (selected.includes(unit)) {
+      onChange(selected.filter((s) => s !== unit));
+    } else {
+      onChange([...selected, unit]);
+    }
+  }
+
+  function removeOne(unit: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    onChange(selected.filter((s) => s !== unit));
+  }
+
+  return (
+    <div className="relative w-full" ref={ref}>
+      {/* Trigger */}
+      <div
+        onClick={() => setOpen(!open)}
+        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-[35px]"
+      >
+        <div className="flex flex-wrap gap-1 flex-1">
+          {selected.length > 0 ? (
+            selected.map((u) => (
+              <span
+                key={u}
+                className="bg-blue-100 text-blue-800 px-2 py-0.5 text-[9px] font-bold flex items-center gap-1"
+              >
+                {u}
+                <X
+                  size={9}
+                  className="cursor-pointer hover:text-red-500"
+                  onClick={(e) => removeOne(u, e)}
+                />
+              </span>
+            ))
+          ) : (
+            <span className="text-gray-400 text-[11px]">pilih unit yang di tuju</span>
+          )}
+        </div>
+        <ChevronDown
+          size={13}
+          className={`ml-1 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-30 w-full mt-1 border border-black bg-white shadow-xl">
+          {/* Search */}
+          <div className="p-2 border-b border-gray-200 bg-gray-50 relative">
+            <input
+              type="text"
+              placeholder="Cari unit..."
+              className="w-full border border-gray-300 px-2 py-1 text-[11px] outline-none pr-6"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+            />
+            <Search size={11} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          </div>
+
+          {/* List dengan grup */}
+          <div className="max-h-60 overflow-y-auto">
+            {Object.entries(grouped).map(([grup, units]) => (
+              <div key={grup}>
+                {/* Label grup */}
+                <div className="px-3 py-1 text-[9px] font-bold text-gray-400 uppercase bg-gray-50 border-b border-gray-100">
+                  {grup}
+                </div>
+                {units.map((unit) => (
+                  <div
+                    key={unit}
+                    onClick={() => toggle(unit)}
+                    className={`px-3 py-2 text-[11px] flex items-center gap-2 cursor-pointer border-b border-gray-100 last:border-none transition-colors ${
+                      selected.includes(unit)
+                        ? "bg-blue-50 font-bold text-blue-700"
+                        : "hover:bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(unit)}
+                      readOnly
+                      className="w-3 h-3 accent-[#5da0dd] pointer-events-none"
+                    />
+                    {unit}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {filtered.length === 0 && (
+              <div className="p-3 text-[10px] text-red-400 italic text-center">
+                Unit tidak ditemukan
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          {selected.length > 0 && (
+            <div className="p-2 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+              <span className="text-[9px] font-bold text-gray-500 uppercase">
+                {selected.length} unit terpilih
+              </span>
+              <button
+                onClick={() => onChange([])}
+                className="text-[9px] text-red-500 font-bold hover:underline"
+              >
+                Hapus Semua
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
+// ── Tabel Utama ───────────────────────────────────────────
 export default function IncomingReportTable() {
   const [laporan,        setLaporan]        = useState<LaporanMasuk[]>([]);
-  const [kepalaList,     setKepalaList]     = useState<KepalaUnit[]>([]);
-  const [selectedKepala, setSelectedKepala] = useState<Record<number, number>>({});
+  const [selectedUnit,   setSelectedUnit]   = useState<Record<number, string[]>>({});
   const [loading,        setLoading]        = useState(true);
   const [loadingKirim,   setLoadingKirim]   = useState<number | null>(null);
   const [error,          setError]          = useState("");
   const [successMsg,     setSuccessMsg]     = useState("");
+  const [modalSrc,       setModalSrc]       = useState<string | null>(null);
 
-  // State untuk modal gambar
-  const [modalSrc, setModalSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   async function fetchData() {
     try {
       setLoading(true);
-      const [resLaporan, resKepala] = await Promise.all([
-        stafApi.getLaporanMasuk(),
-        stafApi.getKepalaUnit(),
-      ]);
-      setLaporan(resLaporan.data);
-      setKepalaList(resKepala.data);
+      const res = await stafApi.getLaporanMasuk();
+      setLaporan(res.data);
     } catch {
       setError("Gagal memuat data. Pastikan kamu sudah login.");
     } finally {
@@ -56,10 +246,9 @@ export default function IncomingReportTable() {
   }
 
   async function handleSend(id_laporan: number) {
-    const id_kepala = selectedKepala[id_laporan];
-
-    if (!id_kepala) {
-      setError("Pilih unit tujuan terlebih dahulu!");
+    const units = selectedUnit[id_laporan] || [];
+    if (units.length === 0) {
+      setError("Pilih minimal 1 unit tujuan!");
       setTimeout(() => setError(""), 3000);
       return;
     }
@@ -69,15 +258,14 @@ export default function IncomingReportTable() {
 
     try {
       setLoadingKirim(id_laporan);
-      await stafApi.distribusiLaporan({ id_laporan, id_kepala });
+      await stafApi.distribusiLaporan({ id_laporan, unit_tujuan: units });
 
       const kode = `LAP-${String(id_laporan).padStart(5, "0")}`;
-      setSuccessMsg(`✅ ${kode} berhasil didistribusikan!`);
-      setTimeout(() => setSuccessMsg(""), 4000);
-
+      setSuccessMsg(`✅ ${kode} dikirim ke: ${units.join(", ")}`);
+      setTimeout(() => setSuccessMsg(""), 5000);
       fetchData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Gagal mendistribusikan laporan.");
+      setError(err instanceof Error ? err.message : "Gagal mendistribusikan.");
       setTimeout(() => setError(""), 4000);
     } finally {
       setLoadingKirim(null);
@@ -94,16 +282,9 @@ export default function IncomingReportTable() {
 
   return (
     <>
-      {/* Modal gambar */}
-      {modalSrc && (
-        <ImageModal
-          src={modalSrc}
-          onClose={() => setModalSrc(null)}
-        />
-      )}
+      {modalSrc && <ImageModal src={modalSrc} onClose={() => setModalSrc(null)} />}
 
       <div className="w-full border-2 border-black bg-white overflow-visible">
-
         {successMsg && (
           <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b border-green-200">
             {successMsg}
@@ -116,7 +297,7 @@ export default function IncomingReportTable() {
         )}
 
         {/* Header */}
-        <div className="flex font-bold uppercase text-xs">
+        <div className="flex font-bold uppercase text-xs border-b-2 border-black">
           <div className="flex-1 border-r-2 border-black p-3 text-center">
             Kritik atau Pengaduan Terkait Polibatam
           </div>
@@ -124,26 +305,21 @@ export default function IncomingReportTable() {
         </div>
 
         {laporan.length === 0 ? (
-          <div className="flex min-h-[180px] border-t-2 border-black items-center justify-center">
-            <p className="text-gray-400 italic text-sm">
-              Tidak ada laporan masuk saat ini.
-            </p>
+          <div className="flex min-h-[180px] items-center justify-center">
+            <p className="text-gray-400 italic text-sm">Tidak ada laporan masuk.</p>
           </div>
         ) : (
           laporan.map((item) => (
             <div key={item.id_laporan} className="flex min-h-[180px] border-t-2 border-black">
 
-              {/* Kiri: Isi Laporan */}
-              <div className="flex-1 border-r-2 border-black p-5 relative">
+              {/* Kiri */}
+              <div className="flex-1 border-r-2 border-black p-5">
                 <p className="text-[9px] text-gray-400 italic mb-1">
                   {item.kode_laporan} · {item.jenis_laporan}
                 </p>
-
                 <div className="border border-gray-400 p-4 h-28 text-xs bg-gray-50 overflow-auto">
                   {item.deskripsi}
                 </div>
-
-                {/* Tombol Lihat Gambar — buka modal saat diklik */}
                 {item.lampiran && (
                   <button
                     onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran}`)}
@@ -154,30 +330,18 @@ export default function IncomingReportTable() {
                 )}
               </div>
 
-              {/* Kanan: Pilih Unit & Send */}
+              {/* Kanan */}
               <div className="w-80 p-5 flex flex-col justify-between">
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold uppercase block text-center mb-2">
                     Pilih Unit :
                   </label>
-
-                  <select
-                    className="border border-black p-2 w-full text-[11px] bg-white outline-none cursor-pointer h-[35px]"
-                    value={selectedKepala[item.id_laporan] || ""}
-                    onChange={(e) =>
-                      setSelectedKepala((prev) => ({
-                        ...prev,
-                        [item.id_laporan]: Number(e.target.value),
-                      }))
+                  <MultiSelectUnit
+                    selected={selectedUnit[item.id_laporan] || []}
+                    onChange={(units) =>
+                      setSelectedUnit((prev) => ({ ...prev, [item.id_laporan]: units }))
                     }
-                  >
-                    <option value="">pilih unit yang di tuju</option>
-                    {kepalaList.map((k) => (
-                      <option key={k.id_kepala} value={k.id_kepala}>
-                        {k.unit} — {k.nama}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div className="flex justify-center mt-6">
