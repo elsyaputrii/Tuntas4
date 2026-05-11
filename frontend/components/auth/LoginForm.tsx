@@ -1,9 +1,3 @@
-// FILE: frontend/components/auth/LoginForm.tsx
-// DIPERBAIKI:
-//   - Input email (bukan username)
-//   - Tombol Login memanggil API sesuai role
-//   - Tombol "lupa password?" navigasi ke halaman forgot password
-
 "use client";
 
 import Image from "next/image";
@@ -51,7 +45,8 @@ export default function LoginForm({
       // Simpan token & data user ke localStorage
       if (res?.data?.token) {
         localStorage.setItem("token", res.data.token);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
+        localStorage.setItem("user",  JSON.stringify(res.data.user));
+        localStorage.setItem("role",  res.data.user.role); // ✅ BARIS YANG DITAMBAHKAN
         router.push(redirectAfterLogin);
       }
     } catch (err: unknown) {
@@ -90,11 +85,12 @@ export default function LoginForm({
           </div>
 
           <h2 className="text-white text-center font-bold text-sm mb-8 uppercase tracking-wider">
-          Pengelolaan Ketidaksesuaian <br /> Politeknik Negeri Batam
+            Pengelolaan Ketidaksesuaian <br /> Politeknik Negeri Batam
           </h2>
 
           {/* Form */}
           <div className="w-full space-y-4">
+
             {/* Email */}
             <div className="relative">
               <span className="absolute inset-y-0 left-4 flex items-center text-gray-600">
@@ -147,6 +143,7 @@ export default function LoginForm({
           >
             {loading ? "Loading..." : "Login"}
           </button>
+
         </div>
       </div>
     </div>

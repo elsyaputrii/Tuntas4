@@ -11,7 +11,9 @@ const { testConnection } = require("./config/db");
 const civitasRoutes       = require("./routes/civitasRoutes");
 const authRoutes          = require("./routes/authRoutes");
 const stafRoutes          = require("./routes/stafRoutes");
-const forgotPasswordRoutes = require("./routes/forgotPasswordRoutes"); // ← BARU
+const forgotPasswordRoutes = require("./routes/forgotPasswordRoutes"); 
+const kepalaUnitRoutes = require("./routes/kepalaUnitRoutes");   // ← TAMBAHKAN
+
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +35,7 @@ app.use("/api/civitas", civitasRoutes);          // tanpa login (anonim)
 app.use("/api/auth",    authRoutes);             // login per role
 app.use("/api/auth",    forgotPasswordRoutes);   // forgot & reset password ← BARU
 app.use("/api/staf",    stafRoutes);             // khusus staf_p4m, wajib login
+app.use("/api/kepala-unit", kepalaUnitRoutes);   
 
 // Health check
 app.get("/", (req, res) => {

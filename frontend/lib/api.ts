@@ -85,3 +85,18 @@ export const stafApi = {
     apiFetch("/staf/status", { method: "PATCH", body: JSON.stringify({ id_laporan, status }) }),
   getRekapitulasi: () => apiFetch("/staf/rekap"),
 };
+
+
+export const kepalaUnitApi = {
+  getLaporanMasuk: () =>
+    apiFetch("/kepala-unit/laporan"),
+
+  submitRancangan: (body: { id_boxing: number; penyebab: string; rencana_tindakan: string }) =>
+    apiFetch("/kepala-unit/rancangan", { method: "POST", body: JSON.stringify(body) }),
+
+  getLaporanHasil: () =>
+    apiFetch("/kepala-unit/laporan-hasil"),
+
+  submitPelaksanaan: (formData: FormData) =>
+    apiFetch("/kepala-unit/pelaksanaan", { method: "POST", body: formData }),
+};
