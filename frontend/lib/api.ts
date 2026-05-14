@@ -31,6 +31,9 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   return data;
 }
 
+// ─────────────────────────────────────────────
+// CIVITAS
+// ─────────────────────────────────────────────
 export const civitasApi = {
   kirimLaporan: (formData: FormData) =>
     apiFetch("/civitas/laporan", { method: "POST", body: formData }),
@@ -40,53 +43,65 @@ export const civitasApi = {
     apiFetch(`/civitas/laporan${nama ? `?nama=${encodeURIComponent(nama)}` : ""}`),
 };
 
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
 export const authApi = {
   loginStaf: (email: string, password: string) =>
-    apiFetch("/auth/staf/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
+    apiFetch("/auth/staf/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   loginKaP4M: (email: string, password: string) =>
-    apiFetch("/auth/kap4m/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
+    apiFetch("/auth/kap4m/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   loginKepalaUnit: (email: string, password: string) =>
-    apiFetch("/auth/kepala-unit/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
+    apiFetch("/auth/kepala-unit/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   getMe: () => apiFetch("/auth/me"),
   forgotPassword: (email: string, role: string) =>
-    apiFetch("/auth/forgot-password", {
-      method: "POST",
-      body: JSON.stringify({ email, role }),
-    }),
+    apiFetch("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email, role }) }),
   resetPassword: (token: string, newPassword: string, confirmPassword: string) =>
-    apiFetch("/auth/reset-password", {
-      method: "POST",
-      body: JSON.stringify({ token, newPassword, confirmPassword }),
-    }),
+    apiFetch("/auth/reset-password", { method: "POST", body: JSON.stringify({ token, newPassword, confirmPassword }) }),
 };
 
+// ─────────────────────────────────────────────
+// STAF P4M
+// ─────────────────────────────────────────────
 export const stafApi = {
-  getLaporanMasuk: () => apiFetch("/staf/laporan"),
-  getKepalaUnit:   () => apiFetch("/staf/kepala-unit"),
+  getLaporanMasuk: () =>
+    apiFetch("/staf/laporan"),
 
-  // ← DIUPDATE: pakai unit_tujuan (array string) bukan id_kepala
+  getKepalaUnit: () =>
+    apiFetch("/staf/kepala-unit"),
+
   distribusiLaporan: (body: { id_laporan: number; unit_tujuan: string[] }) =>
     apiFetch("/staf/boxing", { method: "POST", body: JSON.stringify(body) }),
 
-  getProsesMonitor: () => apiFetch("/staf/proses"),
+  getProsesMonitor: () =>
+    apiFetch("/staf/proses"),
+
+  // ← BARU: Review rancangan dari Kepala Unit
+  reviewRancangan: (body: {
+    id_rancangan: number;
+    status_review: "disetujui" | "tidak_disetujui" | "revisi";
+    catatan?: string;
+  }) =>
+    apiFetch("/staf/review-rancangan", { method: "PATCH", body: JSON.stringify(body) }),
+
   inputHasilPemantauan: (body: {
-    id_boxing: number; hasil: string; catatan?: string; kp_pemantauan?: string;
-  }) => apiFetch("/staf/pemantauan", { method: "POST", body: JSON.stringify(body) }),
+    id_boxing: number;
+    hasil: string;
+    catatan?: string;
+    kp_pemantauan?: string;
+  }) =>
+    apiFetch("/staf/pemantauan", { method: "POST", body: JSON.stringify(body) }),
+
   setStatusLaporan: (id_laporan: number, status: string) =>
     apiFetch("/staf/status", { method: "PATCH", body: JSON.stringify({ id_laporan, status }) }),
-  getRekapitulasi: () => apiFetch("/staf/rekap"),
+
+  getRekapitulasi: () =>
+    apiFetch("/staf/rekap"),
 };
 
-
+// ─────────────────────────────────────────────
+// KEPALA UNIT
+// ─────────────────────────────────────────────
 export const kepalaUnitApi = {
   getLaporanMasuk: () =>
     apiFetch("/kepala-unit/laporan"),

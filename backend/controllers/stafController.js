@@ -402,6 +402,7 @@ module.exports = {
   getKepalaUnit,
   distribusiLaporan,
   getProsesMonitor,
+   reviewRancangan,  
   inputHasilPemantauan,
   setStatusLaporan,
   getRekapitulasi,
