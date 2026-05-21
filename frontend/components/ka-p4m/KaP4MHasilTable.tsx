@@ -1,9 +1,8 @@
 "use client";
 // FILE: frontend/components/ka-p4m/KaP4MHasilTable.tsx
-// Tab 2 Ka-P4M: melihat laporan pemantauan dari Staf P4M dan memberi keputusan akhir
-
+// ============================================================
 import { useState, useEffect, useCallback } from "react";
-import { stafApi } from "@/lib/api";
+import { kaP4MApi } from "@/lib/api"; // ← GANTI dari stafApi ke kaP4MApi
 
 interface HasilItem {
   id_laporan:          number;
@@ -29,12 +28,13 @@ export default function KaP4MHasilTable() {
   const [error,   setError]   = useState("");
   const [msgOk,   setMsgOk]   = useState("");
 
+  // ✅ PERBAIKAN: pakai kaP4MApi.getProsesMonitor() bukan stafApi.getProsesMonitor()
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await stafApi.getProsesMonitor();
-      // Hanya tampilkan yang rancangan sudah disetujui DAN ada hasil pelaksanaan
+      const res = await kaP4MApi.getProsesMonitor();
+      // Filter: hanya tampilkan yang rancangan sudah disetujui DAN ada hasil pelaksanaan
       const filtered = (res.data as HasilItem[]).filter(
         (item) => item.status_review === "disetujui" && item.hasil_tindakan
       );
@@ -48,10 +48,10 @@ export default function KaP4MHasilTable() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Ka-P4M beri keputusan: CLOSE atau kembalikan ke diproses
+  // ✅ PERBAIKAN: pakai kaP4MApi.setStatusLaporan() bukan stafApi.setStatusLaporan()
   async function handleKeputusan(id_laporan: number, keputusan: "selesai" | "diproses") {
     try {
-      await stafApi.setStatusLaporan(id_laporan, keputusan);
+      await kaP4MApi.setStatusLaporan(id_laporan, keputusan);
       setMsgOk(
         keputusan === "selesai"
           ? "✅ Laporan dinyatakan SELESAI oleh Ka P4M."
@@ -86,7 +86,7 @@ export default function KaP4MHasilTable() {
       {/* Header */}
       <div className="flex font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[11px]">
         <div className="flex-1 border-r-2 border-black p-3">Kritik / Pengaduan</div>
-        <div className="w-[18%] border-r-2 border-black p-3">Penyebab</div>
+        <div className="w-[18%] border-r-2 border-black p-3">Rencana Tindakan</div>
         <div className="w-[22%] border-r-2 border-black p-3">Hasil Tindak Lanjut</div>
         <div className="w-[12%] border-r-2 border-black p-3">Status</div>
         <div className="w-[16%] p-3">Keputusan Ka P4M</div>
@@ -95,7 +95,7 @@ export default function KaP4MHasilTable() {
       {data.length === 0 ? (
         <div className="p-12 text-center">
           <p className="text-gray-400 italic text-sm">
-            Belum ada laporan pemantauan yang selesai dilaksanakan.
+            Belum ada laporan hasil pelaksanaan yang perlu diputuskan.
           </p>
           <p className="text-gray-300 text-xs mt-1">
             (Tampil setelah Kepala Unit mengisi laporan hasil pelaksanaan)
@@ -107,7 +107,7 @@ export default function KaP4MHasilTable() {
             key={`${item.id_boxing}-${idx}`}
             className={`flex min-h-[180px] ${idx > 0 ? "border-t-2 border-black" : ""}`}
           >
-            {/* Laporan */}
+            {/* Kolom Laporan */}
             <div className="flex-1 border-r-2 border-black p-5">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
@@ -126,14 +126,14 @@ export default function KaP4MHasilTable() {
               )}
             </div>
 
-            {/* Penyebab */}
+            {/* Kolom Rencana */}
             <div className="w-[18%] border-r-2 border-black p-5">
               <div className="border border-gray-300 p-2 h-28 text-[11px] text-gray-600 overflow-auto">
                 {item.rencana_tindakan || <span className="italic text-gray-300">—</span>}
               </div>
             </div>
 
-            {/* Hasil Tindak Lanjut */}
+            {/* Kolom Hasil Tindak Lanjut */}
             <div className="w-[22%] border-r-2 border-black p-5">
               <div className="border border-gray-300 p-3 h-24 text-[11px] text-gray-600 overflow-auto">
                 {item.tanggal_pelaksanaan && (
@@ -157,7 +157,7 @@ export default function KaP4MHasilTable() {
               )}
             </div>
 
-            {/* Status */}
+            {/* Kolom Status */}
             <div className="w-[12%] border-r-2 border-black p-5 flex items-center justify-center">
               <span
                 className={`text-[10px] font-bold text-center ${
@@ -168,7 +168,7 @@ export default function KaP4MHasilTable() {
               </span>
             </div>
 
-            {/* Keputusan Ka P4M */}
+            {/* Kolom Keputusan Ka P4M */}
             <div className="w-[16%] p-5 flex flex-col gap-2 justify-center items-center">
               {item.status_laporan !== "selesai" ? (
                 <>

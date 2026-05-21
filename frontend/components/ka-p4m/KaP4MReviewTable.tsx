@@ -1,31 +1,31 @@
 "use client";
 // FILE: frontend/components/ka-p4m/KaP4MReviewTable.tsx
-// Tab 1 Ka-P4M: melihat rancangan dari Kepala Unit dan memberi keputusan
+// ============================================================
 
 import { useState, useEffect, useCallback } from "react";
-import { stafApi } from "@/lib/api";
+import { kaP4MApi } from "@/lib/api"; // ← GANTI dari stafApi ke kaP4MApi
 
 interface RancanganItem {
-  id_laporan:       number;
-  kode_laporan:     string;
-  id_boxing:        number;
-  jenis_laporan:    string;
-  isi_laporan:      string;
-  nama_unit:        string;
-  id_rancangan:     number | null;
-  penyebab:         string | null;
-  rencana_tindakan: string | null;
-  status_review:    string | null;
-  catatan_kepala:   string | null;
-  hasil_tindakan:   string | null;
+  id_laporan:          number;
+  kode_laporan:        string;
+  id_boxing:           number;
+  jenis_laporan:       string;
+  isi_laporan:         string;
+  nama_unit:           string;
+  id_rancangan:        number | null;
+  penyebab:            string | null;
+  rencana_tindakan:    string | null;
+  status_review:       string | null;
+  catatan_kepala:      string | null;
+  hasil_tindakan:      string | null;
   tanggal_pelaksanaan: string | null;
 }
 
 const statusBadge: Record<string, { label: string; cls: string }> = {
-  menunggu_review:  { label: "⏳ Menunggu Review",   cls: "text-blue-600 bg-blue-50 border-blue-200" },
-  disetujui:        { label: "✓ Disetujui",           cls: "text-green-600 bg-green-50 border-green-200" },
-  tidak_disetujui:  { label: "✗ Ditolak",             cls: "text-red-500 bg-red-50 border-red-200" },
-  revisi:           { label: "⚠ Perlu Revisi",        cls: "text-yellow-600 bg-yellow-50 border-yellow-200" },
+  menunggu_review:  { label: "⏳ Menunggu Review",  cls: "text-blue-600 bg-blue-50 border-blue-200" },
+  disetujui:        { label: "✓ Disetujui",          cls: "text-green-600 bg-green-50 border-green-200" },
+  tidak_disetujui:  { label: "✗ Ditolak",            cls: "text-red-500 bg-red-50 border-red-200" },
+  revisi:           { label: "⚠ Perlu Revisi",       cls: "text-yellow-600 bg-yellow-50 border-yellow-200" },
 };
 
 export default function KaP4MReviewTable() {
@@ -35,19 +35,20 @@ export default function KaP4MReviewTable() {
   const [msgOk,   setMsgOk]   = useState("");
 
   // State modal review
-  const [modal, setModal]           = useState<{ open: boolean; item: RancanganItem | null }>({ open: false, item: null });
+  const [modal, setModal] = useState<{ open: boolean; item: RancanganItem | null }>({
+    open: false, item: null,
+  });
   const [reviewStatus,  setReviewStatus]  = useState<"disetujui" | "tidak_disetujui" | "revisi">("disetujui");
   const [reviewCatatan, setReviewCatatan] = useState("");
   const [submitting,    setSubmitting]    = useState(false);
 
+  // ✅ PERBAIKAN: pakai kaP4MApi.getProsesMonitor() bukan stafApi.getProsesMonitor()
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      // Gunakan endpoint getProsesMonitor milik staf — Ka-P4M hanya melihat (read-only view)
-      // karena Ka-P4M dan Staf P4M sama-sama butuh data rancangan
-      const res = await stafApi.getProsesMonitor();
-      // Filter: hanya tampilkan yang sudah ada rancangan (sudah diisi Kepala Unit)
+      const res = await kaP4MApi.getProsesMonitor();
+      // Filter: hanya tampilkan yang sudah ada rancangan dari Kepala Unit
       const filtered = (res.data as RancanganItem[]).filter(
         (item) => item.id_rancangan !== null
       );
@@ -65,8 +66,10 @@ export default function KaP4MReviewTable() {
     setModal({ open: true, item });
     setReviewStatus("disetujui");
     setReviewCatatan("");
+    setError("");
   }
 
+  // ✅ PERBAIKAN: pakai kaP4MApi.reviewRancangan() bukan stafApi.reviewRancangan()
   async function handleSubmitReview() {
     if (!modal.item?.id_rancangan) return;
     if (reviewStatus !== "disetujui" && !reviewCatatan.trim()) {
@@ -75,17 +78,15 @@ export default function KaP4MReviewTable() {
     }
     setSubmitting(true);
     try {
-      await stafApi.reviewRancangan({
-        id_rancangan: modal.item.id_rancangan,
+      await kaP4MApi.reviewRancangan({
+        id_rancangan:  modal.item.id_rancangan,
         status_review: reviewStatus,
-        catatan: reviewCatatan || undefined,
+        catatan:       reviewCatatan || undefined,
       });
       setMsgOk(
-        reviewStatus === "disetujui"
-          ? "✅ Rancangan berhasil disetujui!"
-          : reviewStatus === "revisi"
-          ? "📝 Rancangan dikembalikan untuk direvisi."
-          : "❌ Rancangan ditolak."
+        reviewStatus === "disetujui"    ? "✅ Rancangan berhasil disetujui!" :
+        reviewStatus === "revisi"       ? "📝 Rancangan dikembalikan untuk direvisi." :
+                                          "❌ Rancangan ditolak."
       );
       setTimeout(() => setMsgOk(""), 4000);
       setModal({ open: false, item: null });
@@ -109,7 +110,7 @@ export default function KaP4MReviewTable() {
 
   return (
     <>
-      {/* ── MODAL REVIEW ───────────────────────────────── */}
+      {/* ── MODAL REVIEW ─────────────────────────── */}
       {modal.open && modal.item && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white border-2 border-black w-full max-w-lg p-6 shadow-2xl">
@@ -123,8 +124,8 @@ export default function KaP4MReviewTable() {
             {/* Ringkasan laporan */}
             <div className="bg-gray-50 border border-gray-200 p-3 mb-4 text-[11px] space-y-1">
               <p><span className="font-bold">Laporan:</span> {modal.item.isi_laporan}</p>
-              <p><span className="font-bold">Penyebab:</span> {modal.item.penyebab}</p>
-              <p><span className="font-bold">Rencana:</span> {modal.item.rencana_tindakan}</p>
+              <p><span className="font-bold">Penyebab:</span> {modal.item.penyebab || "—"}</p>
+              <p><span className="font-bold">Rencana:</span> {modal.item.rencana_tindakan || "—"}</p>
             </div>
 
             {/* Pilih keputusan */}
@@ -191,7 +192,7 @@ export default function KaP4MReviewTable() {
         </div>
       )}
 
-      {/* ── TABEL ──────────────────────────────────────── */}
+      {/* ── TABEL ──────────────────────────────── */}
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         {msgOk && (
           <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b border-green-200">{msgOk}</p>
@@ -205,8 +206,8 @@ export default function KaP4MReviewTable() {
           <div className="flex-1 border-r-2 border-black p-3">Kritik atau Pengaduan</div>
           <div className="w-[18%] border-r-2 border-black p-3">Penyebab</div>
           <div className="w-[22%] border-r-2 border-black p-3">Rencana Tindak Lanjut</div>
-          <div className="w-[15%] border-r-2 border-black p-3">Pilih Tindakan</div>
-          <div className="w-[20%] p-3">Aksi</div>
+          <div className="w-[15%] border-r-2 border-black p-3">Status Review</div>
+          <div className="w-[20%] p-3">Aksi Ka P4M</div>
         </div>
 
         {data.length === 0 ? (
@@ -214,10 +215,13 @@ export default function KaP4MReviewTable() {
             <p className="text-gray-400 italic text-sm">
               Belum ada rancangan dari Kepala Unit yang perlu direview.
             </p>
+            <p className="text-gray-300 text-xs mt-1">
+              (Rancangan muncul setelah Kepala Unit mengisi penyebab dan rencana tindakan)
+            </p>
           </div>
         ) : (
           data.map((item, idx) => {
-            const badge    = item.status_review ? statusBadge[item.status_review] : null;
+            const badge     = item.status_review ? statusBadge[item.status_review] : null;
             const bisaReview = item.status_review === "menunggu_review";
 
             return (
@@ -242,14 +246,14 @@ export default function KaP4MReviewTable() {
                 {/* Penyebab */}
                 <div className="w-[18%] border-r-2 border-black p-5">
                   <div className="border border-gray-300 p-2 h-28 text-[11px] italic text-gray-600 overflow-auto">
-                    {item.penyebab || <span className="text-gray-300">—</span>}
+                    {item.penyebab || <span className="text-gray-300">Belum diisi</span>}
                   </div>
                 </div>
 
                 {/* Rencana */}
                 <div className="w-[22%] border-r-2 border-black p-5">
                   <div className="border border-gray-300 p-2 h-28 text-[11px] italic text-gray-600 overflow-auto">
-                    {item.rencana_tindakan || <span className="text-gray-300">—</span>}
+                    {item.rencana_tindakan || <span className="text-gray-300">Belum diisi</span>}
                   </div>
                 </div>
 
@@ -260,7 +264,7 @@ export default function KaP4MReviewTable() {
                       {badge.label}
                     </span>
                   ) : (
-                    <span className="text-[10px] text-gray-400 italic">—</span>
+                    <span className="text-[10px] text-gray-400 italic">Belum ada rancangan</span>
                   )}
                 </div>
 
@@ -277,12 +281,12 @@ export default function KaP4MReviewTable() {
                     <div className="text-center">
                       <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
                       {item.hasil_tindakan && (
-                        <span className="text-[10px] text-gray-400">Ada laporan hasil</span>
+                        <span className="text-[10px] text-gray-400 block mt-1">Ada laporan hasil</span>
                       )}
                     </div>
                   ) : item.status_review === "revisi" ? (
                     <span className="text-yellow-600 text-[10px] text-center font-semibold">
-                      ⚠ Menunggu Revisi<br />Kepala Unit
+                      ⚠ Menunggu Revisi<br />dari Kepala Unit
                     </span>
                   ) : item.status_review === "tidak_disetujui" ? (
                     <span className="text-red-500 text-[10px] text-center font-semibold">✗ Ditolak</span>

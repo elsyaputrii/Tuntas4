@@ -64,20 +64,20 @@ export default function LoginForm({
           src="/poltek.jpg"
           alt="Polibatam Background"
           fill
-          className="object-cover blur-[4px] brightness-75"
+          className="object-cover blur-xs brightness-75"
           priority
         />
       </div>
 
       {/* Card Login */}
-      <div className="relative z-10 w-full max-w-md bg-[#7C93A7] p-10 rounded-[30px] shadow-2xl mx-4">
+     <div className="relative z-10 w-full max-w-md bg-[#7C93A7] p-6 sm:p-10 rounded-[20px] sm:rounded-[30px] shadow-2xl mx-4">
         <div className="flex flex-col items-center">
 
           {/* Logo */}
           <div className="mb-6">
             <Image
-              src="/logo-polibatam.png"
-              alt="Logo Polibatam"
+              src="/LogoTuntas.png"
+              alt="Logo Aplikasi"
               width={120}
               height={120}
               className="object-contain"

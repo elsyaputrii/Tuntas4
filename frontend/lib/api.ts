@@ -1,5 +1,4 @@
 // FILE: frontend/lib/api.ts
-
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 function getToken(): string | null {
@@ -32,7 +31,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 }
 
 // ─────────────────────────────────────────────
-// CIVITAS
+// CIVITAS (tanpa login — laporan anonim)
 // ─────────────────────────────────────────────
 export const civitasApi = {
   kirimLaporan: (formData: FormData) =>
@@ -44,7 +43,7 @@ export const civitasApi = {
 };
 
 // ─────────────────────────────────────────────
-// AUTH
+// AUTH — login, forgot password, reset password
 // ─────────────────────────────────────────────
 export const authApi = {
   loginStaf: (email: string, password: string) =>
@@ -61,22 +60,23 @@ export const authApi = {
 };
 
 // ─────────────────────────────────────────────
-// STAF P4M
+// STAF P4M — semua endpoint butuh role = staf_p4m
 // ─────────────────────────────────────────────
 export const stafApi = {
+  // Tab Laporan Masuk
   getLaporanMasuk: () =>
     apiFetch("/staf/laporan"),
-
   getKepalaUnit: () =>
     apiFetch("/staf/kepala-unit"),
-
   distribusiLaporan: (body: { id_laporan: number; unit_tujuan: string[] }) =>
     apiFetch("/staf/boxing", { method: "POST", body: JSON.stringify(body) }),
 
+  // Tab Proses & Pantau
   getProsesMonitor: () =>
     apiFetch("/staf/proses"),
 
-  // ← BARU: Review rancangan dari Kepala Unit
+  // ✅ PERBAIKAN: reviewRancangan sekarang pakai /staf/review-rancangan
+  // Route ini sudah ditambahkan di stafRoutes.js
   reviewRancangan: (body: {
     id_rancangan: number;
     status_review: "disetujui" | "tidak_disetujui" | "revisi";
@@ -91,27 +91,52 @@ export const stafApi = {
     kp_pemantauan?: string;
   }) =>
     apiFetch("/staf/pemantauan", { method: "POST", body: JSON.stringify(body) }),
-
   setStatusLaporan: (id_laporan: number, status: string) =>
     apiFetch("/staf/status", { method: "PATCH", body: JSON.stringify({ id_laporan, status }) }),
 
+  // Tab Rekapitulasi
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
 };
 
 // ─────────────────────────────────────────────
-// KEPALA UNIT
+// KA P4M — semua endpoint butuh role = ka_p4m
+//
+// PERBAIKAN UTAMA:
+// Sebelumnya KaP4MReviewTable.tsx dan KaP4MHasilTable.tsx
+// memanggil stafApi.getProsesMonitor() dan stafApi.reviewRancangan()
+// → Ini salah! Ka P4M bukan Staf P4M → kena 403 Forbidden
+//
+// Sekarang Ka P4M punya endpoint sendiri: /api/ka-p4m/...
+// ─────────────────────────────────────────────
+export const kaP4MApi = {
+  // Ambil semua data proses (untuk KaP4MReviewTable & KaP4MHasilTable)
+  getProsesMonitor: () =>
+    apiFetch("/ka-p4m/proses"),
+
+  // Review rancangan dari Kepala Unit
+  reviewRancangan: (body: {
+    id_rancangan: number;
+    status_review: "disetujui" | "tidak_disetujui" | "revisi";
+    catatan?: string;
+  }) =>
+    apiFetch("/ka-p4m/review-rancangan", { method: "PATCH", body: JSON.stringify(body) }),
+
+  // Ubah status laporan (CLOSE/OPEN) — keputusan akhir Ka P4M
+  setStatusLaporan: (id_laporan: number, status: string) =>
+    apiFetch("/ka-p4m/status", { method: "PATCH", body: JSON.stringify({ id_laporan, status }) }),
+};
+
+// ─────────────────────────────────────────────
+// KEPALA UNIT — semua endpoint butuh role = kepala_unit
 // ─────────────────────────────────────────────
 export const kepalaUnitApi = {
   getLaporanMasuk: () =>
     apiFetch("/kepala-unit/laporan"),
-
   submitRancangan: (body: { id_boxing: number; penyebab: string; rencana_tindakan: string }) =>
     apiFetch("/kepala-unit/rancangan", { method: "POST", body: JSON.stringify(body) }),
-
   getLaporanHasil: () =>
     apiFetch("/kepala-unit/laporan-hasil"),
-
   submitPelaksanaan: (formData: FormData) =>
     apiFetch("/kepala-unit/pelaksanaan", { method: "POST", body: formData }),
 };

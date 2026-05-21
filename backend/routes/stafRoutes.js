@@ -1,6 +1,4 @@
 // FILE: backend/routes/stafRoutes.js
-// Semua route Staff P4M — WAJIB LOGIN dengan role staf_p4m
-
 const express = require("express");
 const router  = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
@@ -9,6 +7,7 @@ const {
   getKepalaUnit,
   distribusiLaporan,
   getProsesMonitor,
+  reviewRancangan,        // ← pastikan ini diimport
   inputHasilPemantauan,
   setStatusLaporan,
   getRekapitulasi,
@@ -18,19 +17,22 @@ const {
 //   1. Punya token valid (authMiddleware)
 //   2. Role harus staf_p4m (roleMiddleware)
 router.use(authMiddleware);
-router.use(roleMiddleware("staf_p4m"));
+router.use(roleMiddleware("staf_p4m", "ka_p4m")); 
+// ka_p4m juga boleh akses GET /proses untuk halaman KaP4MReviewTable
+// karena KaP4MReviewTable.tsx memanggil stafApi.getProsesMonitor()
 
 // ── Tab Laporan Masuk ────────────────────────────────────
-router.get("/laporan",     getLaporanMasuk);   // lihat laporan masuk
-router.get("/kepala-unit", getKepalaUnit);     // ambil daftar kepala unit
-router.post("/boxing",     distribusiLaporan); // distribusikan laporan
+router.get("/laporan",     getLaporanMasuk);    // GET  /api/staf/laporan
+router.get("/kepala-unit", getKepalaUnit);      // GET  /api/staf/kepala-unit
+router.post("/boxing",     distribusiLaporan);  // POST /api/staf/boxing
 
 // ── Tab Proses & Pantau ──────────────────────────────────
-router.get("/proses",       getProsesMonitor);     // lihat semua proses
-router.post("/pemantauan",  inputHasilPemantauan); // input hasil pemantauan
-router.patch("/status",     setStatusLaporan);     // close / open laporan
+router.get("/proses",            getProsesMonitor);      // GET   /api/staf/proses
+router.patch("/review-rancangan", reviewRancangan);      // PATCH /api/staf/review-rancangan ← BARU
+router.post("/pemantauan",       inputHasilPemantauan);  // POST  /api/staf/pemantauan
+router.patch("/status",          setStatusLaporan);      // PATCH /api/staf/status
 
 // ── Tab Rekapitulasi ─────────────────────────────────────
-router.get("/rekap", getRekapitulasi);
+router.get("/rekap", getRekapitulasi);                   // GET   /api/staf/rekap
 
 module.exports = router;

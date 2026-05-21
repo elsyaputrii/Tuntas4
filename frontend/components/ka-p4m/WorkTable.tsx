@@ -83,7 +83,7 @@ export default function KaP4MTable() {
             onClick={() => console.log({ kritik, penyebab, rencana, tindakan, komentar })}
             className="bg-[#3B82F6] text-white font-bold py-2 px-6 rounded text-xs shadow-md active:scale-95 transition-transform"
           >
-            SEND
+            KIRIM
           </button>
         </div>
       </div>
