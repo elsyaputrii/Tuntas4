@@ -1,6 +1,7 @@
 // FILE: backend/routes/kaP4MRoutes.js
 // ============================================================
 // Route khusus Ka P4M
+const express = require("express");
 const router  = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const { pool } = require("../config/db");
