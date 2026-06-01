@@ -71,18 +71,9 @@ export const stafApi = {
   distribusiLaporan: (body: { id_laporan: number; unit_tujuan: string[] }) =>
     apiFetch("/staf/boxing", { method: "POST", body: JSON.stringify(body) }),
 
-  // Tab Proses & Pantau
+  // Tab Proses & Pantau (pantau saja — tutup laporan hanya Ka P4M)
   getProsesMonitor: () =>
     apiFetch("/staf/proses"),
-
-  // ✅ PERBAIKAN: reviewRancangan sekarang pakai /staf/review-rancangan
-  // Route ini sudah ditambahkan di stafRoutes.js
-  reviewRancangan: (body: {
-    id_rancangan: number;
-    status_review: "disetujui" | "tidak_disetujui" | "revisi";
-    catatan?: string;
-  }) =>
-    apiFetch("/staf/review-rancangan", { method: "PATCH", body: JSON.stringify(body) }),
 
   inputHasilPemantauan: (body: {
     id_boxing: number;
@@ -91,10 +82,16 @@ export const stafApi = {
     kp_pemantauan?: string;
   }) =>
     apiFetch("/staf/pemantauan", { method: "POST", body: JSON.stringify(body) }),
-  setStatusLaporan: (id_laporan: number, status: string) =>
-    apiFetch("/staf/status", { method: "PATCH", body: JSON.stringify({ id_laporan, status }) }),
 
-  // Tab Rekapitulasi
+  setKeputusanBoxing: (
+    id_boxing: number,
+    keputusan: "selesai" | "belum" | "lanjut" | "ditindak_lanjut"
+  ) =>
+    apiFetch("/staf/keputusan-boxing", {
+      method: "PATCH",
+      body: JSON.stringify({ id_boxing, keputusan }),
+    }),
+
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
 };
@@ -110,21 +107,14 @@ export const stafApi = {
 // Sekarang Ka P4M punya endpoint sendiri: /api/ka-p4m/...
 // ─────────────────────────────────────────────
 export const kaP4MApi = {
-  // Ambil semua data proses (untuk KaP4MReviewTable & KaP4MHasilTable)
-  getProsesMonitor: () =>
-    apiFetch("/ka-p4m/proses"),
+  getProsesMonitor: () => apiFetch("/ka-p4m/proses"),
 
-  // Review rancangan dari Kepala Unit
-  reviewRancangan: (body: {
+  keputusanKa: (body: {
     id_rancangan: number;
-    status_review: "disetujui" | "tidak_disetujui" | "revisi";
-    catatan?: string;
+    keputusan: "ditindaklanjuti" | "tidak";
+    aksi_masukan?: string;
   }) =>
-    apiFetch("/ka-p4m/review-rancangan", { method: "PATCH", body: JSON.stringify(body) }),
-
-  // Ubah status laporan (CLOSE/OPEN) — keputusan akhir Ka P4M
-  setStatusLaporan: (id_laporan: number, status: string) =>
-    apiFetch("/ka-p4m/status", { method: "PATCH", body: JSON.stringify({ id_laporan, status }) }),
+    apiFetch("/ka-p4m/keputusan", { method: "PATCH", body: JSON.stringify(body) }),
 };
 
 // ─────────────────────────────────────────────

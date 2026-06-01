@@ -6,7 +6,8 @@ import { kepalaUnitApi } from "@/lib/api";
 interface LaporanHasilItem {
   id_boxing: number; id_laporan: number; kode_laporan: string;
   isi_laporan: string; penyebab: string; rencana_tindakan: string;
-  status_review: string; id_pelaksanaan: number | null;
+  status_review: string; status_boxing: string; aksi_masukan: string | null;
+  id_pelaksanaan: number | null;
   hasil_tindakan: string | null; lampiran_hasil: string | null;
   tanggal_pelaksanaan: string | null;
 }
@@ -44,6 +45,7 @@ export default function ResultReportTable() {
   const handleSubmit = async (id_boxing: number) => {
     if (!tanggal[id_boxing]) { alert("Tanggal pelaksanaan harus diisi."); return; }
     if (!uraian[id_boxing]?.trim()) { alert("Uraian hasil harus diisi."); return; }
+    if (!files[id_boxing]) { alert("Gambar bukti wajib diunggah."); return; }
     setSubmitting((prev) => ({ ...prev, [id_boxing]: true }));
     try {
       const formData = new FormData();
@@ -74,7 +76,9 @@ export default function ResultReportTable() {
 
   if (laporanList.length === 0) return (
     <div className="w-full border-2 border-black bg-white p-12 text-center">
-      <p className="text-gray-400 text-sm italic">Belum ada rancangan tindakan yang disetujui oleh Staf P4M.</p>
+      <p className="text-gray-400 text-sm italic">
+        Belum ada laporan yang ditindaklanjuti Ka P4M dan menunggu hasil dari unit Anda.
+      </p>
     </div>
   );
 
@@ -89,7 +93,9 @@ export default function ResultReportTable() {
       </div>
 
       {laporanList.map((item, idx) => {
-        const sudahAda = !!item.id_pelaksanaan;
+        const sudahTerkirim =
+          !!item.id_pelaksanaan && item.status_boxing !== "menunggu_pelaksanaan";
+        const showForm = !sudahTerkirim;
         return (
           <div key={item.id_boxing} className={`flex min-h-[200px] ${idx > 0 ? "border-t-2 border-black" : ""}`}>
             <div className="w-[25%] border-r-2 border-black p-4">
@@ -103,12 +109,17 @@ export default function ResultReportTable() {
               <p className="text-[11px] text-gray-700">{item.rencana_tindakan}</p>
             </div>
             <div className="w-[10%] border-r-2 border-black p-4 flex items-center justify-center">
-              <span className={`font-bold text-center text-[10px] ${sudahAda ? "text-green-600" : "text-blue-600"}`}>
-                {sudahAda ? "Selesai" : "Di setujui"}
+              <span className={`font-bold text-center text-[10px] ${sudahTerkirim ? "text-green-600" : "text-blue-600"}`}>
+                {sudahTerkirim ? "Terkirim" : "Input hasil"}
               </span>
             </div>
             <div className="flex-1 p-5">
-              {sudahAda ? (
+              {item.aksi_masukan && showForm && (
+                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 text-[11px]">
+                  <span className="font-bold text-blue-800">Masukan Ka P4M:</span> {item.aksi_masukan}
+                </div>
+              )}
+              {sudahTerkirim ? (
                 <div className="space-y-2">
                   <div className="text-[11px] text-gray-600">
                     <span className="font-medium">Tanggal:</span>{" "}
@@ -143,7 +154,7 @@ export default function ResultReportTable() {
                     />
                     <label htmlFor={`upload-${item.id_boxing}`}
                       className="border border-black px-3 py-1 text-[10px] cursor-pointer hover:bg-gray-100 flex items-center gap-2">
-                      🖼️ {files[item.id_boxing] ? files[item.id_boxing]!.name : "tambahkan gambar"}
+                      🖼️ {files[item.id_boxing] ? files[item.id_boxing]!.name : "tambahkan gambar (wajib)"}
                     </label>
                   </div>
                   <div className="flex justify-end">

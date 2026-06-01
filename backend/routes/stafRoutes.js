@@ -7,9 +7,8 @@ const {
   getKepalaUnit,
   distribusiLaporan,
   getProsesMonitor,
-  reviewRancangan,        // ← pastikan ini diimport
   inputHasilPemantauan,
-  setStatusLaporan,
+  setKeputusanBoxing,
   getRekapitulasi,
 } = require("../controllers/stafController");
 
@@ -17,22 +16,17 @@ const {
 //   1. Punya token valid (authMiddleware)
 //   2. Role harus staf_p4m (roleMiddleware)
 router.use(authMiddleware);
-router.use(roleMiddleware("staf_p4m", "ka_p4m")); 
-// ka_p4m juga boleh akses GET /proses untuk halaman KaP4MReviewTable
-// karena KaP4MReviewTable.tsx memanggil stafApi.getProsesMonitor()
 
-// ── Tab Laporan Masuk ────────────────────────────────────
-router.get("/laporan",     getLaporanMasuk);    // GET  /api/staf/laporan
-router.get("/kepala-unit", getKepalaUnit);      // GET  /api/staf/kepala-unit
-router.post("/boxing",     distribusiLaporan);  // POST /api/staf/boxing
+// ── Tab Laporan Masuk (khusus Staf P4M) ──────────────────
+router.get("/laporan",     roleMiddleware("staf_p4m"), getLaporanMasuk);
+router.get("/kepala-unit", roleMiddleware("staf_p4m"), getKepalaUnit);
+router.post("/boxing",     roleMiddleware("staf_p4m"), distribusiLaporan);
+router.get("/rekap",       roleMiddleware("staf_p4m"), getRekapitulasi);
 
-// ── Tab Proses & Pantau ──────────────────────────────────
-router.get("/proses",            getProsesMonitor);      // GET   /api/staf/proses
-router.patch("/review-rancangan", reviewRancangan);      // PATCH /api/staf/review-rancangan ← BARU
-router.post("/pemantauan",       inputHasilPemantauan);  // POST  /api/staf/pemantauan
-router.patch("/status",          setStatusLaporan);      // PATCH /api/staf/status
-
-// ── Tab Rekapitulasi ─────────────────────────────────────
-router.get("/rekap", getRekapitulasi);                   // GET   /api/staf/rekap
+// ── Tab Proses & Pantau (khusus Staf P4M — pantau & input pemantauan) ─
+// Review rancangan & penutupan laporan (selesai) hanya lewat /api/ka-p4m
+router.get("/proses",      roleMiddleware("staf_p4m"), getProsesMonitor);
+router.post("/pemantauan", roleMiddleware("staf_p4m"), inputHasilPemantauan);
+router.patch("/keputusan-boxing", roleMiddleware("staf_p4m"), setKeputusanBoxing);
 
 module.exports = router;

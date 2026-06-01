@@ -4,7 +4,11 @@ import { civitasApi } from "@/lib/api";
 
 type Step = "form" | "success";
 
-export default function SubmissionForm() {
+interface SubmissionFormProps {
+  onGoToStatus?: (kode: string) => void;
+}
+
+export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
   const [step, setStep] = useState<Step>("form");
   const [status, setStatus] = useState("");
   const [jenis, setJenis] = useState("");
@@ -99,16 +103,39 @@ export default function SubmissionForm() {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={() => { setStep("form"); setKode(""); setStatus(""); setJenis(""); setKategori(""); setDeskripsi(""); setTanggal(""); setFile(null); }}
+              type="button"
+              onClick={() => {
+                if (onGoToStatus && kode) onGoToStatus(kode);
+              }}
               className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all"
             >
               🔍 Cek Status Laporan
             </button>
             <button
-              onClick={() => { setStep("form"); setKode(""); setStatus(""); setJenis(""); setKategori(""); setDeskripsi(""); setTanggal(""); setFile(null); }}
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(kode);
+                alert("Nomor tiket disalin ke clipboard!");
+              }}
               className="flex items-center gap-2 border border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-all"
             >
-              ⬇️ Download Bukti Laporan
+              📋 Salin Nomor Tiket
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("form");
+                setKode("");
+                setStatus("");
+                setJenis("");
+                setKategori("");
+                setDeskripsi("");
+                setTanggal("");
+                setFile(null);
+              }}
+              className="flex items-center gap-2 border border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-all"
+            >
+              ➕ Buat Laporan Baru
             </button>
           </div>
         </div>
@@ -141,8 +168,9 @@ export default function SubmissionForm() {
                 onChange={(e) => setStatus(e.target.value)}
               >
                 <option value="">pilih status anda</option>
-                <option value="dosen">Dosen</option>
                 <option value="mahasiswa">Mahasiswa</option>
+                <option value="dosen">Dosen</option>
+                <option value="tendik">Tendik</option>
                 <option value="masyarakat">Masyarakat Umum</option>
               </select>
               <span className="absolute right-3 top-3 text-gray-400 pointer-events-none">▾</span>

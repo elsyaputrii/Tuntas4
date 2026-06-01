@@ -13,6 +13,7 @@
 //   8. getRekapitulasi      → ringkasan semua laporan dari awal sampai selesai
 
 const { pool } = require("../config/db");
+const { UNITS_UMUM } = require("../constants/unitsUmum");
 
 // ============================================================
 // 1. GET LAPORAN MASUK
@@ -59,7 +60,9 @@ async function getKepalaUnit(req, res) {
     const [rows] = await pool.query(
       `SELECT id_kepala, nama, unit, nip
        FROM kepala_unit
-       ORDER BY unit ASC`
+       WHERE unit IN (?)
+       ORDER BY unit ASC`,
+      [UNITS_UMUM]
     );
     return res.status(200).json({ success: true, data: rows });
   } catch (error) {
@@ -130,15 +133,41 @@ async function distribusiLaporan(req, res) {
       });
     }
 
+    // Hanya unit bagian Umum yang boleh didistribusikan
+    const unitTidakValid = unitArray.filter((u) => !UNITS_UMUM.includes(u));
+    if (unitTidakValid.length > 0) {
+      conn.release();
+      return res.status(400).json({
+        success: false,
+        message: `Unit tidak valid (hanya bagian Umum): ${unitTidakValid.join(", ")}`,
+      });
+    }
+
     await conn.beginTransaction();
 
     const insertedIds = [];
     for (const unit of unitArray) {
+      const [kepalaRows] = await conn.query(
+        `SELECT id_kepala, nama FROM kepala_unit WHERE unit = ? LIMIT 1`,
+        [unit]
+      );
+
+      if (kepalaRows.length === 0) {
+        await conn.rollback();
+        conn.release();
+        return res.status(400).json({
+          success: false,
+          message: `Kepala unit untuk "${unit}" belum terdaftar. Jalankan seed akun kepala unit terlebih dahulu.`,
+        });
+      }
+
+      const { id_kepala } = kepalaRows[0];
+
       const [result] = await conn.query(
         `INSERT INTO boxing_ketidaksesuaian
           (id_laporan, id_staf, id_kepala, unit_tujuan, id_standar, status)
-         VALUES (?, ?, NULL, ?, ?, 'terdistribusi')`,
-        [id_laporan, id_staf, unit, id_standar || null]
+         VALUES (?, ?, ?, ?, ?, 'terdistribusi')`,
+        [id_laporan, id_staf, id_kepala, unit, id_standar || null]
       );
       insertedIds.push(result.insertId);
     }
@@ -199,6 +228,7 @@ async function getProsesMonitor(req, res) {
         r.penyebab,
         r.deskripsi           AS rencana_tindakan,
         r.status_review,
+        r.aksi_masukan,
         r.catatan             AS catatan_kepala,
 
         p.deskripsi           AS hasil_tindakan,
@@ -227,107 +257,132 @@ async function getProsesMonitor(req, res) {
 }
 
 // ============================================================
-// 5. REVIEW RANCANGAN TINDAKAN  ← FUNGSI BARU (sebelumnya
-//    sudah ada di module.exports tapi BELUM DIDEFINISIKAN
-//    → menyebabkan ReferenceError saat server start)
-//
-//    Ka P4M memberi keputusan atas rancangan yang dibuat
-//    oleh Kepala Unit. Ada 3 pilihan keputusan:
-//      - disetujui      → Kepala Unit bisa lanjut eksekusi
-//      - revisi         → Kepala Unit harus perbaiki rancangan
-//      - tidak_disetujui → Rancangan ditolak
-//
-//    Akses: staf_p4m DAN ka_p4m (diatur di route)
-//    Method: PATCH /api/staf/review-rancangan
-//    Body: { id_rancangan, status_review, catatan? }
-//    Catatan WAJIB jika status bukan 'disetujui'
+// 5. KEPUTUSAN STAF P4M per boxing: selesai | belum | lanjut
 // ============================================================
-async function reviewRancangan(req, res) {
-  const { id_rancangan, status_review, catatan } = req.body;
+async function syncStatusLaporan(id_laporan) {
+  const [pending] = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM boxing_ketidaksesuaian
+     WHERE id_laporan = ? AND status != 'selesai'`,
+    [id_laporan]
+  );
+  const semuaSelesai = Number(pending[0].cnt) === 0;
+  await pool.query(
+    `UPDATE laporan_ketidaksesuaian SET status = ? WHERE id_laporan = ?`,
+    [semuaSelesai ? "selesai" : "diproses", id_laporan]
+  );
+}
 
-  // Validasi field wajib
-  if (!id_rancangan) {
+async function setKeputusanBoxing(req, res) {
+  const { id_boxing, keputusan } = req.body;
+
+  let aksi = keputusan;
+  const valid = ["selesai", "belum", "lanjut", "ditindak_lanjut"];
+  if (!id_boxing || !valid.includes(aksi)) {
     return res.status(400).json({
       success: false,
-      message: "id_rancangan wajib diisi.",
+      message: "id_boxing dan keputusan (selesai|belum|ditindak_lanjut) wajib diisi.",
     });
   }
-
-  const statusValid = ["disetujui", "tidak_disetujui", "revisi"];
-  if (!statusValid.includes(status_review)) {
-    return res.status(400).json({
-      success: false,
-      message: `status_review tidak valid. Pilih: ${statusValid.join(", ")}`,
-    });
-  }
-
-  // Jika bukan disetujui, catatan wajib ada (agar Kepala Unit tahu
-  // apa yang perlu diperbaiki atau alasan penolakan)
-  if (status_review !== "disetujui" && !catatan?.trim()) {
-    return res.status(400).json({
-      success: false,
-      message: "Catatan wajib diisi untuk keputusan revisi atau tidak_disetujui.",
-    });
-  }
+  if (aksi === "ditindak_lanjut") aksi = "lanjut";
 
   try {
-    // Pastikan rancangan benar-benar ada di database
-    const [existing] = await pool.query(
-      `SELECT id_rancangan, status_review
-       FROM rancangan_tindakan
-       WHERE id_rancangan = ?`,
-      [id_rancangan]
+    const [rows] = await pool.query(
+      `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing,
+              r.status_review, r.id_rancangan
+       FROM boxing_ketidaksesuaian b
+       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+       WHERE b.id_boxing = ?`,
+      [id_boxing]
     );
 
-    if (existing.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Rancangan tidak ditemukan.",
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Data tidak ditemukan." });
+    }
+
+    const row = rows[0];
+
+    if (aksi === "selesai") {
+      if (row.status_boxing !== "di_staff") {
+        return res.status(400).json({
+          success: false,
+          message: "Hanya laporan yang sudah di Staf P4M yang bisa ditandai selesai.",
+        });
+      }
+      await pool.query(
+        `UPDATE boxing_ketidaksesuaian SET status = 'selesai' WHERE id_boxing = ?`,
+        [id_boxing]
+      );
+      await syncStatusLaporan(row.id_laporan);
+      return res.status(200).json({
+        success: true,
+        message: "Laporan unit ini selesai dan masuk rekapitulasi.",
       });
     }
 
-    // Rancangan yang sudah disetujui dan sudah ada pelaksanaannya
-    // tidak boleh diubah lagi (proteksi data integritas)
-    if (existing[0].status_review === "disetujui") {
-      const [pelaksanaan] = await pool.query(
-        `SELECT p.id_pelaksanaan
-         FROM pelaksanaan_tindakan p
-         JOIN rancangan_tindakan r ON r.id_boxing = p.id_boxing
-         WHERE r.id_rancangan = ?`,
-        [id_rancangan]
-      );
-      if (pelaksanaan.length > 0) {
+    if (aksi === "belum") {
+      if (row.status_boxing !== "di_staff" || row.status_review !== "ditindaklanjuti") {
         return res.status(400).json({
           success: false,
-          message: "Rancangan yang sudah dilaksanakan tidak bisa diubah kembali.",
+          message: "Opsi 'belum' hanya untuk laporan ditindaklanjuti yang sudah ada hasil unit.",
         });
+      }
+      await pool.query(
+        `UPDATE boxing_ketidaksesuaian SET status = 'menunggu_pelaksanaan' WHERE id_boxing = ?`,
+        [id_boxing]
+      );
+      await pool.query(
+        `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
+        [row.id_laporan]
+      );
+      return res.status(200).json({
+        success: true,
+        message: "Laporan dikembalikan ke Kepala Unit untuk perbaikan hasil tindak lanjut.",
+      });
+    }
+
+    // lanjut — buka kembali dari selesai
+    if (row.status_boxing !== "selesai") {
+      return res.status(400).json({
+        success: false,
+        message: "Opsi 'lanjut' hanya untuk laporan yang sudah pernah ditandai selesai.",
+      });
+    }
+
+    if (row.status_review === "ditindaklanjuti") {
+      await pool.query(
+        `UPDATE boxing_ketidaksesuaian SET status = 'menunggu_pelaksanaan' WHERE id_boxing = ?`,
+        [id_boxing]
+      );
+    } else {
+      await pool.query(
+        `UPDATE boxing_ketidaksesuaian SET status = 'diproses' WHERE id_boxing = ?`,
+        [id_boxing]
+      );
+      if (row.id_rancangan) {
+        await pool.query(
+          `UPDATE rancangan_tindakan SET status_review = 'menunggu_keputusan_ka' WHERE id_rancangan = ?`,
+          [row.id_rancangan]
+        );
       }
     }
 
-    // Simpan keputusan review ke kolom status_review dan catatan
     await pool.query(
-      `UPDATE rancangan_tindakan
-       SET status_review = ?, catatan = ?, updated_at = NOW()
-       WHERE id_rancangan = ?`,
-      [status_review, catatan?.trim() || null, id_rancangan]
+      `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
+      [row.id_laporan]
     );
-
-    // Pesan sukses disesuaikan dengan keputusan yang dipilih
-    const pesanSukses = {
-      disetujui:       "✅ Rancangan berhasil disetujui. Kepala Unit dapat melaksanakan tindakan.",
-      tidak_disetujui: "❌ Rancangan berhasil ditolak.",
-      revisi:          "📝 Rancangan dikembalikan untuk direvisi oleh Kepala Unit.",
-    };
 
     return res.status(200).json({
       success: true,
-      message: pesanSukses[status_review],
+      message:
+        row.status_review === "ditindaklanjuti"
+          ? "Laporan ditindaklanjuti lagi. Kembali ke Kepala Unit untuk mengisi ulang hasil tindak lanjut."
+          : "Laporan dibuka kembali ke Kepala Unit (penyebab & rencana) lalu Ka P4M.",
     });
   } catch (error) {
-    console.error("Error reviewRancangan:", error);
+    console.error("Error setKeputusanBoxing:", error);
     return res.status(500).json({
       success: false,
-      message: "Gagal menyimpan keputusan review rancangan.",
+      message: "Gagal menyimpan keputusan.",
     });
   }
 }
@@ -400,61 +455,8 @@ async function inputHasilPemantauan(req, res) {
 }
 
 // ============================================================
-// 7. SET STATUS LAPORAN (CLOSE / OPEN)
-//    Mengubah status akhir laporan menjadi selesai atau kembali
-//    ke diproses. Dipakai oleh Staf P4M dan Ka P4M.
-//
-//    !! Dipakai juga oleh Ka P4M (via role ka_p4m) !!
-//    → Tab "Laporan Pemantauan" → tombol "Selesai" atau "Kembalikan"
-//
-//    Body: { id_laporan, status }
-//    status yang valid: 'selesai' | 'diproses' | 'ditolak'
+// 7. GET REKAPITULASI — hanya boxing yang sudah selesai (Staf)
 // ============================================================
-async function setStatusLaporan(req, res) {
-  const { id_laporan, status } = req.body;
-
-  const statusValid = ["selesai", "diproses", "ditolak"];
-  if (!id_laporan || !statusValid.includes(status)) {
-    return res.status(400).json({
-      success: false,
-      message: `Status tidak valid. Pilih: ${statusValid.join(", ")}`,
-    });
-  }
-
-  try {
-    const [result] = await pool.query(
-      `UPDATE laporan_ketidaksesuaian SET status = ? WHERE id_laporan = ?`,
-      [status, id_laporan]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Laporan tidak ditemukan.",
-      });
-    }
-
-    const pesanStatus = {
-      selesai:  "Laporan dinyatakan SELESAI (CLOSE).",
-      diproses: "Laporan dikembalikan ke status DIPROSES (OPEN).",
-      ditolak:  "Laporan ditolak.",
-    };
-
-    return res.status(200).json({
-      success: true,
-      message: pesanStatus[status],
-    });
-  } catch (error) {
-    console.error("Error setStatusLaporan:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Gagal mengubah status laporan.",
-    });
-  }
-}
-
-// ============================================================
-// 8. GET REKAPITULASI
 //    Ringkasan semua laporan dari awal sampai selesai.
 //    Khusus Staf P4M — Ka P4M tidak butuh endpoint ini
 //    karena tab mereka hanya butuh /proses.
@@ -470,7 +472,9 @@ async function getRekapitulasi(req, res) {
         l.status              AS status_laporan,
         l.created_at,
 
+        b.id_boxing,
         b.unit_tujuan         AS nama_unit,
+        b.status              AS status_boxing,
 
         r.penyebab,
         r.deskripsi           AS rencana_tindakan,
@@ -480,7 +484,7 @@ async function getRekapitulasi(req, res) {
         p.lampiran            AS lampiran_hasil,
         p.tanggal             AS tanggal_pelaksanaan
       FROM laporan_ketidaksesuaian l
-      LEFT JOIN boxing_ketidaksesuaian b   ON b.id_laporan = l.id_laporan
+      JOIN boxing_ketidaksesuaian b        ON b.id_laporan = l.id_laporan AND b.status = 'selesai'
       LEFT JOIN rancangan_tindakan r       ON r.id_boxing  = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p     ON p.id_boxing  = b.id_boxing
       ORDER BY l.created_at DESC`
@@ -510,8 +514,7 @@ module.exports = {
   getKepalaUnit,
   distribusiLaporan,
   getProsesMonitor,
-  reviewRancangan,       // ← FIX: sebelumnya di-export tapi belum ada fungsinya
   inputHasilPemantauan,
-  setStatusLaporan,
+  setKeputusanBoxing,
   getRekapitulasi,
 };

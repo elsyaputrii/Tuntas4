@@ -5,63 +5,12 @@ import { useState, useEffect, useRef } from "react";
 import { stafApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import { ChevronDown, X, Search } from "lucide-react";
+import { DAFTAR_UNIT_UMUM } from "@/lib/unitsUmum";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
-// ── Daftar unit langsung dari PPTX ────────────────────────
-const DAFTAR_UNIT = [
-  // Umum
-  { grup: "Umum", unit: "MANAJEMEN" },
-  { grup: "Umum", unit: "P4M" },
-  { grup: "Umum", unit: "P3M" },
-  { grup: "Umum", unit: "SPI" },
-  { grup: "Umum", unit: "UPA-PERPUS" },
-  { grup: "Umum", unit: "UPA-PKK" },
-  { grup: "Umum", unit: "UPA-PP" },
-  { grup: "Umum", unit: "UPA-TIK" },
-  { grup: "Umum", unit: "SHILAU" },
-  { grup: "Umum", unit: "SBAK" },
-  { grup: "Umum", unit: "SBUM" },
-  { grup: "Umum", unit: "Pokja BMN dan Pengadaan" },
-  { grup: "Umum", unit: "Pokja Humas dan Kerjasama" },
-  { grup: "Umum", unit: "Pokja Kemahasiswaan" },
-  { grup: "Umum", unit: "Pokja Keuangan" },
-  { grup: "Umum", unit: "Pokja Organisasi SDM" },
-  { grup: "Umum", unit: "Pokja Perencanaan" },
-  // Jur. MB
-  { grup: "Jur. MB", unit: "Jur. MB" },
-  { grup: "Jur. MB", unit: "Prodi ABT" },
-  { grup: "Jur. MB", unit: "Prodi AK" },
-  { grup: "Jur. MB", unit: "Prodi AM" },
-  { grup: "Jur. MB", unit: "Prodi LPI" },
-  { grup: "Jur. MB", unit: "Prodi DB" },
-  // Jur. IF
-  { grup: "Jur. IF", unit: "Jur. IF" },
-  { grup: "Jur. IF", unit: "Prodi AN" },
-  { grup: "Jur. IF", unit: "Prodi GM" },
-  { grup: "Jur. IF", unit: "Prodi IF" },
-  { grup: "Jur. IF", unit: "Prodi TRM" },
-  { grup: "Jur. IF", unit: "Prodi RKS" },
-  { grup: "Jur. IF", unit: "Prodi TRPL" },
-  { grup: "Jur. IF", unit: "Prodi TP" },
-  { grup: "Jur. IF", unit: "Prodi TKO" },
-  // Jur. MS
-  { grup: "Jur. MS", unit: "Jur. MS" },
-  { grup: "Jur. MS", unit: "Prodi TRKP" },
-  { grup: "Jur. MS", unit: "Prodi TRPF" },
-  { grup: "Jur. MS", unit: "Prodi MS" },
-  { grup: "Jur. MS", unit: "Prodi PPI" },
-  { grup: "Jur. MS", unit: "Prodi TPPU" },
-  { grup: "Jur. MS", unit: "Prodi MET" },
-  // Jur. EL
-  { grup: "Jur. EL", unit: "Jur. EL" },
-  { grup: "Jur. EL", unit: "Prodi TRE" },
-  { grup: "Jur. EL", unit: "Prodi EM" },
-  { grup: "Jur. EL", unit: "Prodi IN" },
-  { grup: "Jur. EL", unit: "Prodi MK" },
-  { grup: "Jur. EL", unit: "Prodi TRR" },
-  { grup: "Jur. EL", unit: "Prodi TRPE" },
-];
+// Hanya unit bagian Umum (MANAJEMEN s/d Pokja Perencanaan)
+const DAFTAR_UNIT = DAFTAR_UNIT_UMUM;
 
 interface LaporanMasuk {
   id_laporan:    number;

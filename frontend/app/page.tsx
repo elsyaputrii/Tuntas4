@@ -7,6 +7,7 @@ import FAQSection from "@/components/FAQ";
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"form" | "status" | null>(null);
+  const [statusKode, setStatusKode] = useState("");
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -84,7 +85,10 @@ export default function HomePage() {
 
       {/* STATUS */}
       <button
-        onClick={() => setActiveTab("status")}
+        onClick={() => {
+        setStatusKode("");
+        setActiveTab("status");
+      }}
         className={`relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105
           ${
             activeTab === "status"
@@ -140,7 +144,10 @@ export default function HomePage() {
 
       {/* STATUS */}
       <button
-        onClick={() => setActiveTab("status")}
+        onClick={() => {
+        setStatusKode("");
+        setActiveTab("status");
+      }}
         className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300
           ${
             activeTab === "status"
@@ -176,15 +183,30 @@ export default function HomePage() {
               📝 Buat Laporan
             </button>
             <button
-              onClick={() => setActiveTab("status")}
+              onClick={() => {
+        setStatusKode("");
+        setActiveTab("status");
+      }}
               className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "status" ? "bg-white text-blue-600 shadow" : "text-gray-500 hover:text-gray-700"}`}
             >
               🔍 Cek Status
             </button>
           </div>
 
-          {activeTab === "form" && <SubmissionForm />}
-          {activeTab === "status" && <StatusChecker />}
+          {activeTab === "form" && (
+            <SubmissionForm
+              onGoToStatus={(kode) => {
+                setStatusKode(kode);
+                setActiveTab("status");
+              }}
+            />
+          )}
+          {activeTab === "status" && (
+            <StatusChecker
+              key={statusKode || "cek-status"}
+              initialKode={statusKode}
+            />
+          )}
         </div>
       )}
 

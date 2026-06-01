@@ -111,13 +111,6 @@ export const stafApi = {
       body: JSON.stringify(body),
     }),
 
-  // Set status laporan: 'selesai' (CLOSE) atau 'diproses' (OPEN)
-  setStatusLaporan: (id_laporan: number, status: string) =>
-    apiFetch("/staf/status", {
-      method: "PATCH",
-      body: JSON.stringify({ id_laporan, status }),
-    }),
-
   // Rekapitulasi semua laporan dari awal sampai selesai
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
