@@ -4,10 +4,18 @@ import { useState, useEffect, useCallback } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 
 interface LaporanItem {
-  id_boxing: number; id_laporan: number; kode_laporan: string;
-  jenis_laporan: string; isi_laporan: string; lampiran_laporan: string | null;
-  status_boxing: string; penyebab: string | null; rencana_tindakan: string | null;
-  status_review: string | null; catatan_review: string | null;
+  id_boxing: number;
+  id_laporan: number;
+  kode_laporan: string;
+  jenis_laporan: string;
+  isi_laporan: string;
+  lampiran_laporan: string | null;
+  status_boxing: string;
+  penyebab: string | null;
+  rencana_tindakan: string | null;
+  status_review: string | null;
+  catatan_review: string | null;
+  created_at?: string | null;
 }
 
 const statusBadge: Record<string, { label: string; cls: string }> = {
@@ -48,7 +56,8 @@ export default function DiscrepancyTable() {
 
   const handleSend = async (id_boxing: number) => {
     if (!penyebab[id_boxing]?.trim() || !rencana[id_boxing]?.trim()) {
-      alert("Penyebab dan rencana tindak lanjut harus diisi."); return;
+      alert("Penyebab dan rencana tindak lanjut harus diisi.");
+      return;
     }
     setSending((prev) => ({ ...prev, [id_boxing]: true }));
     try {
@@ -115,7 +124,6 @@ export default function DiscrepancyTable() {
                 </div>
               )}
             </div>
-
             <div className="w-[22%] border-r-2 border-black p-5">
               <textarea
                 className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
@@ -125,7 +133,6 @@ export default function DiscrepancyTable() {
                 disabled={!editable}
               />
             </div>
-
             <div className="w-[22%] border-r-2 border-black p-5">
               <textarea
                 className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
@@ -135,7 +142,6 @@ export default function DiscrepancyTable() {
                 disabled={!editable}
               />
             </div>
-
             <div className="flex-1 p-5 flex items-center justify-center">
               {item.status_review === "disetujui" ? (
                 <div className="text-center">
@@ -150,7 +156,7 @@ export default function DiscrepancyTable() {
                   disabled={sending[item.id_boxing]}
                   className="bg-[#5da0dd] text-white px-8 py-2 rounded font-bold uppercase text-[10px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
                 >
-                  {sending[item.id_boxing] ? "MENGIRIM..." : "SEND"}
+                  {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
                 </button>
               )}
             </div>
