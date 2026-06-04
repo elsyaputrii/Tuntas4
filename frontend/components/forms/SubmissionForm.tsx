@@ -26,6 +26,21 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
 
   const MAX_CHARS = 1000;
 
+  // Helper: dapatkan hari ini (jam direset ke 00:00:00 untuk perbandingan)
+  const getToday = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  };
+
+  // Cek apakah tanggal adalah masa depan
+  const isFutureDate = (year: number, month: number, day: number) => {
+    const selectedDate = new Date(year, month, day);
+    selectedDate.setHours(0, 0, 0, 0);
+    const today = getToday();
+    return selectedDate > today;
+  };
+
   // Calendar logic
   const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDay = (month: number, year: number) => new Date(year, month, 1).getDay();
@@ -33,11 +48,48 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
   const dayNames = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
 
   function selectDate(day: number) {
+    // Cegah pemilihan tanggal future
+    if (isFutureDate(calYear, calMonth, day)) {
+      setError("Tidak bisa memilih tanggal yang akan datang!");
+      return;
+    }
+    
     const d = String(day).padStart(2, "0");
     const m = String(calMonth + 1).padStart(2, "0");
     setTanggal(`${d}/${m}/${calYear}`);
     setShowCalendar(false);
+    setError(""); // Hapus error kalau berhasil
   }
+
+  // Navigasi bulan dengan batasan (tidak bisa ke bulan future)
+  const goPrevMonth = () => {
+    if (calMonth === 0) {
+      setCalMonth(11);
+      setCalYear(y => y - 1);
+    } else {
+      setCalMonth(m => m - 1);
+    }
+  };
+
+  const goNextMonth = () => {
+    const today = getToday();
+    const currentMonthStart = new Date(calYear, calMonth, 1);
+    const nextMonthStart = new Date(calYear, calMonth + 1, 1);
+    const nextMonthEnd = new Date(calYear, calMonth + 2, 0);
+    
+    // Cek apakah bulan berikutnya masih <= hari ini
+    if (nextMonthStart <= today || nextMonthEnd <= today) {
+      if (calMonth === 11) {
+        // Cek apakah tahun depan masih <= tahun sekarang
+        if (calYear + 1 <= today.getFullYear()) {
+          setCalMonth(0);
+          setCalYear(y => y + 1);
+        }
+      } else {
+        setCalMonth(m => m + 1);
+      }
+    }
+  };
 
   async function handleKirim() {
     setError("");
@@ -45,6 +97,14 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
       setError("Semua field wajib diisi!");
       return;
     }
+
+    // VALIDASI TANGGAL FUTURE SAAT SUBMIT (double protection)
+    const [day, month, year] = tanggal.split('/').map(Number);
+    if (isFutureDate(year, month - 1, day)) {
+      setError("Tanggal kejadian tidak boleh lebih besar dari hari ini!");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("status_pelapor", status);
     formData.append("jenis_laporan", jenis);
@@ -235,9 +295,9 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
                 <div className="absolute top-12 left-0 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-72">
                   {/* Nav */}
                   <div className="flex items-center justify-between mb-3">
-                    <button onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600">‹</button>
+                    <button onClick={goPrevMonth} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600">‹</button>
                     <span className="font-semibold text-sm text-gray-700">{monthNames[calMonth]} {calYear} ▾</span>
-                    <button onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600">›</button>
+                    <button onClick={goNextMonth} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600">›</button>
                   </div>
                   {/* Day headers */}
                   <div className="grid grid-cols-7 mb-1">
@@ -248,22 +308,42 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
                     {Array.from({ length: getFirstDay(calMonth, calYear) === 0 ? 6 : getFirstDay(calMonth, calYear) - 1 }).map((_, i) => <div key={i} />)}
                     {Array.from({ length: getDaysInMonth(calMonth, calYear) }).map((_, i) => {
                       const day = i + 1;
-                      const today = new Date();
+                      const today = getToday();
                       const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
                       const selD = tanggal ? parseInt(tanggal.split('/')[0]) : null;
                       const selM = tanggal ? parseInt(tanggal.split('/')[1]) - 1 : null;
                       const selY = tanggal ? parseInt(tanggal.split('/')[2]) : null;
                       const isSelected = selD === day && selM === calMonth && selY === calYear;
+                      
+                      // Cek apakah tanggal ini future
+                      const isFuture = isFutureDate(calYear, calMonth, day);
+                      
                       return (
-                        <button key={day} onClick={() => selectDate(day)}
+                        <button 
+                          key={day} 
+                          onClick={() => !isFuture && selectDate(day)}
+                          disabled={isFuture}
                           className={`w-8 h-8 text-xs rounded-full flex items-center justify-center mx-auto transition-all
-                            ${isSelected ? "bg-blue-600 text-white font-bold" : isToday ? "bg-blue-100 text-blue-700 font-semibold" : "hover:bg-gray-100 text-gray-700"}`}>
+                            ${isFuture ? "bg-gray-100 text-gray-300 cursor-not-allowed" :
+                              isSelected ? "bg-blue-600 text-white font-bold" : 
+                              isToday ? "bg-blue-100 text-blue-700 font-semibold" : 
+                              "hover:bg-gray-100 text-gray-700"
+                            }`}
+                        >
                           {day}
                         </button>
                       );
                     })}
                   </div>
-                  <button onClick={() => selectDate(new Date().getDate())} className="w-full mt-3 text-xs text-blue-600 font-semibold hover:underline">Hari ini</button>
+                  <button 
+                    onClick={() => {
+                      const today = getToday();
+                      selectDate(today.getDate());
+                    }} 
+                    className="w-full mt-3 text-xs text-blue-600 font-semibold hover:underline"
+                  >
+                    Hari ini
+                  </button>
                 </div>
               )}
             </div>
