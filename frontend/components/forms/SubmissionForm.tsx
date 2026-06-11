@@ -230,7 +230,6 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
                 <option value="">pilih status anda</option>
                 <option value="mahasiswa">Mahasiswa</option>
                 <option value="dosen">Dosen</option>
-                <option value="tendik">Tendik</option>
                 <option value="masyarakat">Masyarakat Umum</option>
               </select>
               <span className="absolute right-3 top-3 text-gray-400 pointer-events-none">▾</span>
