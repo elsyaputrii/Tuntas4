@@ -1,501 +1,350 @@
 "use client";
+// FILE: frontend/components/staff-p4m/tables/RecapitulationTable.tsx
+//
+// Fitur:
+//  1. Statistik ringkasan (total, selesai, dipantau, ditindaklanjuti, belum)
+//  2. Kalender interaktif → klik tanggal untuk filter
+//  3. Tabel rekap status (sudah vs belum ditindaklanjuti)
+//  4. Export EXCEL  → semua laporan (selesai + dipantau) via exportExcel.ts
+//  5. Export PDF    → per harian/mingguan/bulanan/tahunan via exportPdf.ts
+
 import { useState, useEffect, useCallback } from "react";
 import { stafApi } from "@/lib/api";
+import { exportExcel } from "@/lib/exportExcel";
+import { exportPDFRekap, type PdfKategori } from "@/lib/exportPdf";
+import { fmtTgl, getWeekNumber, sameDay } from "@/lib/exportHelpers";
+import type { RekapItem, ProsesItem } from "@/lib/exportTypes";
 
-interface RekapItem {
-  id_laporan: number;
-  id_boxing: number;
-  kode_laporan: string;
-  jenis_laporan: string;
-  uraian_ketidaksesuaian: string;
-  lampiran_laporan: string | null;
-  status_laporan: string;
-  nama_unit: string | null;
-  status_review: string | null;
-  penyebab: string | null;
-  rencana_tindakan: string | null;
-  hasil_tindakan: string | null;
-  lampiran_hasil: string | null;
-  tanggal_pelaksanaan: string | null;
+const BULAN_PANJANG = [
+  "Januari","Februari","Maret","April","Mei","Juni",
+  "Juli","Agustus","September","Oktober","November","Desember",
+];
+
+// ─── Kalender Mini ─────────────────────────────────────────────────────────
+interface CalendarProps {
+  selectedDate: Date;
+  onSelectDate: (d: Date) => void;
+  highlightedDates: Set<string>;
 }
 
-function fmtTgl(iso: string | null) {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function exportExcel(data: RekapItem[]) {
-  const totalMasuk = data.length;
-  const ditindaklanjuti = data.filter(
-    (d) => d.status_review === "ditindaklanjuti"
-  ).length;
-  const tidakDitindaklanjuti = data.filter(
-    (d) => d.status_review === "tidak_ditindaklanjuti"
-  ).length;
-
-  const rows: string[][] = [
-    ["REKAPITULASI LAPORAN KETIDAKSESUAIAN - TUNTAS POLIBATAM"],
-    ["Tanggal Export", new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })],
-    [],
-    ["RINGKASAN"],
-    ["Total Laporan Masuk (Selesai)", String(totalMasuk)],
-    ["Ditindaklanjuti", String(ditindaklanjuti)],
-    ["Tidak Ditindaklanjuti", String(tidakDitindaklanjuti)],
-    [],
-    [
-      "No",
-      "Kode Laporan",
-      "Jenis Laporan",
-      "Uraian Ketidaksesuaian",
-      "Unit",
-      "Penyebab",
-      "Rencana Tindakan",
-      "Hasil Tindak Lanjut",
-      "Tanggal Pelaksanaan",
-      "Status Keputusan",
-    ],
-  ];
-
-  data.forEach((item, idx) => {
-    const keputusan =
-      item.status_review === "ditindaklanjuti"
-        ? "Ditindaklanjuti"
-        : item.status_review === "tidak_ditindaklanjuti"
-        ? "Tidak Ditindaklanjuti"
-        : "-";
-
-    rows.push([
-      String(idx + 1),
-      item.kode_laporan,
-      item.jenis_laporan ?? "-",
-      item.uraian_ketidaksesuaian ?? "-",
-      item.nama_unit ?? "-",
-      item.penyebab ?? "-",
-      item.rencana_tindakan ?? "-",
-      item.hasil_tindakan ?? "-",
-      fmtTgl(item.tanggal_pelaksanaan),
-      keputusan,
-    ]);
-  });
-
-  const csvContent =
-    "\uFEFF" +
-    rows
-      .map((row) =>
-        row
-          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-          .join(";")
-      )
-      .join("\r\n");
-
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `Rekapitulasi_TUNTAS_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function exportPDF(data: RekapItem[]) {
-  const totalMasuk = data.length;
-  const ditindaklanjuti = data.filter(
-    (d) => d.status_review === "ditindaklanjuti"
-  ).length;
-  const tidakDitindaklanjuti = data.filter(
-    (d) => d.status_review === "tidak_ditindaklanjuti"
-  ).length;
-
-  const rows = data
-    .map(
-      (item, idx) => `
-      <tr>
-        <td style="text-align:center">${idx + 1}</td>
-        <td style="text-align:center;font-weight:600">${item.kode_laporan}</td>
-        <td style="text-transform:capitalize">${item.jenis_laporan ?? "-"}</td>
-        <td>${item.uraian_ketidaksesuaian ?? "-"}</td>
-        <td style="text-align:center">${item.nama_unit ?? "-"}</td>
-        <td>${item.penyebab ?? "-"}</td>
-        <td>${item.rencana_tindakan ?? "-"}</td>
-        <td>${item.hasil_tindakan ?? "-"}</td>
-        <td style="text-align:center">${fmtTgl(item.tanggal_pelaksanaan)}</td>
-        <td style="text-align:center">
-          <span style="
-            display:inline-block;
-            padding:2px 8px;
-            border-radius:4px;
-            font-size:10px;
-            font-weight:700;
-            background:${item.status_review === "ditindaklanjuti" ? "#d1fae5" : item.status_review === "tidak_ditindaklanjuti" ? "#fee2e2" : "#f3f4f6"};
-            color:${item.status_review === "ditindaklanjuti" ? "#065f46" : item.status_review === "tidak_ditindaklanjuti" ? "#991b1b" : "#6b7280"};
-          ">
-            ${item.status_review === "ditindaklanjuti" ? "Ditindaklanjuti" : item.status_review === "tidak_ditindaklanjuti" ? "Tidak Ditindaklanjuti" : "-"}
-          </span>
-        </td>
-      </tr>`
-    )
-    .join("");
-
-  const html = `
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-      <meta charset="UTF-8" />
-      <title>Laporan Rekapitulasi TUNTAS Polibatam</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 20px; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 3px double #4d5e71; padding-bottom: 14px; }
-        .header .logo-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 8px; }
-        .header .logo-box { width: 48px; height: 48px; background: #4d5e71; color: white; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; border-radius: 6px; }
-        .header h1 { font-size: 16px; font-weight: 900; color: #4d5e71; letter-spacing: 0.5px; }
-        .header h2 { font-size: 13px; font-weight: 700; color: #222; margin-top: 2px; }
-        .header p  { font-size: 10px; color: #666; margin-top: 4px; }
-        .summary { display: flex; gap: 16px; margin-bottom: 18px; }
-        .summary-card { flex: 1; border: 1.5px solid #e5e7eb; border-radius: 6px; padding: 10px 14px; }
-        .summary-card .label { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
-        .summary-card .value { font-size: 22px; font-weight: 900; margin-top: 2px; }
-        .summary-card.total  { border-color: #4d5e71; }  .summary-card.total  .value { color: #4d5e71; }
-        .summary-card.ditindak { border-color: #10b981; } .summary-card.ditindak .value { color: #059669; }
-        .summary-card.tidak   { border-color: #ef4444; }  .summary-card.tidak   .value { color: #dc2626; }
-        table { width: 100%; border-collapse: collapse; font-size: 10px; }
-        thead tr { background: #4d5e71; color: white; }
-        thead th { padding: 7px 6px; text-align: center; font-weight: 700; border: 1px solid #3a4d5e; }
-        tbody tr:nth-child(even) { background: #f8fafc; }
-        tbody tr:hover { background: #eff6ff; }
-        tbody td { padding: 6px; border: 1px solid #e2e8f0; vertical-align: top; line-height: 1.4; }
-        .footer { margin-top: 20px; display: flex; justify-content: space-between; font-size: 10px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 10px; }
-        .ttd { text-align: center; }
-        .ttd .name { margin-top: 50px; font-weight: 700; border-top: 1px solid #333; padding-top: 4px; width: 180px; margin-left: auto; margin-right: auto; }
-        @media print {
-          body { padding: 10px; }
-          @page { size: A4 landscape; margin: 15mm; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="logo-row">
-          <div class="logo-box">T</div>
-          <div>
-            <h1>TUNTAS — Politeknik Negeri Batam</h1>
-            <h2>Laporan Rekapitulasi Ketidaksesuaian</h2>
-            <p>Dicetak: ${new Date().toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
-          </div>
-        </div>
-      </div>
-      <div class="summary">
-        <div class="summary-card total">
-          <div class="label">Total Laporan Selesai</div>
-          <div class="value">${totalMasuk}</div>
-        </div>
-        <div class="summary-card ditindak">
-          <div class="label">Ditindaklanjuti</div>
-          <div class="value">${ditindaklanjuti}</div>
-        </div>
-        <div class="summary-card tidak">
-          <div class="label">Tidak Ditindaklanjuti</div>
-          <div class="value">${tidakDitindaklanjuti}</div>
-        </div>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width:28px">No</th>
-            <th style="width:72px">Kode</th>
-            <th style="width:64px">Jenis</th>
-            <th>Uraian Ketidaksesuaian</th>
-            <th style="width:80px">Unit</th>
-            <th>Penyebab</th>
-            <th>Rencana Tindakan</th>
-            <th>Hasil Tindak Lanjut</th>
-            <th style="width:80px">Tgl Pelaksanaan</th>
-            <th style="width:90px">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows || `<tr><td colspan="10" style="text-align:center;padding:20px;color:#9ca3af;font-style:italic">Belum ada data rekapitulasi</td></tr>`}
-        </tbody>
-      </table>
-      <div class="footer">
-        <div>
-          <p>Dokumen ini digenerate otomatis oleh sistem TUNTAS Polibatam.</p>
-          <p>Jika ada ketidaksesuaian data, hubungi P4M Polibatam.</p>
-        </div>
-        <div class="ttd">
-          <p>Batam, ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p>
-          <p>Kepala P4M,</p>
-          <div class="name">( _________________ )</div>
-        </div>
-      </div>
-      <script>
-        window.onload = function() { window.print(); }
-      </script>
-    </body>
-    </html>
-  `;
-
-  const win = window.open("", "_blank", "width=1000,height=700");
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-  }
-}
-
-export default function RecapitulationTable() {
-  const [data, setData] = useState<RekapItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [msg, setMsg] = useState("");
-  const [exportingExcel, setExportingExcel] = useState(false);
-  const [exportingPDF, setExportingPDF] = useState(false);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await stafApi.getRekapitulasi();
-      setData(res.data);
-    } catch {
-      setError("Gagal memuat data rekapitulasi.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  async function ditindaklanjutiLagi(id_boxing: number) {
-    const ok = confirm(
-      "Laporan akan ditindaklanjuti lagi dan dikirim kembali ke Kepala Unit untuk mengisi ulang hasil tindak lanjut. Lanjutkan?"
-    );
-    if (!ok) return;
-    try {
-      const res = await stafApi.setKeputusanBoxing(id_boxing, "ditindak_lanjut");
-      setMsg(res.message);
-      setTimeout(() => setMsg(""), 5000);
-      fetchData();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Gagal mengubah status.");
-      setTimeout(() => setError(""), 4000);
-    }
-  }
-
-  function handleExportExcel() {
-    setExportingExcel(true);
-    try {
-      exportExcel(data);
-    } finally {
-      setTimeout(() => setExportingExcel(false), 1000);
-    }
-  }
-
-  function handleExportPDF() {
-    setExportingPDF(true);
-    try {
-      exportPDF(data);
-    } finally {
-      setTimeout(() => setExportingPDF(false), 1000);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-gray-400 italic">
-        Memuat data...
-      </div>
-    );
-  }
-
-  if (error && data.length === 0) {
-    return (
-      <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-red-500">
-        ❌ {error}
-      </div>
-    );
-  }
-
-  const totalMasuk = data.length;
-  const ditindaklanjuti = data.filter((d) => d.status_review === "ditindaklanjuti").length;
-  const tidakDitindaklanjuti = data.filter((d) => d.status_review === "tidak_ditindaklanjuti").length;
+function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: CalendarProps) {
+  const [viewDate, setViewDate] = useState(new Date(selectedDate));
+  const year  = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const rawFirstDay = new Date(year, month, 1).getDay();
+  const startOffset = rawFirstDay === 0 ? 6 : rawFirstDay - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
 
   return (
-    <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
-      <p className="text-[10px] text-gray-600 px-3 py-2 bg-amber-50 border-b border-amber-200">
-        Laporan di sini sudah ditandai selesai. Anda tetap bisa menekan{" "}
-        <strong>Ditindaklanjuti lagi</strong> agar kembali ke Kepala Unit (tab Laporan Hasil).
-      </p>
-
-      {msg && (
-        <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msg}</p>
-      )}
-      {error && (
-        <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>
-      )}
-
-      {/* Statistik ringkasan */}
-      <div className="flex gap-4 p-3 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded shadow-sm">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wide">Total Selesai</span>
-          <span className="text-base font-black text-[#4d5e71]">{totalMasuk}</span>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded shadow-sm">
-          <span className="text-[10px] text-green-700 uppercase tracking-wide">Ditindaklanjuti</span>
-          <span className="text-base font-black text-green-700">{ditindaklanjuti}</span>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded shadow-sm">
-          <span className="text-[10px] text-red-600 uppercase tracking-wide">Tidak Ditindaklanjuti</span>
-          <span className="text-base font-black text-red-600">{tidakDitindaklanjuti}</span>
-        </div>
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm" style={{minWidth:228}}>
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={()=>setViewDate(new Date(year,month-1,1))}
+          className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 text-sm font-bold">‹</button>
+        <span className="text-xs font-semibold text-gray-700">{BULAN_PANJANG[month]} {year}</span>
+        <button onClick={()=>setViewDate(new Date(year,month+1,1))}
+          className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 text-sm font-bold">›</button>
       </div>
-
-      {/* Tombol Export */}
-      <div className="flex gap-2 items-center p-3 border-b border-gray-200 bg-white">
-        <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mr-1">
-          📥 EXPORT :
-        </span>
-
-        <button
-          type="button"
-          onClick={handleExportPDF}
-          disabled={exportingPDF || data.length === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all shadow-sm"
-        >
-          {exportingPDF ? (
-            <>
-              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Membuka...
-            </>
-          ) : (
-            <>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="9" y1="12" x2="15" y2="12" />
-                <line x1="9" y1="16" x2="12" y2="16" />
-              </svg>
-              PDF
-            </>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={handleExportExcel}
-          disabled={exportingExcel || data.length === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white text-[10px] font-bold rounded transition-all shadow-sm"
-        >
-          {exportingExcel ? (
-            <>
-              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Mengunduh...
-            </>
-          ) : (
-            <>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M9 3v18M3 9h18M3 15h18" />
-              </svg>
-              Excel
-            </>
-          )}
-        </button>
-
-        {data.length === 0 && (
-          <span className="text-[9px] text-gray-400 italic ml-1">
-            (Belum ada data untuk diekspor)
-          </span>
-        )}
+      <div className="grid grid-cols-7 mb-1">
+        {["Sen","Sel","Rab","Kam","Jum","Sab","Min"].map(d=>(
+          <div key={d} className="text-center text-[9px] text-gray-400 font-medium py-0.5">{d}</div>
+        ))}
       </div>
-
-      {/* Header tabel */}
-      <div className="flex min-w-[1100px] font-bold uppercase border-t border-black bg-gray-50 text-center">
-        <div className="w-12 border-r-2 border-black p-3">NO</div>
-        <div className="flex-1 border-r-2 border-black p-3">Uraian Ketidaksesuaian</div>
-        <div className="w-40 border-r-2 border-black p-3">Penyebab</div>
-        <div className="w-40 border-r-2 border-black p-3">Rencana</div>
-        <div className="w-20 border-r-2 border-black p-3">Status</div>
-        <div className="flex-1 border-r-2 border-black p-3">Hasil Tindak Lanjut</div>
-        <div className="w-36 p-3">Aksi</div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {Array.from({length:startOffset}).map((_,i)=><div key={`e${i}`}/>)}
+        {Array.from({length:daysInMonth}).map((_,i)=>{
+          const day=i+1;
+          const thisDate=new Date(year,month,day); thisDate.setHours(0,0,0,0);
+          const key=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+          const isSelected=sameDay(thisDate,selectedDate);
+          const isToday=sameDay(thisDate,today);
+          const hasData=highlightedDates.has(key);
+          return (
+            <button key={day} onClick={()=>onSelectDate(new Date(year,month,day))}
+              className={`w-7 h-7 text-[10px] rounded-full flex items-center justify-center mx-auto relative transition-all
+                ${isSelected?"bg-[#4d5e71] text-white font-bold":isToday?"bg-blue-100 text-blue-700 font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
+              {day}
+              {hasData&&!isSelected&&<span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#5da0dd] rounded-full"/>}
+            </button>
+          );
+        })}
       </div>
+      <button onClick={()=>{setViewDate(new Date());onSelectDate(new Date());}}
+        className="w-full mt-2 text-[10px] text-[#4d5e71] font-semibold hover:underline">Hari Ini</button>
+    </div>
+  );
+}
 
-      {data.length === 0 ? (
-        <div className="flex min-w-[1100px] border-t-2 border-black p-8 justify-center">
-          <p className="text-gray-400 italic">Belum ada data rekapitulasi.</p>
-        </div>
-      ) : (
-        data.map((item, index) => (
-          <div
-            key={`${item.id_boxing}-${index}`}
-            className="flex min-w-[1100px] border-t-2 border-black text-[11px]"
-          >
-            <div className="w-12 border-r-2 border-black p-3 flex justify-center items-start">
-              <span className="font-bold text-base">{index + 1}</span>
-            </div>
-            <div className="flex-1 border-r-2 border-black p-4">
-              <p className="text-[9px] text-gray-400 italic mb-1">
-                {item.kode_laporan}
-                {item.nama_unit && ` · ${item.nama_unit}`}
-              </p>
-              <div className="border border-gray-400 p-3 h-24 font-bold text-[10px] overflow-auto uppercase">
-                {item.uraian_ketidaksesuaian}
-              </div>
-            </div>
-            <div className="w-40 border-r-2 border-black p-4 flex items-center justify-center">
-              <span className="italic text-gray-500 text-center text-[10px]">
-                {item.penyebab || "—"}
-              </span>
-            </div>
-            <div className="w-40 border-r-2 border-black p-4 flex items-center justify-center">
-              <span className="italic text-gray-500 text-center text-[10px]">
-                {item.rencana_tindakan || "—"}
-              </span>
-            </div>
-            <div className="w-20 border-r-2 border-black p-4 flex items-center justify-center">
-              <span className="border border-gray-400 p-1 italic text-center w-full text-[9px]">
-                selesai
-              </span>
-            </div>
-            <div className="flex-1 border-r-2 border-black p-4">
-              <div className="border border-gray-400 p-3 h-24 italic text-gray-500 overflow-auto">
-                {item.tanggal_pelaksanaan && (
-                  <span className="block font-bold not-italic text-gray-700 mb-1">
-                    {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID")}
-                  </span>
-                )}
-                {item.hasil_tindakan || "belum ada hasil"}
-              </div>
-            </div>
-            <div className="w-36 p-4 flex flex-col justify-center gap-2">
-              {item.status_review === "ditindaklanjuti" ? (
-                <button
-                  type="button"
-                  onClick={() => ditindaklanjutiLagi(item.id_boxing)}
-                  className="w-full border-2 border-orange-500 bg-orange-50 text-orange-800 text-[9px] font-bold py-2 leading-tight hover:bg-orange-100"
-                >
-                  ↻ Ditindaklanjuti lagi
+// ─── Komponen Utama ─────────────────────────────────────────────────────────
+type FilterMode = "semua"|"harian"|"mingguan"|"bulanan"|"tahunan";
+
+export default function RecapitulationTable() {
+  const [rekapData,  setRekapData]  = useState<RekapItem[]>([]);
+  const [prosesData, setProsesData] = useState<ProsesItem[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
+  const [msg,        setMsg]        = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [filterMode,   setFilterMode]   = useState<FilterMode>("semua");
+  const [exportingExcelLoading, setExportingExcelLoading] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState<PdfKategori|null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const [rekapRes, prosesRes] = await Promise.all([
+        stafApi.getRekapitulasi(),
+        stafApi.getProsesMonitor(),
+      ]);
+      setRekapData(rekapRes.data ?? []);
+      setProsesData(prosesRes.data ?? []);
+    } catch { setError("Gagal memuat data rekapitulasi."); }
+    finally  { setLoading(false); }
+  }, []);
+
+  useEffect(()=>{ fetchData(); },[fetchData]);
+
+  const selesaiBoxingIds = new Set(rekapData.map(d=>d.id_boxing));
+  const dipantauData     = prosesData.filter(p=>!selesaiBoxingIds.has(p.id_boxing));
+
+  const allItems = [
+    ...rekapData.map(d=>({
+      id_boxing:d.id_boxing, kode:d.kode_laporan, jenis:d.jenis_laporan??"—",
+      uraian:d.uraian_ketidaksesuaian??"—", unit:d.nama_unit??"—",
+      penyebab:d.penyebab??"—", rencana:d.rencana_tindakan??"—",
+      hasil:d.hasil_tindakan??"—", tglPelaksanaan:fmtTgl(d.tanggal_pelaksanaan),
+      statusReview:d.status_review??"", statusBoxing:d.status_boxing??"",
+      tglMasuk:d.created_at??null, isSelesai:true,
+    })),
+    ...dipantauData.map(p=>({
+      id_boxing:p.id_boxing, kode:p.kode_laporan, jenis:p.jenis_laporan??"—",
+      uraian:p.isi_laporan??"—", unit:p.nama_unit??"—",
+      penyebab:p.penyebab??"—", rencana:p.rencana_tindakan??"—",
+      hasil:p.hasil_tindakan??"—", tglPelaksanaan:fmtTgl(p.tanggal_pelaksanaan),
+      statusReview:p.status_review??"", statusBoxing:p.status_boxing??"",
+      tglMasuk:p.created_at??null, isSelesai:false,
+    })),
+  ];
+
+  const highlightedDates = new Set<string>(
+    allItems.filter(d=>d.tglMasuk).map(d=>{
+      const dt=new Date(d.tglMasuk!);
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+    })
+  );
+
+  function isInFilter(tglMasuk:string|null):boolean{
+    if(filterMode==="semua") return true;
+    if(!tglMasuk) return false;
+    const d=new Date(tglMasuk);
+    if(filterMode==="harian")   return sameDay(d,selectedDate);
+    if(filterMode==="mingguan") return d.getFullYear()===selectedDate.getFullYear()&&getWeekNumber(d)===getWeekNumber(selectedDate);
+    if(filterMode==="bulanan")  return d.getFullYear()===selectedDate.getFullYear()&&d.getMonth()===selectedDate.getMonth();
+    return d.getFullYear()===selectedDate.getFullYear();
+  }
+
+  const filteredItems   = allItems.filter(d=>isInFilter(d.tglMasuk));
+  const totalAll        = filteredItems.length;
+  const selesaiCount    = filteredItems.filter(d=>d.isSelesai).length;
+  const dipantauCount   = filteredItems.filter(d=>!d.isSelesai).length;
+  const ditindakCount   = filteredItems.filter(d=>d.statusReview==="ditindaklanjuti").length;
+  const tidakDitindak   = filteredItems.filter(d=>d.statusReview==="tidak_ditindaklanjuti").length;
+  const menungguCount   = filteredItems.filter(d=>!["ditindaklanjuti","tidak_ditindaklanjuti"].includes(d.statusReview)).length;
+
+  const labelFilter:Record<FilterMode,string>={
+    semua:"Semua Waktu", harian:fmtTgl(selectedDate.toISOString()),
+    mingguan:`Minggu ke-${getWeekNumber(selectedDate)} / ${selectedDate.getFullYear()}`,
+    bulanan:`${BULAN_PANJANG[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
+    tahunan:`Tahun ${selectedDate.getFullYear()}`,
+  };
+
+  async function bukaLagi(id_boxing:number, statusReview:string){
+    const ok=confirm(statusReview==="ditindaklanjuti"?"Laporan akan ditindaklanjuti lagi. Lanjutkan?":"Laporan akan dibuka kembali. Lanjutkan?");
+    if(!ok) return;
+    try{
+      const keputusan=statusReview==="ditindaklanjuti"?"ditindak_lanjut":"lanjut";
+      const res=await stafApi.setKeputusanBoxing(id_boxing, keputusan as "ditindak_lanjut"|"lanjut");
+      setMsg(res.message); setTimeout(()=>setMsg(""),5000); fetchData();
+    }catch(err:unknown){
+      setError(err instanceof Error?err.message:"Gagal."); setTimeout(()=>setError(""),4000);
+    }
+  }
+
+  if(loading) return(
+    <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-gray-400 italic">
+      Memuat data rekapitulasi…
+    </div>
+  );
+
+  return(
+    <div className="w-full space-y-4">
+      {msg   &&<p className="text-green-700 text-xs font-bold px-3 py-2 bg-green-50 border border-green-200 rounded">{msg}</p>}
+      {error &&<p className="text-red-500 text-xs font-bold px-3 py-2 bg-red-50 border border-red-200 rounded">❌ {error}</p>}
+
+      {/* Baris atas: Kalender + Statistik */}
+      <div className="flex flex-wrap gap-4">
+
+        {/* Kolom kiri: Kalender + filter mode */}
+        <div className="flex flex-col gap-3">
+          <MiniCalendar selectedDate={selectedDate} onSelectDate={setSelectedDate} highlightedDates={highlightedDates}/>
+          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+            <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Filter Tampilan</p>
+            <div className="flex flex-col gap-1">
+              {(["semua","harian","mingguan","bulanan","tahunan"] as FilterMode[]).map(mode=>(
+                <button key={mode} onClick={()=>setFilterMode(mode)}
+                  className={`text-left px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${filterMode===mode?"bg-[#4d5e71] text-white":"hover:bg-gray-100 text-gray-600"}`}>
+                  {mode==="semua"?"🗂 Semua":mode==="harian"?"📅 Harian":mode==="mingguan"?"📆 Mingguan":mode==="bulanan"?"🗓 Bulanan":"📊 Tahunan"}
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => ditindaklanjutiLagi(item.id_boxing)}
-                  className="w-full border border-gray-400 text-[9px] py-2 hover:bg-gray-50"
-                >
-                  ↻ Buka kembali
-                </button>
-              )}
+              ))}
             </div>
           </div>
-        ))
-      )}
+        </div>
+
+        {/* Kolom kanan: Statistik + rekap status */}
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📊 Statistik — {labelFilter[filterMode]}</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {[
+                {label:"Total Laporan",val:totalAll,color:"text-[#4d5e71]",bg:"bg-slate-50 border-slate-200"},
+                {label:"Selesai",val:selesaiCount,color:"text-green-700",bg:"bg-green-50 border-green-200"},
+                {label:"Dipantau",val:dipantauCount,color:"text-amber-700",bg:"bg-amber-50 border-amber-200"},
+                {label:"Ditindaklanjuti",val:ditindakCount,color:"text-blue-700",bg:"bg-blue-50 border-blue-200"},
+                {label:"Belum Ditindak",val:tidakDitindak+menungguCount,color:"text-red-700",bg:"bg-red-50 border-red-200"},
+              ].map(s=>(
+                <div key={s.label} className={`border rounded-xl p-3 ${s.bg}`}>
+                  <p className="text-[9px] text-gray-500 uppercase tracking-wide">{s.label}</p>
+                  <p className={`text-2xl font-black mt-1 ${s.color}`}>{s.val}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📋 Rekap Status Tindak Lanjut</p>
+            <table className="w-full text-[10px] border-collapse">
+              <thead>
+                <tr className="bg-[#4d5e71] text-white">
+                  <th className="p-2 text-left border border-[#3a4d5e]">Status</th>
+                  <th className="p-2 text-center border border-[#3a4d5e]">Jumlah</th>
+                  <th className="p-2 text-center border border-[#3a4d5e]">Persentase</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  {label:"✅ Ditindaklanjuti",count:ditindakCount,cls:"bg-green-50 text-green-800"},
+                  {label:"❌ Tidak Ditindaklanjuti",count:tidakDitindak,cls:"bg-red-50 text-red-800"},
+                  {label:"⏳ Menunggu / Proses",count:menungguCount,cls:"bg-yellow-50 text-yellow-800"},
+                  {label:"📂 Total",count:totalAll,cls:"bg-gray-50 text-gray-800 font-bold"},
+                ].map(r=>(
+                  <tr key={r.label} className={r.cls}>
+                    <td className="p-2 border border-gray-200">{r.label}</td>
+                    <td className="p-2 border border-gray-200 text-center font-bold text-sm">{r.count}</td>
+                    <td className="p-2 border border-gray-200 text-center">
+                      {totalAll>0?`${((r.count/totalAll)*100).toFixed(1)}%`:"—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar Export */}
+      <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
+        <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">📥 Export:</span>
+        <button
+          onClick={()=>{setExportingExcelLoading(true);exportExcel(rekapData,prosesData);setTimeout(()=>setExportingExcelLoading(false),1200);}}
+          disabled={exportingExcelLoading||allItems.length===0}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white text-[10px] font-bold rounded transition-all">
+          {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel (Semua)
+        </button>
+        <span className="text-[9px] text-gray-400 ml-1">PDF per periode:</span>
+        {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
+          <button key={kat}
+            onClick={()=>{setExportingPDF(kat);exportPDFRekap(rekapData,prosesData,kat,selectedDate);setTimeout(()=>setExportingPDF(null),1200);}}
+            disabled={exportingPDF===kat}
+            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
+            {exportingPDF===kat?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📄"}
+            {kat.charAt(0).toUpperCase()+kat.slice(1)}
+          </button>
+        ))}
+        <span className="text-[9px] text-gray-400 ml-auto italic">
+          {filteredItems.length} laporan · {labelFilter[filterMode]}
+        </span>
+      </div>
+
+      {/* Tabel Rekapitulasi */}
+      <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
+        <div className="flex min-w-[1100px] font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
+          <div className="w-10 border-r-2 border-black p-2">No</div>
+          <div className="flex-1 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
+          <div className="w-36 border-r-2 border-black p-2">Penyebab</div>
+          <div className="w-36 border-r-2 border-black p-2">Rencana</div>
+          <div className="w-20 border-r-2 border-black p-2">Status</div>
+          <div className="flex-1 border-r-2 border-black p-2">Hasil Tindak Lanjut</div>
+          <div className="w-28 p-2">Tindakan</div>
+        </div>
+
+        {filteredItems.length===0?(
+          <div className="flex min-w-[1100px] p-8 justify-center border-t-2 border-black">
+            <p className="text-gray-400 italic text-sm">Tidak ada data untuk periode ini.</p>
+          </div>
+        ):(
+          filteredItems.map((item,index)=>(
+            <div key={`${item.id_boxing}-${index}`} className="flex min-w-[1100px] border-t-2 border-black text-[11px]">
+              <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
+                <span className="font-bold text-sm">{index+1}</span>
+              </div>
+              <div className="flex-1 border-r-2 border-black p-3">
+                <p className="text-[9px] text-gray-400 italic mb-1 flex items-center gap-1 flex-wrap">
+                  <span>{item.kode}</span>
+                  {item.unit!=="—"&&<span>· {item.unit}</span>}
+                  <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${item.isSelesai?"bg-green-100 text-green-700":"bg-amber-100 text-amber-700"}`}>
+                    {item.isSelesai?"Selesai":"Dipantau"}
+                  </span>
+                </p>
+                <div className="border border-gray-400 p-2 h-20 font-bold text-[10px] overflow-auto uppercase">{item.uraian}</div>
+              </div>
+              <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
+                <span className="italic text-gray-500 text-center text-[10px]">{item.penyebab}</span>
+              </div>
+              <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
+                <span className="italic text-gray-500 text-center text-[10px]">{item.rencana}</span>
+              </div>
+              <div className="w-20 border-r-2 border-black p-3 flex items-center justify-center">
+                <span className={`text-[8px] font-bold text-center px-1 py-0.5 rounded ${
+                  item.statusReview==="ditindaklanjuti"?"bg-green-100 text-green-700":
+                  item.statusReview==="tidak_ditindaklanjuti"?"bg-red-100 text-red-700":"bg-yellow-100 text-yellow-700"
+                }`}>
+                  {item.statusReview==="ditindaklanjuti"?"✓ Ditindak":item.statusReview==="tidak_ditindaklanjuti"?"✗ Tidak":"⏳ Proses"}
+                </span>
+              </div>
+              <div className="flex-1 border-r-2 border-black p-3">
+                <div className="border border-gray-400 p-2 h-20 italic text-gray-500 overflow-auto">
+                  {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
+                  {item.hasil}
+                </div>
+              </div>
+              <div className="w-28 p-3 flex flex-col justify-center gap-1.5">
+                {item.isSelesai?(
+                  <button onClick={()=>bukaLagi(item.id_boxing,item.statusReview)}
+                    className={`w-full border-2 text-[9px] font-bold py-1.5 leading-tight transition-all ${
+                      item.statusReview==="ditindaklanjuti"
+                        ?"border-orange-500 bg-orange-50 text-orange-800 hover:bg-orange-100"
+                        :"border-gray-400 text-gray-600 hover:bg-gray-50"
+                    }`}>
+                    {item.statusReview==="ditindaklanjuti"?"↻ Tindak lagi":"↻ Buka"}
+                  </button>
+                ):(
+                  <span className="text-[9px] text-amber-600 font-bold text-center">⏳ Dipantau</span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
