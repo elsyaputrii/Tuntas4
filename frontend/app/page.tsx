@@ -5,6 +5,18 @@ import SubmissionForm from "@/components/forms/SubmissionForm";
 import StatusChecker from "@/components/status/StatusChecker";
 import FAQSection from "@/components/FAQ";
 
+function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="relative group">
+      {children}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded bg-gray-800 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-200 ease-out pointer-events-none z-50 shadow-lg">
+        {label}
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"form" | "status" | null>(null);
   const [statusKode, setStatusKode] = useState("");
@@ -43,89 +55,78 @@ export default function HomePage() {
     </div>
 
     {/* DESKTOP MENU */}
-    <div className="hidden md:flex items-center gap-8">
-
-      {/* BERANDA */}
-      <button
-        onClick={() => setActiveTab(null)}
-        className={`relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105
-          ${
-            activeTab === null
-              ? "text-blue-600"
-              : "text-gray-600"
-          }`}
-      >
-        <div className="flex items-center gap-2">
-          <span>🏠</span>
-        </div>
-
-        {activeTab === null && (
-          <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
-        )}
-      </button>
-
-      {/* BUAT LAPORAN */}
-      <button
-        onClick={() => setActiveTab("form")}
-        className={`relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105
-          ${
-            activeTab === "form"
-              ? "text-blue-600"
-              : "text-gray-600"
-          }`}
-      >
-        <div className="flex items-center gap-2">
-          <span>📝</span>
-        </div>
-
-        {activeTab === "form" && (
-          <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
-        )}
-      </button>
-
-      {/* STATUS */}
-      <button
-        onClick={() => {
+<div className="hidden md:flex items-center gap-8">
+ 
+  {/* BERANDA */}
+  <Tooltip label="Beranda">
+    <button
+      onClick={() => setActiveTab(null)}
+      className={`relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105
+        ${activeTab === null ? "text-blue-600" : "text-gray-600"}`}
+    >
+      <div className="flex items-center gap-2">
+        <span>🏠</span>
+      </div>
+      {activeTab === null && (
+        <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
+      )}
+    </button>
+  </Tooltip>
+ 
+  {/* BUAT LAPORAN */}
+  <Tooltip label="Buat Laporan">
+    <button
+      onClick={() => setActiveTab("form")}
+      className={`relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105
+        ${activeTab === "form" ? "text-blue-600" : "text-gray-600"}`}
+    >
+      <div className="flex items-center gap-2">
+        <span>📝</span>
+      </div>
+      {activeTab === "form" && (
+        <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
+      )}
+    </button>
+  </Tooltip>
+ 
+  {/* CEK STATUS */}
+  <Tooltip label="Cek Status">
+    <button
+      onClick={() => {
         setStatusKode("");
         setActiveTab("status");
       }}
-        className={`relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105
-          ${
-            activeTab === "status"
-              ? "text-blue-600"
-              : "text-gray-600"
-          }`}
-      >
-        <div className="flex items-center gap-2">
-          <span>🔍</span>
-        </div>
-
-        {activeTab === "status" && (
-          <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
-        )}
-      </button>
-
-      {/* FAQ */}
-      <button
-        onClick={() => {
-          setActiveTab(null);
-
-          setTimeout(() => {
-            document
-              .getElementById("faq")
-              ?.scrollIntoView({
-                behavior: "smooth",
-              });
-          }, 100);
-        }}
-        className="relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-600"
-      >
-        <div className="flex items-center gap-2">
-          <span>❓</span>
-        </div>
-      </button>
-    </div>
-
+      className={`relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105
+        ${activeTab === "status" ? "text-blue-600" : "text-gray-600"}`}
+    >
+      <div className="flex items-center gap-2">
+        <span>🔍</span>
+      </div>
+      {activeTab === "status" && (
+        <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
+      )}
+    </button>
+  </Tooltip>
+ 
+  {/* FAQ / BANTUAN */}
+  <Tooltip label="FAQ">
+    <button
+      onClick={() => {
+        setActiveTab(null);
+        setTimeout(() => {
+          document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      }}
+      className="relative font-semibold transition-all duration-300 hover:text-blue-600 hover:scale-105 text-gray-600"
+    >
+      <div className="flex items-center gap-2">
+        <span>❓</span>
+      </div>
+    </button>
+  </Tooltip>
+ 
+</div>
+ 
     {/* MOBILE MENU */}
     <div className="flex md:hidden items-center gap-2">
 
