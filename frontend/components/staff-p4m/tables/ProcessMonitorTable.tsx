@@ -97,10 +97,10 @@ export default function ProcessMonitorTable() {
     const tidakKa  = item.status_review==="tidak_ditindaklanjuti";
 
     return(
-      <div key={`${item.id_laporan}-${item.id_boxing}`} className="flex min-w-[1200px] border-t-2 border-black">
+      <div key={`${item.id_laporan}-${item.id_boxing}`} className="flex min-w-[1390px] border-t-2 border-black">
 
-        {/* Kolom Laporan — diperkecil */}
-        <div className="w-48 border-r-2 border-black p-3">
+        {/* Kolom Laporan */}
+        <div className="w-[500px] border-r-2 border-black p-3">
           <p className="text-[9px] text-gray-400 mb-1 leading-tight">
             <span className="font-bold">{item.kode_laporan}</span><br/>
             {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing??"]"] ?? item.status_boxing}</span>
@@ -109,13 +109,13 @@ export default function ProcessMonitorTable() {
         </div>
 
         {/* Keputusan Ka P4M */}
-        <div className="w-28 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
+        <div className="w-[180px] border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
           {rev&&<span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>{rev.label}</span>}
           {item.aksi_masukan&&<p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
         </div>
 
         {/* Hasil Unit */}
-        <div className="flex-1 border-r-2 border-black p-3">
+        <div className="w-[500px] border-r-2 border-black p-3">
           <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
             {item.hasil_tindakan||(tidakKa?"— (tidak ditindaklanjuti)":"Belum ada hasil")}
           </div>
@@ -127,7 +127,7 @@ export default function ProcessMonitorTable() {
         </div>
 
         {/* Keputusan Staf */}
-        <div className="w-36 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center">
+        <div className="w-[150px] border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center">
           {diStaff&&(
             <>
               <button type="button" onClick={()=>putuskan(item.id_boxing,"selesai")}
@@ -152,10 +152,10 @@ export default function ProcessMonitorTable() {
         </div>
 
         {/* Export PDF — kolom paling kanan */}
-        <div className="w-24 p-3 flex items-center justify-center">
+        <div className="w-[60px] p-3 flex items-center justify-center">
           <button type="button" onClick={()=>handleExportPDF(item)} disabled={exportingId===item.id_boxing}
             title={`Export PDF — ${item.kode_laporan}`}
-            className="flex flex-col items-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded transition-all w-full">
+            className="flex flex-col items-center gap-1 px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded transition-all">
             {exportingId===item.id_boxing
               ?<span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>
               :<><span className="text-base leading-none">📄</span><span>PDF</span></>
@@ -179,12 +179,12 @@ export default function ProcessMonitorTable() {
       {error&&<p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
 
       {/* Header */}
-      <div className="flex min-w-[1200px] font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
-        <div className="w-48 border-r-2 border-black p-3">Laporan</div>
-        <div className="w-28 border-r-2 border-black p-3">Keputusan Ka</div>
-        <div className="flex-1 border-r-2 border-black p-3">Hasil Unit</div>
-        <div className="w-36 border-r-2 border-black p-3">Keputusan Staf</div>
-        <div className="w-24 p-3">Export PDF</div>
+      <div className="flex min-w-[1390px] font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
+      <div className="w-[500px] border-r-2 border-black p-3">Laporan</div>
+      <div className="w-[180px] border-r-2 border-black p-3">Keputusan Ka</div>
+      <div className="w-[500px] border-r-2 border-black p-3">Hasil Unit</div>
+      <div className="w-[150px] border-r-2 border-black p-3">Keputusan Staf</div>
+      <div className="w-[60px] p-3">Export PDF</div>
       </div>
 
       {aktif.length===0&&selesai.length===0?(
