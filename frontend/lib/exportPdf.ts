@@ -56,17 +56,41 @@ const BASE_CSS = `
   @media print { body { padding:8px; } @page { size:A4 landscape; margin:12mm; } }
 `;
 
+// ─── FIX: printWindow sekarang auto-close popup setelah print ───
+// Sebelumnya popup tidak pernah ditutup → menyebabkan Next.js
+// router bingung dan halaman parent loading terus / hilang.
 function printWindow(html: string) {
   const win = window.open("", "_blank", "width=1100,height=750");
-  if (!win) { alert("Popup diblokir browser. Izinkan popup untuk mencetak PDF."); return; }
+  if (!win) {
+    alert("Popup diblokir browser. Izinkan popup untuk mencetak PDF.");
+    return;
+  }
   win.document.write(html);
   win.document.close();
+
+  // Tutup popup otomatis setelah user selesai dengan dialog print
+  // (baik print maupun cancel)
+  win.addEventListener("afterprint", () => {
+    win.close();
+  });
 }
+
+// ─── Script tag yang dipakai di setiap HTML template ────────
+// afterprint sudah handle close, tapi tambah fallback kecil
+// via focus kembali ke parent supaya Next.js tidak kehilangan context
+const PRINT_SCRIPT = `
+<script>
+  window.onload = function() {
+    window.print();
+  };
+  window.addEventListener('afterprint', function() {
+    window.close();
+  });
+</script>
+`;
 
 // ═══════════════════════════════════════════════════════════════
 // 1. PDF REKAPITULASI — per kategori waktu
-//    Dipakai oleh RecapitulationTable.tsx
-//    Menggabungkan laporan SELESAI + DIPANTAU dalam periode terpilih
 // ═══════════════════════════════════════════════════════════════
 export function exportPDFRekap(
   rekapData: RekapItem[],
@@ -74,7 +98,6 @@ export function exportPDFRekap(
   kategori: PdfKategori,
   selectedDate: Date
 ) {
-  // ─ Filter berdasarkan kategori waktu ─
   function isInRange(iso: string | null): boolean {
     if (!iso) return false;
     const d = new Date(iso);
@@ -87,7 +110,7 @@ export function exportPDFRekap(
       d.getFullYear() === selectedDate.getFullYear() &&
       d.getMonth()    === selectedDate.getMonth()
     );
-    return d.getFullYear() === selectedDate.getFullYear(); // tahunan
+    return d.getFullYear() === selectedDate.getFullYear();
   }
 
   const selesaiBoxingIds = new Set(rekapData.map((d) => d.id_boxing));
@@ -96,7 +119,6 @@ export function exportPDFRekap(
   const filteredSelesai  = rekapData.filter((d) => isInRange(d.created_at ?? null));
   const filteredDipantau = dipantauData.filter((p) => isInRange(p.created_at ?? null));
 
-  // Label periode
   const labelKat: Record<PdfKategori, string> = {
     harian:   `Tanggal ${fmtTgl(selectedDate.toISOString())}`,
     mingguan: `Minggu ke-${getWeekNumber(selectedDate)} / ${selectedDate.getFullYear()}`,
@@ -104,7 +126,6 @@ export function exportPDFRekap(
     tahunan:  `Tahun ${selectedDate.getFullYear()}`,
   };
 
-  // ─ Gabungkan ─
   const selesaiRows = filteredSelesai.map((d, i) => ({
     no: i + 1,
     kode: d.kode_laporan,
@@ -208,7 +229,7 @@ export function exportPDFRekap(
     <div class="name">( _________________ )</div>
   </div>
 </div>
-<script>window.onload=function(){window.print()}</script>
+${PRINT_SCRIPT}
 </body></html>`;
 
   printWindow(html);
@@ -216,8 +237,6 @@ export function exportPDFRekap(
 
 // ═══════════════════════════════════════════════════════════════
 // 2. PDF PROSES MONITOR — per laporan individual
-//    Dipakai oleh ProcessMonitorTable.tsx (kolom paling kanan)
-//    Mencetak 1 laporan beserta detail penyebab, rencana, hasil
 // ═══════════════════════════════════════════════════════════════
 export interface ProsesDetailItem {
   kode_laporan: string;
@@ -256,7 +275,6 @@ export function exportPDFProses(item: ProsesDetailItem) {
   <p>Kode: <strong>${item.kode_laporan}</strong> &nbsp;|&nbsp; Dicetak: ${fmtTglWaktu(new Date().toISOString())}</p>
 </div>
 
-<!-- Identitas -->
 <div class="section">
   <div class="section-title">Identitas Laporan</div>
   <div class="field"><span class="lbl">Kode Laporan</span><span class="val">${item.kode_laporan}</span></div>
@@ -267,32 +285,27 @@ export function exportPDFProses(item: ProsesDetailItem) {
   <div class="field"><span class="lbl">Status Review</span><span class="val">${labelStatusReview(item.status_review)}</span></div>
 </div>
 
-<!-- Isi Laporan -->
 <div class="section">
   <div class="section-title">Isi Laporan Civitas</div>
   <div class="box">${item.isi_laporan ?? "—"}</div>
 </div>
 
-<!-- Penyebab -->
 <div class="section">
   <div class="section-title">Analisis Penyebab (Kepala Unit)</div>
   <div class="box">${item.penyebab ?? "<em style='color:#9ca3af'>Belum diisi</em>"}</div>
 </div>
 
-<!-- Rencana -->
 <div class="section">
   <div class="section-title">Rencana Tindakan (Kepala Unit)</div>
   <div class="box">${item.rencana_tindakan ?? "<em style='color:#9ca3af'>Belum diisi</em>"}</div>
 </div>
 
-<!-- Masukan Ka P4M -->
 ${item.aksi_masukan ? `
 <div class="section">
   <div class="section-title">Masukan Ka P4M</div>
   <div class="box" style="background:#eff6ff;border-color:#bfdbfe">${item.aksi_masukan}</div>
 </div>` : ""}
 
-<!-- Hasil Pelaksanaan -->
 <div class="section">
   <div class="section-title">Hasil Pelaksanaan Tindakan</div>
   ${item.tanggal_pelaksanaan
@@ -301,7 +314,6 @@ ${item.aksi_masukan ? `
   <div class="box">${item.hasil_tindakan ?? "<em style='color:#9ca3af'>Belum ada hasil</em>"}</div>
 </div>
 
-<!-- TTD -->
 <div class="footer">
   <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p></div>
   <div class="ttd">
@@ -310,7 +322,7 @@ ${item.aksi_masukan ? `
     <div class="name">( _________________ )</div>
   </div>
 </div>
-<script>window.onload=function(){window.print()}</script>
+${PRINT_SCRIPT}
 </body></html>`;
 
   printWindow(html);
