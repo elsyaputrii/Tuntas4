@@ -3,29 +3,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function StaffHero() {
-  const router            = useRouter();
-  const [nama, setNama]   = useState<string>("");
+  const router = useRouter();
+  const [nama, setNama] = useState<string>("");
 
   useEffect(() => {
     const raw = localStorage.getItem("user");
-
-    // Kalau tidak ada data → redirect ke login
-    if (!raw) {
-      router.push("/staff-p4m/login");
-      return;
-    }
+    if (!raw) { router.push("/staff-p4m/login"); return; }
 
     try {
       const user = JSON.parse(raw) as { nama?: string; role?: string };
-
-      // Kalau role bukan staf_p4m → redirect
-      if (user.role !== "staf_p4m") {
-        router.push("/staff-p4m/login");
-        return;
-      }
-
-      // Baru set nama setelah semua validasi lolos
-      setNama(user.nama ?? "");
+      if (user.role !== "staf_p4m") { router.push("/staff-p4m/login"); return; }
+      setTimeout(() => setNama(user.nama ?? ""), 0);
     } catch {
       router.push("/staff-p4m/login");
     }
@@ -38,19 +26,21 @@ export default function StaffHero() {
   }
 
   return (
-    <div className="bg-dark-header p-8 text-white mb-6 flex items-center justify-between">
-      <h1 className="text-2xl font-bold leading-tight">
-        Transformasi Tata Kelola <br />
-        Organisasi: Aplikasi Pengelolaan Ketidaksesuaian Polibatam
-      </h1>
+    <div className="bg-dark-header p-4 sm:p-6 md:p-8 text-white mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold leading-tight">
+          Transformasi Tata Kelola <br className="hidden sm:block" />
+          Organisasi: Aplikasi Pengelolaan Ketidaksesuaian Polibatam
+        </h1>
+      </div>
 
-      <div className="flex flex-col items-end gap-2 ml-6 shrink-0">
+      <div className="flex flex-col sm:items-end gap-2 shrink-0">
         {nama && (
           <p className="text-sm text-blue-200 font-medium">👤 {nama}</p>
         )}
         <button
           onClick={handleLogout}
-          className="text-xs bg-white text-dark-header font-bold px-4 py-1.5 rounded hover:bg-gray-100 transition-all"
+          className="self-start sm:self-auto text-xs bg-white text-dark-header font-bold px-4 py-1.5 rounded hover:bg-gray-100 transition-all"
         >
           Logout
         </button>

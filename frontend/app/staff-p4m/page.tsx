@@ -41,13 +41,13 @@ export default function StaffP4MPage() {
   if (!bolehRender) return null;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 md:p-12">
+    <main className="min-h-screen bg-gray-50 p-3 sm:p-6 md:p-12">
       <div className="max-w-[95%] mx-auto">
         <StaffHero />
 
         <StaffNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        <div className="mt-6 transition-all duration-300 animate-in fade-in">
+        <div className="mt-4 sm:mt-6 transition-all duration-300 animate-in fade-in">
           {activeTab === 'incoming' && <IncomingReportTable />}
           {activeTab === 'process'  && <ProcessMonitorTable />}
           {activeTab === 'recap'    && <RecapitulationTable />}
