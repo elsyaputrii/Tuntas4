@@ -39,7 +39,19 @@ export function getWeekNumber(d: Date): number {
   );
 }
 
-/** Cek apakah dua Date dalam hari yang sama */
+/**
+ * Normalkan ISO string dari DB (UTC) ke Date lokal
+ * supaya perbandingan hari tidak tergeser akibat timezone.
+ * Contoh: "2026-06-02T00:00:00.000Z" di UTC+7 → tetap 2 Juni, bukan 1 Juni.
+ */
+export function toLocalDate(iso: string): Date {
+  // Ambil bagian tanggal saja (YYYY-MM-DD) lalu buat Date lokal
+  const part = iso.slice(0, 10); // "2026-06-02"
+  const [y, m, d] = part.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Cek apakah dua Date dalam hari yang sama (berdasarkan komponen lokal) */
 export function sameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

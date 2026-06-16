@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from "react";
 import { stafApi } from "@/lib/api";
 import { exportExcel } from "@/lib/exportExcel";
 import { exportPDFRekap, type PdfKategori } from "@/lib/exportPdf";
-import { fmtTgl, getWeekNumber, sameDay } from "@/lib/exportHelpers";
+import { fmtTgl, getWeekNumber, sameDay, toLocalDate } from "@/lib/exportHelpers";
 import type { RekapItem, ProsesItem } from "@/lib/exportTypes";
 
 const BULAN_PANJANG = [
@@ -62,15 +62,15 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
           return (
             <button key={day} onClick={()=>onSelectDate(new Date(year,month,day))}
               className={`w-7 h-7 text-[10px] rounded-full flex items-center justify-center mx-auto relative transition-all
-                ${isSelected?"bg-[#4d5e71] text-white font-bold":isToday?"bg-blue-100 text-blue-700 font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
+                ${isSelected?"bg-dark-header text-white font-bold":isToday?"bg-blue-100 text-blue-700 font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
               {day}
-              {hasData&&!isSelected&&<span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#5da0dd] rounded-full"/>}
+              {hasData&&!isSelected&&<span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-polibatam rounded-full"/>}
             </button>
           );
         })}
       </div>
       <button onClick={()=>{setViewDate(new Date());onSelectDate(new Date());}}
-        className="w-full mt-2 text-[10px] text-[#4d5e71] font-semibold hover:underline">Hari Ini</button>
+        className="w-full mt-2 text-[10px] text-dark-header font-semibold hover:underline">Hari Ini</button>
     </div>
   );
 }
@@ -128,7 +128,7 @@ export default function RecapitulationTable() {
 
   const highlightedDates = new Set<string>(
     allItems.filter(d=>d.tglMasuk).map(d=>{
-      const dt=new Date(d.tglMasuk!);
+      const dt = toLocalDate(d.tglMasuk!); // ← fix timezone
       return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
     })
   );
@@ -136,7 +136,7 @@ export default function RecapitulationTable() {
   function isInFilter(tglMasuk:string|null):boolean{
     if(filterMode==="semua") return true;
     if(!tglMasuk) return false;
-    const d=new Date(tglMasuk);
+    const d = toLocalDate(tglMasuk); // ← fix: pakai toLocalDate agar tidak geser timezone UTC→WIB
     if(filterMode==="harian")   return sameDay(d,selectedDate);
     if(filterMode==="mingguan") return d.getFullYear()===selectedDate.getFullYear()&&getWeekNumber(d)===getWeekNumber(selectedDate);
     if(filterMode==="bulanan")  return d.getFullYear()===selectedDate.getFullYear()&&d.getMonth()===selectedDate.getMonth();
@@ -186,13 +186,13 @@ export default function RecapitulationTable() {
 
         {/* Kolom kiri: Kalender + filter mode */}
         <div className="flex flex-col gap-3">
-          <MiniCalendar selectedDate={selectedDate} onSelectDate={setSelectedDate} highlightedDates={highlightedDates}/>
+          <MiniCalendar selectedDate={selectedDate} onSelectDate={(d)=>{setSelectedDate(d);setFilterMode("harian");}} highlightedDates={highlightedDates}/>
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
             <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Filter Tampilan</p>
             <div className="flex flex-col gap-1">
               {(["semua","harian","mingguan","bulanan","tahunan"] as FilterMode[]).map(mode=>(
                 <button key={mode} onClick={()=>setFilterMode(mode)}
-                  className={`text-left px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${filterMode===mode?"bg-[#4d5e71] text-white":"hover:bg-gray-100 text-gray-600"}`}>
+                  className={`text-left px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${filterMode===mode?"bg-dark-header text-white":"hover:bg-gray-100 text-gray-600"}`}>
                   {mode==="semua"?"🗂 Semua":mode==="harian"?"📅 Harian":mode==="mingguan"?"📆 Mingguan":mode==="bulanan"?"🗓 Bulanan":"📊 Tahunan"}
                 </button>
               ))}
@@ -224,7 +224,7 @@ export default function RecapitulationTable() {
             <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📋 Rekap Status Tindak Lanjut</p>
             <table className="w-full text-[10px] border-collapse">
               <thead>
-                <tr className="bg-[#4d5e71] text-white">
+                <tr className="bg-dark-header text-white">
                   <th className="p-2 text-left border border-[#3a4d5e]">Status</th>
                   <th className="p-2 text-center border border-[#3a4d5e]">Jumlah</th>
                   <th className="p-2 text-center border border-[#3a4d5e]">Persentase</th>
@@ -255,18 +255,34 @@ export default function RecapitulationTable() {
       <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
         <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">📥 Export:</span>
         <button
-          onClick={()=>{setExportingExcelLoading(true);exportExcel(rekapData,prosesData);setTimeout(()=>setExportingExcelLoading(false),1200);}}
-          disabled={exportingExcelLoading||allItems.length===0}
+          onClick={()=>{
+            // Export Excel hanya data yang sudah difilter, bukan semua data
+            const filteredRekap   = rekapData.filter(d=>isInFilter(d.created_at??null));
+            const filteredDipantau = prosesData.filter(p=>{
+              const selesaiIds=new Set(rekapData.map(d=>d.id_boxing));
+              return !selesaiIds.has(p.id_boxing)&&isInFilter(p.created_at??null);
+            });
+            setExportingExcelLoading(true);
+            exportExcel(filteredRekap, filteredDipantau);
+            setTimeout(()=>setExportingExcelLoading(false),1200);
+          }}
+          disabled={exportingExcelLoading||filteredItems.length===0}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white text-[10px] font-bold rounded transition-all">
-          {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel (Semua)
+          {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel ({filterMode==="semua"?"Semua":labelFilter[filterMode]})
         </button>
         <span className="text-[9px] text-gray-400 ml-1">PDF per periode:</span>
         {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
           <button key={kat}
-            onClick={()=>{setExportingPDF(kat);exportPDFRekap(rekapData,prosesData,kat,selectedDate);setTimeout(()=>setExportingPDF(null),1200);}}
+            onClick={()=>{
+              // Fix bug cancel PDF: set spinner, panggil fungsi, lalu langsung reset
+              // (tidak pakai setTimeout agar tidak stuck kalau user cancel cepat/lambat)
+              setExportingPDF(kat);
+              exportPDFRekap(rekapData,prosesData,kat,selectedDate);
+              setExportingPDF(null);
+            }}
             disabled={exportingPDF===kat}
             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
-            {exportingPDF===kat?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📄"}
+            {"📄"}
             {kat.charAt(0).toUpperCase()+kat.slice(1)}
           </button>
         ))}
@@ -277,7 +293,7 @@ export default function RecapitulationTable() {
 
       {/* Tabel Rekapitulasi */}
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
-        <div className="flex min-w-[1100px] font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
+        <div className="flex min-w-275 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
           <div className="w-10 border-r-2 border-black p-2">No</div>
           <div className="flex-1 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
           <div className="w-36 border-r-2 border-black p-2">Penyebab</div>
@@ -288,12 +304,12 @@ export default function RecapitulationTable() {
         </div>
 
         {filteredItems.length===0?(
-          <div className="flex min-w-[1100px] p-8 justify-center border-t-2 border-black">
+          <div className="flex min-w-275 p-8 justify-center border-t-2 border-black">
             <p className="text-gray-400 italic text-sm">Tidak ada data untuk periode ini.</p>
           </div>
         ):(
           filteredItems.map((item,index)=>(
-            <div key={`${item.id_boxing}-${index}`} className="flex min-w-[1100px] border-t-2 border-black text-[11px]">
+            <div key={`${item.id_boxing}-${index}`} className="flex min-w-275 border-t-2 border-black text-[11px]">
               <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
                 <span className="font-bold text-sm">{index+1}</span>
               </div>
