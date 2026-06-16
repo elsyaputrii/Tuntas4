@@ -3,12 +3,13 @@ const express = require("express");
 const router  = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const {
-  getLaporanMasuk,
+   getLaporanMasuk,
   getKepalaUnit,
   distribusiLaporan,
   getProsesMonitor,
   inputHasilPemantauan,
   setKeputusanBoxing,
+  setApprovalStaf,    // ← TAMBAHKAN INI
   getRekapitulasi,
 } = require("../controllers/stafController");
 
@@ -28,5 +29,6 @@ router.get("/rekap",       roleMiddleware("staf_p4m"), getRekapitulasi);
 router.get("/proses",      roleMiddleware("staf_p4m"), getProsesMonitor);
 router.post("/pemantauan", roleMiddleware("staf_p4m"), inputHasilPemantauan);
 router.patch("/keputusan-boxing", roleMiddleware("staf_p4m"), setKeputusanBoxing);
+router.patch("/approval-boxing",  roleMiddleware("staf_p4m"), setApprovalStaf);
 
 module.exports = router;

@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { stafApi } from "@/lib/api";
 import { exportPDFProses } from "@/lib/exportPdf";
-import Image from "next/image";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -10,27 +9,38 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http:/
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
       onClick={onClose}
     >
       <div
-        className="relative max-w-3xl w-full mx-4"
+        className="relative"
+        style={{ width: "85vw", maxWidth: "1100px" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute -top-8 right-0 text-white text-2xl font-bold"
+          className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300 z-10"
         >
           ✕
         </button>
-        <Image
-  src={src}
-  alt="Bukti lampiran"
-  width={900}
-  height={600}
-  className="w-full max-h-[80vh] object-contain rounded shadow-lg bg-white"
-  unoptimized
-/>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt="Bukti lampiran"
+          style={{ width: "100%", maxHeight: "85vh", objectFit: "contain", background: "white", borderRadius: "8px" }}
+          onError={(e) => {
+            const el = e.target as HTMLImageElement;
+            el.style.display = "none";
+            const parent = el.parentElement;
+            if (parent && !parent.querySelector(".err-msg")) {
+              const msg = document.createElement("div");
+              msg.className = "err-msg";
+              msg.style.cssText = "color:#ef4444;padding:32px;text-align:center;background:white;border-radius:8px;font-size:13px";
+              msg.innerText = "❌ Gambar tidak ditemukan.\nURL: " + src;
+              parent.appendChild(msg);
+            }
+          }}
+        />
       </div>
     </div>
   );
@@ -54,6 +64,7 @@ interface ProsesItem {
   hasil_tindakan: string | null;
   lampiran_hasil: string | null;
   tanggal_pelaksanaan: string | null;
+  approval_staf: string | null;
   created_at?: string | null;
 }
 
@@ -112,6 +123,29 @@ export default function ProcessMonitorTable() {
       setError(err instanceof Error ? err.message : "Gagal menyimpan.");
       setTimeout(() => setError(""), 4000);
     }
+  }
+
+  async function approvalStaf(id_boxing: number, approval: "diterima" | "ditolak") {
+    setError("");
+    try {
+      const res = await stafApi.setApprovalBoxing(id_boxing, approval);
+      setMsg(res.message);
+      setTimeout(() => setMsg(""), 4000);
+      fetchData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan approval.");
+      setTimeout(() => setError(""), 4000);
+    }
+  }
+
+  // Helper: buat URL gambar yang benar
+  function getImageUrl(lampiran: string | null): string {
+    if (!lampiran) return "";
+    // Jika sudah ada http, pakai langsung
+    if (lampiran.startsWith("http")) return lampiran;
+    // Jika sudah ada "uploads/" di depan, jangan double
+    if (lampiran.startsWith("uploads/")) return `${BASE_URL}/${lampiran}`;
+    return `${BASE_URL}/uploads/${lampiran}`;
   }
 
   function handleExportPDF(item: ProsesItem) {
@@ -209,7 +243,7 @@ export default function ProcessMonitorTable() {
               <button
                 type="button"
                 onClick={() =>
-                  setSelectedImage(`${BASE_URL}/uploads/${item.lampiran_hasil}`)
+                  setSelectedImage(getImageUrl(item.lampiran_hasil))
                 }
                 className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
               >
@@ -301,11 +335,11 @@ export default function ProcessMonitorTable() {
         {/* ── DESKTOP ── */}
         <div className="hidden lg:block">
           <div className="flex min-w-275 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
-            <div className="w-95 border-r-2 border-black p-3">Laporan</div>
+            <div className="w-120 border-r-2 border-black p-3">Laporan</div>
             <div className="w-40 border-r-2 border-black p-3">Keputusan Ka</div>
             <div className="w-85 border-r-2 border-black p-3">Hasil Unit</div>
             <div className="w-40 border-r-2 border-black p-3">Keputusan Staf</div>
-            <div className="w-15 p-3">PDF</div>
+            <div style={{width:"60px",padding:"8px",textAlign:"center"}}>PDF</div>
           </div>
 
           {aktif.length === 0 && selesai.length === 0 ? (
@@ -324,7 +358,7 @@ export default function ProcessMonitorTable() {
                     className="flex min-w-275 border-t-2 border-black"
                   >
                     {/* Kolom Laporan */}
-                    <div className="w-95 border-r-2 border-black p-3">
+                    <div className="w-120 border-r-2 border-black p-3">
                       <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                         <span className="font-bold">{item.kode_laporan}</span><br />
                         {item.nama_unit} ·{" "}
@@ -372,7 +406,7 @@ export default function ProcessMonitorTable() {
                         <button
                           type="button"
                           onClick={() =>
-                            setSelectedImage(`${BASE_URL}/uploads/${item.lampiran_hasil}`)
+                            setSelectedImage(getImageUrl(item.lampiran_hasil))
                           }
                           className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
                         >
@@ -381,28 +415,34 @@ export default function ProcessMonitorTable() {
                       )}
                     </div>
 
-                    {/* Kolom Keputusan Staf — tombol ✓ dan ✗ */}
+                    {/* Kolom Approval Staf — tombol ✓ dan ✗ */}
                     <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center items-center">
-                      {diStaff && item.hasil_tindakan ? (
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            onClick={() => putuskan(item.id_boxing, "selesai")}
-                            title="Terima — Laporan selesai"
-                            className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold flex items-center justify-center shadow"
-                          >
-                            ✓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => putuskan(item.id_boxing, "belum")}
-                            title="Tolak — Belum selesai"
-                            className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold flex items-center justify-center shadow"
-                          >
-                            ✗
-                          </button>
-                        </div>
-                      ) : diStaff ? (
+                      {item.status_boxing === "di_staff" && item.hasil_tindakan ? (
+                        item.approval_staf ? (
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded border ${item.approval_staf === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"}`}>
+                            {item.approval_staf === "diterima" ? "✓ Diterima" : "✗ Ditolak"}
+                          </span>
+                        ) : (
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              onClick={() => approvalStaf(item.id_boxing, "diterima")}
+                              title="Terima hasil tindak lanjut"
+                              className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold flex items-center justify-center shadow"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => approvalStaf(item.id_boxing, "ditolak")}
+                              title="Tolak hasil tindak lanjut"
+                              className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold flex items-center justify-center shadow"
+                            >
+                              ✗
+                            </button>
+                          </div>
+                        )
+                      ) : item.status_boxing === "di_staff" ? (
                         <span className="text-[9px] text-gray-400 italic text-center">
                           Menunggu hasil unit
                         </span>
@@ -414,16 +454,16 @@ export default function ProcessMonitorTable() {
                     </div>
 
                     {/* Kolom PDF */}
-                    <div className="w-15 p-3 flex items-center justify-center">
+                    <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
                       <button
                         type="button"
                         onClick={() => handleExportPDF(item)}
                         disabled={exportingId === item.id_boxing}
-                        className="flex flex-col items-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded"
+                        className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded"
                       >
                         {exportingId === item.id_boxing
                           ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          : <><span className="text-base leading-none">📄</span><span>PDF</span></>}
+                          : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
                       </button>
                     </div>
                   </div>
@@ -446,7 +486,7 @@ export default function ProcessMonitorTable() {
                         key={`${item.id_laporan}-${item.id_boxing}`}
                         className="flex min-w-275 border-t-2 border-black"
                       >
-                        <div className="w-95 border-r-2 border-black p-3">
+                        <div className="w-120 border-r-2 border-black p-3">
                           <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                             <span className="font-bold">{item.kode_laporan}</span><br />
                             {item.nama_unit} · <span className="italic">Selesai</span>
@@ -483,7 +523,7 @@ export default function ProcessMonitorTable() {
                             <button
                               type="button"
                               onClick={() =>
-                                setSelectedImage(`${BASE_URL}/uploads/${item.lampiran_hasil}`)
+                                setSelectedImage(getImageUrl(item.lampiran_hasil))
                               }
                               className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
                             >
@@ -511,16 +551,16 @@ export default function ProcessMonitorTable() {
                             </button>
                           )}
                         </div>
-                        <div className="w-15 p-3 flex items-center justify-center">
+                        <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
                           <button
                             type="button"
                             onClick={() => handleExportPDF(item)}
                             disabled={exportingId === item.id_boxing}
-                            className="flex flex-col items-center gap-1 px-2 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded"
+                            className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded"
                           >
                             {exportingId === item.id_boxing
                               ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              : <><span className="text-base leading-none">📄</span><span>PDF</span></>}
+                              : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
                           </button>
                         </div>
                       </div>

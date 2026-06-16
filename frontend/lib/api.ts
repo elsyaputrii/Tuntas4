@@ -92,6 +92,15 @@ export const stafApi = {
       body: JSON.stringify({ id_boxing, keputusan }),
     }),
 
+  setApprovalBoxing: (
+    id_boxing: number,
+    approval: "diterima" | "ditolak"
+  ) =>
+    apiFetch("/staf/approval-boxing", {
+      method: "PATCH",
+      body: JSON.stringify({ id_boxing, approval }),
+    }),
+
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
 };

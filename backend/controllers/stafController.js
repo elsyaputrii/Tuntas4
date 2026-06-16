@@ -11,6 +11,7 @@
 //   6. inputHasilPemantauan → Staf P4M input hasil pemantauan lapangan
 //   7. setStatusLaporan     → tutup (close) atau buka kembali laporan
 //   8. getRekapitulasi      → ringkasan semua laporan dari awal sampai selesai
+//   9. setApprovalStaf      → Staf P4M setujui/tolak hasil tindak lanjut unit ← BARU
 
 const { pool } = require("../config/db");
 const { UNITS_UMUM } = require("../constants/unitsUmum");
@@ -506,8 +507,62 @@ async function getRekapitulasi(req, res) {
 }
 
 // ============================================================
+// 8. APPROVAL STAF — PATCH /api/staf/approval-boxing
+//    Staf P4M menentukan: diterima atau ditolak setelah lihat gambar
+//    Body: { id_boxing, approval }  → approval: "diterima" | "ditolak"
+// ============================================================
+async function setApprovalStaf(req, res) {
+  const { id_boxing, approval } = req.body;
+  const validApproval = ["diterima", "ditolak"];
+  if (!id_boxing || !validApproval.includes(approval)) {
+    return res.status(400).json({
+      success: false,
+      message: "id_boxing dan approval (diterima|ditolak) wajib diisi.",
+    });
+  }
+  try {
+    const [rows] = await pool.query(
+      `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing
+       FROM boxing_ketidaksesuaian b
+       WHERE b.id_boxing = ?`,
+      [id_boxing]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Data boxing tidak ditemukan.",
+      });
+    }
+    const row = rows[0];
+    // Hanya bisa approve jika boxing sudah di_staff
+    if (row.status_boxing !== "di_staff") {
+      return res.status(400).json({
+        success: false,
+        message: "Approval hanya bisa dilakukan jika laporan sudah ada di Staf P4M (di_staff).",
+      });
+    }
+    await pool.query(
+      `UPDATE boxing_ketidaksesuaian
+       SET approval_staf = ?
+       WHERE id_boxing = ?`,
+      [approval, id_boxing]
+    );
+    const pesan =
+      approval === "diterima"
+        ? "Hasil tindak lanjut unit DITERIMA oleh Staf P4M."
+        : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Unit perlu perbaikan.";
+    return res.status(200).json({ success: true, message: pesan });
+  } catch (error) {
+    console.error("Error setApprovalStaf:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal menyimpan approval.",
+    });
+  }
+}
+
+// ============================================================
 // EXPORT SEMUA FUNGSI
-// reviewRancangan sekarang sudah benar-benar didefinisikan di atas
 // ============================================================
 module.exports = {
   getLaporanMasuk,
@@ -517,4 +572,5 @@ module.exports = {
   inputHasilPemantauan,
   setKeputusanBoxing,
   getRekapitulasi,
+  setApprovalStaf, // ← tambahan baru
 };
