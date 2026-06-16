@@ -31,7 +31,7 @@ export default function HomePage() {
 
     {/* LOGO */}
     <div className="flex items-center gap-3">
-      <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg">
+      <div className="w-10 h-10 bg-linear-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg">
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
           <path
             d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
@@ -68,7 +68,7 @@ export default function HomePage() {
         <span>🏠</span>
       </div>
       {activeTab === null && (
-        <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
+        <div className="absolute -bottom-2 left-0 w-full h-0.75 bg-blue-600 rounded-full" />
       )}
     </button>
   </Tooltip>
@@ -84,7 +84,7 @@ export default function HomePage() {
         <span>📝</span>
       </div>
       {activeTab === "form" && (
-        <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
+        <div className="absolute -bottom-2 left-0 w-full h- bg-blue-600 rounded-full" />
       )}
     </button>
   </Tooltip>
@@ -103,7 +103,7 @@ export default function HomePage() {
         <span>🔍</span>
       </div>
       {activeTab === "status" && (
-        <div className="absolute -bottom-2 left-0 w-full h-[3px] bg-blue-600 rounded-full" />
+        <div className="absolute -bottom-2 left-0 w-full h-0.75 bg-blue-600 rounded-full" />
       )}
     </button>
   </Tooltip>

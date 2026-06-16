@@ -139,7 +139,8 @@ async function getLaporanHasil(req, res) {
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing,
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
-        r.status_review, r.aksi_masukan,
+        r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
+        l.created_at AS tanggal_laporan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan,
         p.lampiran AS lampiran_hasil, p.tanggal AS tanggal_pelaksanaan
       FROM boxing_ketidaksesuaian b
@@ -195,9 +196,10 @@ async function submitPelaksanaan(req, res) {
     }
 
     const [boxingRows] = await pool.query(
-      `SELECT b.id_boxing, b.id_laporan
+      `SELECT b.id_boxing, b.id_laporan, l.created_at AS tanggal_laporan, r.updated_at AS tanggal_ditindaklanjuti
        FROM boxing_ketidaksesuaian b
        JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
        WHERE b.id_boxing = ? AND b.id_kepala = ?
          AND r.status_review = 'ditindaklanjuti'
          AND b.status = 'menunggu_pelaksanaan'`,
@@ -212,6 +214,21 @@ async function submitPelaksanaan(req, res) {
     }
 
     const id_laporan = boxingRows[0].id_laporan;
+    const tanggalLaporan = new Date(boxingRows[0].tanggal_laporan);
+    tanggalLaporan.setHours(0, 0, 0, 0);
+    const tanggalDitindaklanjuti = boxingRows[0].tanggal_ditindaklanjuti
+      ? new Date(boxingRows[0].tanggal_ditindaklanjuti)
+      : tanggalLaporan;
+    tanggalDitindaklanjuti.setHours(0, 0, 0, 0);
+    const minTanggal = tanggalDitindaklanjuti >= tanggalLaporan ? tanggalDitindaklanjuti : tanggalLaporan;
+    const tanggalInput = new Date(tanggal);
+    tanggalInput.setHours(0, 0, 0, 0);
+    if (tanggalInput < minTanggal) {
+      return res.status(400).json({
+        success: false,
+        message: "Tanggal pelaksanaan tidak boleh lebih awal dari tanggal Ka P4M menindaklanjuti laporan.",
+      });
+    }
 
     const [existingPelaksanaan] = await pool.query(
       `SELECT id_pelaksanaan FROM pelaksanaan_tindakan WHERE id_boxing = ?`,

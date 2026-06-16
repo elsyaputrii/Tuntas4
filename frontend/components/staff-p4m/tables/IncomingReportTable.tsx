@@ -64,7 +64,7 @@ function MultiSelectUnit({
     <div className="relative w-full" ref={ref}>
       <div
         onClick={() => setOpen(!open)}
-        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-[35px]"
+        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-8.75"
       >
         <div className="flex flex-wrap gap-1 flex-1">
           {selected.length > 0 ? (
@@ -107,7 +107,7 @@ function MultiSelectUnit({
                       selected.includes(unit) ? "bg-blue-50 font-bold text-blue-700" : "hover:bg-gray-100 text-gray-700"
                     }`}
                   >
-                    <input type="checkbox" checked={selected.includes(unit)} readOnly className="w-3 h-3 accent-[#5da0dd] pointer-events-none" />
+                    <input type="checkbox" checked={selected.includes(unit)} readOnly className="w-3 h-3 accent-blue-polibatam pointer-events-none" />
                     {unit}
                   </div>
                 ))}
@@ -198,7 +198,7 @@ export default function IncomingReportTable() {
         )}
 
         {/* DESKTOP: tabel asli */}
-        <div className="hidden md:block min-w-[600px]">
+        <div className="hidden md:block min-w-150">
           <div className="flex font-bold uppercase text-xs border-b-2 border-black">
             <div className="flex-1 border-r-2 border-black p-3 text-center">
               Kritik atau Pengaduan Terkait Polibatam
@@ -207,12 +207,12 @@ export default function IncomingReportTable() {
           </div>
 
           {laporan.length === 0 ? (
-            <div className="flex min-h-[180px] items-center justify-center">
+            <div className="flex min-h-45 items-center justify-center">
               <p className="text-gray-400 italic text-sm">Tidak ada laporan masuk.</p>
             </div>
           ) : (
             laporan.map((item) => (
-              <div key={item.id_laporan} className="flex min-h-[180px] border-t-2 border-black">
+              <div key={item.id_laporan} className="flex min-h-45 border-t-2 border-black">
                 <div className="flex-1 border-r-2 border-black p-5">
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode_laporan} · {item.jenis_laporan}</p>
                   <div className="border border-gray-400 p-4 h-28 text-xs bg-gray-50 overflow-auto">{item.deskripsi}</div>
@@ -237,7 +237,7 @@ export default function IncomingReportTable() {
                     <button
                       onClick={() => handleSend(item.id_laporan)}
                       disabled={loadingKirim === item.id_laporan}
-                      className="bg-[#5da0dd] text-white px-10 py-2 font-bold shadow-md hover:bg-blue-600 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
+                      className="bg-blue-polibatam text-white px-10 py-2 font-bold shadow-md hover:bg-blue-600 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
                     >
                       {loadingKirim === item.id_laporan ? "MENGIRIM..." : "SEND"}
                     </button>
@@ -277,7 +277,7 @@ export default function IncomingReportTable() {
                 <button
                   onClick={() => handleSend(item.id_laporan)}
                   disabled={loadingKirim === item.id_laporan}
-                  className="w-full bg-[#5da0dd] text-white py-2.5 font-bold shadow-md hover:bg-blue-600 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
+                  className="w-full bg-blue-polibatam text-white py-2.5 font-bold shadow-md hover:bg-blue-600 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
                 >
                   {loadingKirim === item.id_laporan ? "MENGIRIM..." : "SEND"}
                 </button>

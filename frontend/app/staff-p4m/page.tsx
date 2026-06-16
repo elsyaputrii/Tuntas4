@@ -31,7 +31,7 @@ export default function StaffP4MPage() {
         return;
       }
       // Lolos semua pengecekan → tampilkan halaman
-      setBolehRender(true);
+      setTimeout(() => setBolehRender(true), 0);
     } catch {
       router.push("/staff-p4m/login");
     }

@@ -16,7 +16,7 @@ export default function StaffNavigation({ activeTab, setActiveTab }: NavigationP
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`flex items-center gap-1.5 pb-3 font-medium text-xs sm:text-sm transition-all duration-300 whitespace-nowrap flex-shrink-0 px-1
+          className={`flex items-center gap-1.5 pb-3 font-medium text-xs sm:text-sm transition-all duration-300 whitespace-nowrap shrink-0 px-1
             ${activeTab === tab.id
               ? 'text-black border-b-2 border-black font-semibold'
               : 'text-gray-500 border-b-2 border-transparent hover:text-black'

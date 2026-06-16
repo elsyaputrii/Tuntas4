@@ -10,6 +10,8 @@ interface LaporanHasilItem {
   id_pelaksanaan: number | null;
   hasil_tindakan: string | null; lampiran_hasil: string | null;
   tanggal_pelaksanaan: string | null;
+  tanggal_laporan: string | null;
+  tanggal_ditindaklanjuti: string | null;
 }
 
 export default function ResultReportTable() {
@@ -44,6 +46,23 @@ export default function ResultReportTable() {
 
   const handleSubmit = async (id_boxing: number) => {
     if (!tanggal[id_boxing]) { alert("Tanggal pelaksanaan harus diisi."); return; }
+    const item = laporanList.find(l => l.id_boxing === id_boxing);
+    if (item) {
+      const tanggalInput = new Date(tanggal[id_boxing]);
+      tanggalInput.setHours(0, 0, 0, 0);
+      const refDate = item.tanggal_ditindaklanjuti
+        ? new Date(item.tanggal_ditindaklanjuti)
+        : item.tanggal_laporan
+          ? new Date(item.tanggal_laporan)
+          : null;
+      if (refDate) {
+        refDate.setHours(0, 0, 0, 0);
+        if (tanggalInput < refDate) {
+          alert("Tanggal pelaksanaan tidak boleh lebih awal dari tanggal Ka P4M menindaklanjuti laporan.");
+          return;
+        }
+      }
+    }
     if (!uraian[id_boxing]?.trim()) { alert("Uraian hasil harus diisi."); return; }
     if (!files[id_boxing]) { alert("Gambar bukti wajib diunggah."); return; }
     setSubmitting((prev) => ({ ...prev, [id_boxing]: true }));
@@ -62,7 +81,7 @@ export default function ResultReportTable() {
 
   if (loading) return (
     <div className="w-full border-2 border-black bg-white p-12 text-center">
-      <div className="w-6 h-6 border-4 border-[#5da0dd] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+      <div className="w-6 h-6 border-4 border-blue-polibatam border-t-transparent rounded-full animate-spin mx-auto mb-3" />
       <p className="text-gray-400 text-xs">Memuat data laporan hasil...</p>
     </div>
   );
@@ -70,7 +89,7 @@ export default function ResultReportTable() {
   if (errMsg) return (
     <div className="w-full border-2 border-red-400 bg-red-50 p-8 text-center">
       <p className="text-red-500 text-sm">{errMsg}</p>
-      <button onClick={fetchData} className="mt-3 px-4 py-1.5 bg-[#5da0dd] text-white text-xs rounded">Coba Lagi</button>
+      <button onClick={fetchData} className="mt-3 px-4 py-1.5 bg-blue-polibatam text-white text-xs rounded">Coba Lagi</button>
     </div>
   );
 
@@ -97,7 +116,7 @@ export default function ResultReportTable() {
           !!item.id_pelaksanaan && item.status_boxing !== "menunggu_pelaksanaan";
         const showForm = !sudahTerkirim;
         return (
-          <div key={item.id_boxing} className={`flex min-h-[200px] ${idx > 0 ? "border-t-2 border-black" : ""}`}>
+          <div key={item.id_boxing} className={`flex min-h-50 ${idx > 0 ? "border-t-2 border-black" : ""}`}>
             <div className="w-[25%] border-r-2 border-black p-4">
               <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded block mb-2">{item.kode_laporan}</span>
               <p className="text-[11px] text-black leading-relaxed">{item.isi_laporan}</p>
@@ -131,19 +150,24 @@ export default function ResultReportTable() {
                   {item.lampiran_hasil && (
                     <a href={`${process.env.NEXT_PUBLIC_API_URL?.replace("/api","") || "http://localhost:5000"}/uploads/${item.lampiran_hasil}`}
                       target="_blank" rel="noopener noreferrer"
-                      className="text-[10px] text-[#5da0dd] hover:underline">🖼️ Lihat Lampiran</a>
+                      className="text-[10px] text-blue-polibatam hover:underline">🖼️ Lihat Lampiran</a>
                   )}
                   <div className="text-[10px] text-green-500 font-medium">✓ Laporan telah dikirim ke Staf P4M</div>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <input type="date"
-                    className="w-full border border-black p-2 text-[11px] outline-none focus:border-[#5da0dd]"
+                    className="w-full border border-black p-2 text-[11px] outline-none focus:border-blue-polibatam"
                     value={tanggal[item.id_boxing] || ""}
+                    min={item.tanggal_ditindaklanjuti
+                      ? new Date(item.tanggal_ditindaklanjuti).toISOString().split('T')[0]
+                      : item.tanggal_laporan
+                        ? new Date(item.tanggal_laporan).toISOString().split('T')[0]
+                        : undefined}
                     onChange={(e) => setTanggal((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
                   />
                   <textarea
-                    className="w-full h-24 border border-black p-3 text-[11px] text-black outline-none focus:border-[#5da0dd] resize-none"
+                    className="w-full h-24 border border-black p-3 text-[11px] text-black outline-none focus:border-blue-polibatam resize-none"
                     placeholder="Tambahkan Uraian Hasil Tindak Lanjut..."
                     value={uraian[item.id_boxing] || ""}
                     onChange={(e) => setUraian((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
@@ -159,8 +183,8 @@ export default function ResultReportTable() {
                   </div>
                   <div className="flex justify-end">
                     <button onClick={() => handleSubmit(item.id_boxing)} disabled={submitting[item.id_boxing]}
-                      className="bg-[#5da0dd] text-white px-6 py-1.5 rounded font-bold uppercase text-[10px] hover:bg-blue-600 shadow transition-all disabled:opacity-50">
-                      {submitting[item.id_boxing] ? "Menyimpan..." : "Submit"}
+                      className="bg-blue-polibatam text-white px-6 py-1.5 rounded font-bold uppercase text-[10px] hover:bg-blue-600 shadow transition-all disabled:opacity-50">
+                      {submitting[item.id_boxing] ? "Menyimpan..." : "Kirim"}
                     </button>
                   </div>
                 </div>
