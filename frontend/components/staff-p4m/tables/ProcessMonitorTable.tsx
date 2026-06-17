@@ -90,6 +90,8 @@ export default function ProcessMonitorTable() {
   const [exportingId, setExportingId] = useState<number | null>(null);
   // State untuk menyimpan URL gambar yang sedang dibuka di modal
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  // State untuk feedback langsung setelah tombol ✓/✗ ditekan
+  const [pendingKeputusan, setPendingKeputusan] = useState<Record<number, "selesai"|"belum">>({});
 
   useEffect(() => { fetchData(); }, []);
 
@@ -113,6 +115,10 @@ export default function ProcessMonitorTable() {
       const ok = confirm("Laporan akan ditindaklanjuti lagi. Lanjutkan?");
       if (!ok) return;
     }
+    // Langsung sembunyikan tombol & tampilkan teks konfirmasi
+    if (keputusan === "selesai" || keputusan === "belum") {
+      setPendingKeputusan(prev => ({ ...prev, [id_boxing]: keputusan }));
+    }
     setError("");
     try {
       const res = await stafApi.setKeputusanBoxing(id_boxing, keputusan);
@@ -120,6 +126,8 @@ export default function ProcessMonitorTable() {
       setTimeout(() => setMsg(""), 4000);
       fetchData();
     } catch (err: unknown) {
+      // Kalau gagal, kembalikan tombol
+      setPendingKeputusan(prev => { const n = {...prev}; delete n[id_boxing]; return n; });
       setError(err instanceof Error ? err.message : "Gagal menyimpan.");
       setTimeout(() => setError(""), 4000);
     }
@@ -256,25 +264,38 @@ export default function ProcessMonitorTable() {
         {/* Aksi: centang / silang atau status menunggu */}
         <div className="flex flex-wrap gap-2">
           {diStaff && item.hasil_tindakan ? (
-            // Tampilkan tombol ✓ dan ✗ hanya jika ada hasil dari unit
-            <div className="flex gap-3 justify-center w-full">
-              <button
-                type="button"
-                onClick={() => putuskan(item.id_boxing, "selesai")}
-                title="Terima — Laporan selesai"
-                className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white text-2xl font-bold flex items-center justify-center shadow"
-              >
-                ✓
-              </button>
-              <button
-                type="button"
-                onClick={() => putuskan(item.id_boxing, "belum")}
-                title="Tolak — Belum selesai"
-                className="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white text-2xl font-bold flex items-center justify-center shadow"
-              >
-                ✗
-              </button>
-            </div>
+            pendingKeputusan[item.id_boxing] ? (
+              // Setelah diklik: tampilkan teks konfirmasi, kedua tombol hilang
+              <div className={`w-full text-center text-xs font-bold py-2 rounded ${
+                pendingKeputusan[item.id_boxing] === "selesai"
+                  ? "text-green-700 bg-green-50 border border-green-200"
+                  : "text-red-700 bg-red-50 border border-red-200"
+              }`}>
+                {pendingKeputusan[item.id_boxing] === "selesai"
+                  ? "✓ Keputusan disetujui"
+                  : "✗ Keputusan ditolak"}
+              </div>
+            ) : (
+              // Tampilkan tombol ✓ dan ✗ hanya jika ada hasil dari unit
+              <div className="flex gap-3 justify-center w-full">
+                <button
+                  type="button"
+                  onClick={() => putuskan(item.id_boxing, "selesai")}
+                  title="Terima — Laporan selesai"
+                  className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white text-2xl font-bold flex items-center justify-center shadow"
+                >
+                  ✓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => putuskan(item.id_boxing, "belum")}
+                  title="Tolak — Belum selesai"
+                  className="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white text-2xl font-bold flex items-center justify-center shadow"
+                >
+                  ✗
+                </button>
+              </div>
+            )
           ) : diStaff ? (
             <span className="text-[10px] text-gray-400 italic">Menunggu hasil unit</span>
           ) : null}

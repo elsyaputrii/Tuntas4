@@ -14,7 +14,11 @@ export default function ImageModal({ src, onClose }: ImageModalProps) {
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const posRef    = useRef(pos);
-  posRef.current  = pos;
+
+  // Sync posRef setiap kali pos berubah — harus di useEffect, bukan di render
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -110,10 +114,10 @@ export default function ImageModal({ src, onClose }: ImageModalProps) {
 
           <button
             onClick={onClose}
-            className="text-white text-lg w-8 h-8 flex items-center justify-center hover:bg-red-500/70 rounded-full transition"
+            className="text-white text-sm font-bold px-3 py-1 bg-red-500/80 hover:bg-red-600 rounded-full transition flex items-center gap-1"
             title="Tutup"
           >
-            ✕
+            ✕ Tutup
           </button>
         </div>
 

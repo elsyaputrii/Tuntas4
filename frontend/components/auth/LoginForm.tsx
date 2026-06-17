@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
+import { Eye, EyeOff } from "lucide-react";
 
 interface LoginFormProps {
   role: "staf_p4m" | "ka_p4m" | "kepala_unit";
@@ -17,10 +18,11 @@ export default function LoginForm({
   forgotPasswordPath,
   redirectAfterLogin,
 }: LoginFormProps) {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState("");
   const router = useRouter();
 
   async function handleLogin() {
@@ -57,7 +59,7 @@ export default function LoginForm({
   }
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
       {/* Background blur */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -112,13 +114,22 @@ export default function LoginForm({
                 🔒
               </span>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Enter Password"
-                className="w-full pl-12 pr-4 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none"
+                className="w-full pl-12 pr-12 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute inset-y-0 right-4 flex items-center text-gray-500 hover:text-gray-700 transition"
+                tabIndex={-1}
+                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+              >
+                {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+              </button>
             </div>
 
             {/* Error message */}

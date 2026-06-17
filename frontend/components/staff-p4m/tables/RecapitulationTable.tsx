@@ -64,7 +64,7 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
               className={`w-7 h-7 text-[10px] rounded-full flex items-center justify-center mx-auto relative transition-all
                 ${isSelected?"bg-dark-header text-white font-bold":isToday?"bg-blue-100 text-blue-700 font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
               {day}
-              {hasData&&!isSelected&&<span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-polibatam rounded-full"/>}
+              {hasData&&<span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${isSelected?"bg-white/70":"bg-blue-polibatam"}`}/>}
             </button>
           );
         })}
