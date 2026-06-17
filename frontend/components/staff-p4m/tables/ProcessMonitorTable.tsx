@@ -5,28 +5,13 @@ import { exportPDFProses } from "@/lib/exportPdf";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
-// Komponen modal untuk menampilkan gambar lampiran dari kepala unit
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-      onClick={onClose}
-    >
-      <div
-        className="relative"
-        style={{ width: "85vw", maxWidth: "1100px" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300 z-10"
-        >
-          ✕
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={onClose}>
+      <div className="relative" style={{ width: "85vw", maxWidth: "1100px" }} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300 z-10">✕</button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt="Bukti lampiran"
+        <img src={src} alt="Bukti lampiran"
           style={{ width: "100%", maxHeight: "85vh", objectFit: "contain", background: "white", borderRadius: "8px" }}
           onError={(e) => {
             const el = e.target as HTMLImageElement;
@@ -88,10 +73,9 @@ export default function ProcessMonitorTable() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [exportingId, setExportingId] = useState<number | null>(null);
-  // State untuk menyimpan URL gambar yang sedang dibuka di modal
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  // State untuk feedback langsung setelah tombol ✓/✗ ditekan
   const [pendingKeputusan, setPendingKeputusan] = useState<Record<number, "selesai"|"belum">>({});
+  const [pendingApproval, setPendingApproval] = useState<Record<number, "diterima"|"ditolak">>({});
 
   useEffect(() => { fetchData(); }, []);
 
@@ -107,15 +91,11 @@ export default function ProcessMonitorTable() {
     }
   }
 
-  async function putuskan(
-    id_boxing: number,
-    keputusan: "selesai" | "belum" | "lanjut" | "ditindak_lanjut"
-  ) {
+  async function putuskan(id_boxing: number, keputusan: "selesai" | "belum" | "lanjut" | "ditindak_lanjut") {
     if (keputusan === "ditindak_lanjut") {
       const ok = confirm("Laporan akan ditindaklanjuti lagi. Lanjutkan?");
       if (!ok) return;
     }
-    // Langsung sembunyikan tombol & tampilkan teks konfirmasi
     if (keputusan === "selesai" || keputusan === "belum") {
       setPendingKeputusan(prev => ({ ...prev, [id_boxing]: keputusan }));
     }
@@ -126,7 +106,6 @@ export default function ProcessMonitorTable() {
       setTimeout(() => setMsg(""), 4000);
       fetchData();
     } catch (err: unknown) {
-      // Kalau gagal, kembalikan tombol
       setPendingKeputusan(prev => { const n = {...prev}; delete n[id_boxing]; return n; });
       setError(err instanceof Error ? err.message : "Gagal menyimpan.");
       setTimeout(() => setError(""), 4000);
@@ -134,6 +113,7 @@ export default function ProcessMonitorTable() {
   }
 
   async function approvalStaf(id_boxing: number, approval: "diterima" | "ditolak") {
+    setPendingApproval(prev => ({ ...prev, [id_boxing]: approval }));
     setError("");
     try {
       const res = await stafApi.setApprovalBoxing(id_boxing, approval);
@@ -141,17 +121,15 @@ export default function ProcessMonitorTable() {
       setTimeout(() => setMsg(""), 4000);
       fetchData();
     } catch (err: unknown) {
+      setPendingApproval(prev => { const n = {...prev}; delete n[id_boxing]; return n; });
       setError(err instanceof Error ? err.message : "Gagal menyimpan approval.");
       setTimeout(() => setError(""), 4000);
     }
   }
 
-  // Helper: buat URL gambar yang benar
   function getImageUrl(lampiran: string | null): string {
     if (!lampiran) return "";
-    // Jika sudah ada http, pakai langsung
     if (lampiran.startsWith("http")) return lampiran;
-    // Jika sudah ada "uploads/" di depan, jangan double
     if (lampiran.startsWith("uploads/")) return `${BASE_URL}/${lampiran}`;
     return `${BASE_URL}/uploads/${lampiran}`;
   }
@@ -176,10 +154,46 @@ export default function ProcessMonitorTable() {
     setTimeout(() => setExportingId(null), 1200);
   }
 
+  function renderApprovalButtons(item: ProsesItem) {
+    const pending = pendingApproval[item.id_boxing];
+    const existing = item.approval_staf;
+
+    if (item.status_boxing !== "di_staff") {
+      return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
+    }
+    if (!item.hasil_tindakan) {
+      return <span className="text-[9px] text-gray-400 italic text-center">Menunggu hasil unit</span>;
+    }
+    // ✅ FIX: cek 'menunggu' supaya tidak dianggap sudah ada keputusan
+    if (pending || (existing && existing !== "menunggu")) {
+      const val = pending ?? existing;
+      return (
+        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
+          val === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
+        }`}>
+          {val === "diterima" ? "✓ Disetujui" : "✗ Tidak Disetujui"}
+        </span>
+      );
+    }
+    return (
+      <div className="flex gap-3">
+        <button type="button" onClick={() => approvalStaf(item.id_boxing, "diterima")}
+          title="Terima hasil tindak lanjut"
+          className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold flex items-center justify-center shadow">
+          ✓
+        </button>
+        <button type="button" onClick={() => approvalStaf(item.id_boxing, "ditolak")}
+          title="Tolak hasil tindak lanjut"
+          className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold flex items-center justify-center shadow">
+          ✗
+        </button>
+      </div>
+    );
+  }
+
   const aktif = data.filter((d) => d.status_boxing !== "selesai");
   const selesai = data.filter((d) => d.status_boxing === "selesai");
 
-  // ─── MOBILE CARD ────────────────────────────────────────────────────────────
   function renderCard(item: ProsesItem) {
     const rev = item.status_review ? reviewBadge[item.status_review] : null;
     const diStaff = item.status_boxing === "di_staff";
@@ -188,11 +202,7 @@ export default function ProcessMonitorTable() {
     const tidakKa = item.status_review === "tidak_ditindaklanjuti";
 
     return (
-      <div
-        key={`${item.id_laporan}-${item.id_boxing}`}
-        className="border-t-2 border-black p-4 space-y-3"
-      >
-        {/* Header */}
+      <div key={`${item.id_laporan}-${item.id_boxing}`} className="border-t-2 border-black p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div>
             <span className="text-xs font-bold text-gray-700">{item.kode_laporan}</span>
@@ -202,120 +212,55 @@ export default function ProcessMonitorTable() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {rev && (
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 border rounded ${rev.cls}`}>
-                {rev.label}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => handleExportPDF(item)}
-              disabled={exportingId === item.id_boxing}
-              className="flex items-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded"
-            >
-              {exportingId === item.id_boxing
-                ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : "📄 PDF"}
+            {rev && <span className={`text-[9px] font-bold px-1.5 py-0.5 border rounded ${rev.cls}`}>{rev.label}</span>}
+            <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
+              className="flex items-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded">
+              {exportingId === item.id_boxing ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "📄 PDF"}
             </button>
           </div>
         </div>
 
-        {/* Isi laporan */}
         <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-20 overflow-auto bg-gray-50">
           {item.isi_laporan}
         </div>
 
-        {/* Masukan Ka P4M */}
         {item.aksi_masukan && (
-          <p className="text-[10px] text-gray-500 italic border-l-2 border-blue-300 pl-2">
-            {item.aksi_masukan}
-          </p>
+          <p className="text-[10px] text-gray-500 italic border-l-2 border-blue-300 pl-2">{item.aksi_masukan}</p>
         )}
 
-        {/* Hasil unit + tombol Lihat Gambar */}
         {item.hasil_tindakan && (
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Hasil Unit:</p>
-            <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-16 overflow-auto">
-              {item.hasil_tindakan}
-            </div>
+            <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-16 overflow-auto">{item.hasil_tindakan}</div>
             {item.tanggal_pelaksanaan && (
               <p className="text-[9px] text-gray-400 mt-1">
-                📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", {
-                  day: "2-digit", month: "short", year: "numeric",
-                })}
+                📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
               </p>
             )}
-            {/* Tombol Lihat Gambar — muncul jika kepala unit mengunggah lampiran */}
             {item.lampiran_hasil && (
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedImage(getImageUrl(item.lampiran_hasil))
-                }
-                className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
-              >
+              <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
+                className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
                 🖼️ Lihat Gambar
               </button>
             )}
           </div>
         )}
 
-        {/* Aksi: centang / silang atau status menunggu */}
         <div className="flex flex-wrap gap-2">
-          {diStaff && item.hasil_tindakan ? (
-            pendingKeputusan[item.id_boxing] ? (
-              // Setelah diklik: tampilkan teks konfirmasi, kedua tombol hilang
-              <div className={`w-full text-center text-xs font-bold py-2 rounded ${
-                pendingKeputusan[item.id_boxing] === "selesai"
-                  ? "text-green-700 bg-green-50 border border-green-200"
-                  : "text-red-700 bg-red-50 border border-red-200"
-              }`}>
-                {pendingKeputusan[item.id_boxing] === "selesai"
-                  ? "✓ Keputusan disetujui"
-                  : "✗ Keputusan ditolak"}
-              </div>
-            ) : (
-              // Tampilkan tombol ✓ dan ✗ hanya jika ada hasil dari unit
-              <div className="flex gap-3 justify-center w-full">
-                <button
-                  type="button"
-                  onClick={() => putuskan(item.id_boxing, "selesai")}
-                  title="Terima — Laporan selesai"
-                  className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white text-2xl font-bold flex items-center justify-center shadow"
-                >
-                  ✓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => putuskan(item.id_boxing, "belum")}
-                  title="Tolak — Belum selesai"
-                  className="w-12 h-12 rounded-full bg-red-500 hover:bg-red-600 text-white text-2xl font-bold flex items-center justify-center shadow"
-                >
-                  ✗
-                </button>
-              </div>
-            )
-          ) : diStaff ? (
-            <span className="text-[10px] text-gray-400 italic">Menunggu hasil unit</span>
-          ) : null}
-
-          {/* Tombol tindak lagi / buka kembali untuk yang sudah selesai */}
+          {diStaff && (
+            <div className="w-full flex justify-center">
+              {renderApprovalButtons(item)}
+            </div>
+          )}
           {isSelesai && ditindak && (
-            <button
-              type="button"
-              onClick={() => putuskan(item.id_boxing, "ditindak_lanjut")}
-              className="flex-1 min-w-30 border border-orange-500 bg-orange-50 text-orange-800 text-xs font-bold py-2 hover:bg-orange-100 rounded"
-            >
+            <button type="button" onClick={() => putuskan(item.id_boxing, "ditindak_lanjut")}
+              className="flex-1 min-w-30 border border-orange-500 bg-orange-50 text-orange-800 text-xs font-bold py-2 hover:bg-orange-100 rounded">
               ↻ Tindak lagi
             </button>
           )}
           {isSelesai && tidakKa && (
-            <button
-              type="button"
-              onClick={() => putuskan(item.id_boxing, "lanjut")}
-              className="flex-1 min-w-30 border border-gray-500 text-xs py-2 hover:bg-gray-50 rounded"
-            >
+            <button type="button" onClick={() => putuskan(item.id_boxing, "lanjut")}
+              className="flex-1 min-w-30 border border-gray-500 text-xs py-2 hover:bg-gray-50 rounded">
               ↻ Buka kembali
             </button>
           )}
@@ -327,31 +272,20 @@ export default function ProcessMonitorTable() {
     );
   }
 
-  // ─── LOADING ─────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-gray-400 italic">
-      Memuat data…
-    </div>
+    <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-gray-400 italic">Memuat data…</div>
   );
 
-  // ─── RENDER ──────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Modal gambar lampiran — muncul saat tombol "Lihat Gambar" ditekan */}
-      {selectedImage && (
-        <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
-      )}
+      {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
           Staf P4M menentukan selesai atau belum. Klik 📄 untuk export PDF per laporan.
         </p>
-        {msg && (
-          <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msg}</p>
-        )}
-        {error && (
-          <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>
-        )}
+        {msg   && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msg}</p>}
+        {error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
 
         {/* ── DESKTOP ── */}
         <div className="hidden lg:block">
@@ -364,124 +298,46 @@ export default function ProcessMonitorTable() {
           </div>
 
           {aktif.length === 0 && selesai.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 italic min-w-275">
-              Belum ada laporan diproses.
-            </div>
+            <div className="p-8 text-center text-gray-400 italic min-w-275">Belum ada laporan diproses.</div>
           ) : (
             <>
-              {/* ── Baris aktif ── */}
               {aktif.map((item) => {
                 const rev = item.status_review ? reviewBadge[item.status_review] : null;
-                const diStaff = item.status_boxing === "di_staff";
                 return (
-                  <div
-                    key={`${item.id_laporan}-${item.id_boxing}`}
-                    className="flex min-w-275 border-t-2 border-black"
-                  >
-                    {/* Kolom Laporan */}
+                  <div key={`${item.id_laporan}-${item.id_boxing}`} className="flex min-w-275 border-t-2 border-black">
                     <div className="w-120 border-r-2 border-black p-3">
                       <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                         <span className="font-bold">{item.kode_laporan}</span><br />
-                        {item.nama_unit} ·{" "}
-                        <span className="italic">
-                          {boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}
-                        </span>
+                        {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}</span>
                       </p>
-                      <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">
-                        {item.isi_laporan}
-                      </div>
+                      <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">{item.isi_laporan}</div>
                     </div>
-
-                    {/* Kolom Keputusan Ka */}
                     <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
-                      {rev && (
-                        <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>
-                          {rev.label}
-                        </span>
-                      )}
-                      {item.aksi_masukan && (
-                        <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">
-                          {item.aksi_masukan}
-                        </p>
-                      )}
+                      {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>{rev.label}</span>}
+                      {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
                     </div>
-
-                    {/* Kolom Hasil Unit — ada tombol Lihat Gambar di bawah tanggal */}
                     <div className="w-85 border-r-2 border-black p-3">
                       <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
-                        {item.hasil_tindakan ||
-                          (item.status_review === "tidak_ditindaklanjuti"
-                            ? "— (tidak ditindaklanjuti)"
-                            : "Belum ada hasil")}
+                        {item.hasil_tindakan || (item.status_review === "tidak_ditindaklanjuti" ? "— (tidak ditindaklanjuti)" : "Belum ada hasil")}
                       </div>
                       {item.tanggal_pelaksanaan && (
                         <p className="text-[9px] text-gray-400 mt-1">
-                          📅{" "}
-                          {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", {
-                            day: "2-digit", month: "short", year: "numeric",
-                          })}
+                          📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
                         </p>
                       )}
-                      {/* Tombol Lihat Gambar muncul di bawah tanggal jika ada lampiran */}
                       {item.lampiran_hasil && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedImage(getImageUrl(item.lampiran_hasil))
-                          }
-                          className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
-                        >
+                        <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
+                          className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
                           🖼️ Lihat Gambar
                         </button>
                       )}
                     </div>
-
-                    {/* Kolom Approval Staf — tombol ✓ dan ✗ */}
                     <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center items-center">
-                      {item.status_boxing === "di_staff" && item.hasil_tindakan ? (
-                        item.approval_staf ? (
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded border ${item.approval_staf === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"}`}>
-                            {item.approval_staf === "diterima" ? "✓ Diterima" : "✗ Ditolak"}
-                          </span>
-                        ) : (
-                          <div className="flex gap-3">
-                            <button
-                              type="button"
-                              onClick={() => approvalStaf(item.id_boxing, "diterima")}
-                              title="Terima hasil tindak lanjut"
-                              className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold flex items-center justify-center shadow"
-                            >
-                              ✓
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => approvalStaf(item.id_boxing, "ditolak")}
-                              title="Tolak hasil tindak lanjut"
-                              className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold flex items-center justify-center shadow"
-                            >
-                              ✗
-                            </button>
-                          </div>
-                        )
-                      ) : item.status_boxing === "di_staff" ? (
-                        <span className="text-[9px] text-gray-400 italic text-center">
-                          Menunggu hasil unit
-                        </span>
-                      ) : (
-                        <span className="text-[9px] text-gray-400 italic text-center">
-                          Menunggu tahap sebelumnya
-                        </span>
-                      )}
+                      {renderApprovalButtons(item)}
                     </div>
-
-                    {/* Kolom PDF */}
                     <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      <button
-                        type="button"
-                        onClick={() => handleExportPDF(item)}
-                        disabled={exportingId === item.id_boxing}
-                        className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded"
-                      >
+                      <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
+                        className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded">
                         {exportingId === item.id_boxing
                           ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
@@ -491,7 +347,6 @@ export default function ProcessMonitorTable() {
                 );
               })}
 
-              {/* ── Baris selesai ── */}
               {selesai.length > 0 && (
                 <>
                   <div className="bg-gray-100 px-3 py-1 text-[10px] font-bold uppercase border-t-2 border-black min-w-275">
@@ -499,34 +354,20 @@ export default function ProcessMonitorTable() {
                   </div>
                   {selesai.map((item) => {
                     const rev = item.status_review ? reviewBadge[item.status_review] : null;
-                    const isSelesai = item.status_boxing === "selesai";
                     const ditindak = item.status_review === "ditindaklanjuti";
                     const tidakKa = item.status_review === "tidak_ditindaklanjuti";
                     return (
-                      <div
-                        key={`${item.id_laporan}-${item.id_boxing}`}
-                        className="flex min-w-275 border-t-2 border-black"
-                      >
+                      <div key={`${item.id_laporan}-${item.id_boxing}`} className="flex min-w-275 border-t-2 border-black">
                         <div className="w-120 border-r-2 border-black p-3">
                           <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                             <span className="font-bold">{item.kode_laporan}</span><br />
                             {item.nama_unit} · <span className="italic">Selesai</span>
                           </p>
-                          <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">
-                            {item.isi_laporan}
-                          </div>
+                          <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">{item.isi_laporan}</div>
                         </div>
                         <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
-                          {rev && (
-                            <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>
-                              {rev.label}
-                            </span>
-                          )}
-                          {item.aksi_masukan && (
-                            <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">
-                              {item.aksi_masukan}
-                            </p>
-                          )}
+                          {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>{rev.label}</span>}
+                          {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
                         </div>
                         <div className="w-85 border-r-2 border-black p-3">
                           <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
@@ -534,51 +375,33 @@ export default function ProcessMonitorTable() {
                           </div>
                           {item.tanggal_pelaksanaan && (
                             <p className="text-[9px] text-gray-400 mt-1">
-                              📅{" "}
-                              {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", {
-                                day: "2-digit", month: "short", year: "numeric",
-                              })}
+                              📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
                             </p>
                           )}
                           {item.lampiran_hasil && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelectedImage(getImageUrl(item.lampiran_hasil))
-                              }
-                              className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
-                            >
+                            <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
+                              className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
                               🖼️ Lihat Gambar
                             </button>
                           )}
                         </div>
                         <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center">
-                          {isSelesai && ditindak && (
-                            <button
-                              type="button"
-                              onClick={() => putuskan(item.id_boxing, "ditindak_lanjut")}
-                              className="w-full border border-orange-500 bg-orange-50 text-orange-800 text-[10px] font-bold py-1.5 hover:bg-orange-100"
-                            >
+                          {ditindak && (
+                            <button type="button" onClick={() => putuskan(item.id_boxing, "ditindak_lanjut")}
+                              className="w-full border border-orange-500 bg-orange-50 text-orange-800 text-[10px] font-bold py-1.5 hover:bg-orange-100">
                               ↻ Tindak lagi
                             </button>
                           )}
-                          {isSelesai && tidakKa && (
-                            <button
-                              type="button"
-                              onClick={() => putuskan(item.id_boxing, "lanjut")}
-                              className="w-full border border-gray-500 text-[10px] py-1.5 hover:bg-gray-50"
-                            >
+                          {tidakKa && (
+                            <button type="button" onClick={() => putuskan(item.id_boxing, "lanjut")}
+                              className="w-full border border-gray-500 text-[10px] py-1.5 hover:bg-gray-50">
                               ↻ Buka kembali
                             </button>
                           )}
                         </div>
                         <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                          <button
-                            type="button"
-                            onClick={() => handleExportPDF(item)}
-                            disabled={exportingId === item.id_boxing}
-                            className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded"
-                          >
+                          <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
+                            className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded">
                             {exportingId === item.id_boxing
                               ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                               : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
@@ -602,9 +425,7 @@ export default function ProcessMonitorTable() {
               {aktif.map(renderCard)}
               {selesai.length > 0 && (
                 <>
-                  <div className="bg-gray-100 px-3 py-2 text-[10px] font-bold uppercase border-t-2 border-black">
-                    Sudah selesai
-                  </div>
+                  <div className="bg-gray-100 px-3 py-2 text-[10px] font-bold uppercase border-t-2 border-black">Sudah selesai</div>
                   {selesai.map(renderCard)}
                 </>
               )}

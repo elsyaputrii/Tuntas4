@@ -344,7 +344,7 @@ export default function RecapitulationTable() {
                 </div>
               </div>
               <div className="w-28 p-3 flex flex-col justify-center gap-1.5">
-                {item.isSelesai?(
+                {item.isSelesai || (!item.isSelesai && item.statusReview==="tidak_ditindaklanjuti") ? (
                   <button onClick={()=>bukaLagi(item.id_boxing,item.statusReview)}
                     className={`w-full border-2 text-[9px] font-bold py-1.5 leading-tight transition-all ${
                       item.statusReview==="ditindaklanjuti"

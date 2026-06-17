@@ -58,13 +58,7 @@ export default function ResetPasswordForm({ loginPath }: ResetPasswordFormProps)
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 z-0">
-        <Image
-          src="/background-polibatam.jpg"
-          alt="Polibatam Background"
-          fill
-          className="object-cover blur-[4px] brightness-75"
-          priority
-        />
+        
       </div>
 
       <div className="relative z-10 w-full max-w-sm bg-[#7C93A7] p-10 rounded-[30px] shadow-2xl mx-4">
@@ -89,7 +83,7 @@ export default function ResetPasswordForm({ loginPath }: ResetPasswordFormProps)
           /* ── STATE 2: Form buat password baru ── */
           <div className="flex flex-col items-center">
             <h2 className="text-white text-center font-bold text-2xl mb-8 leading-tight">
-              Create New <br /> Password
+              Ganti Password <br /> Baru
             </h2>
 
             <div className="w-full space-y-4">

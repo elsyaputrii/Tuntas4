@@ -42,18 +42,7 @@ export default function ForgotPasswordForm({ role, loginPath }: ForgotPasswordFo
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
-      {/* Background blur — sama seperti halaman login */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="/background-polibatam.jpg"
-          alt="Polibatam Background"
-          fill
-          className="object-cover blur-[4px] brightness-75"
-          priority
-        />
-      </div>
-
-      {/* Card */}
+      
       <div className="relative z-10 w-full max-w-sm bg-[#7C93A7] p-10 rounded-[30px] shadow-2xl mx-4">
 
         {!sent ? (
