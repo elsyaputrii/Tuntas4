@@ -488,6 +488,7 @@ async function getRekapitulasi(req, res) {
       JOIN boxing_ketidaksesuaian b        ON b.id_laporan = l.id_laporan
       LEFT JOIN rancangan_tindakan r       ON r.id_boxing  = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p     ON p.id_boxing  = b.id_boxing
+      WHERE b.status IN ('selesai', 'di_staff')
       ORDER BY l.created_at DESC`
     );
 

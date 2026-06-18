@@ -29,6 +29,11 @@ interface CalendarProps {
 
 function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: CalendarProps) {
   const [viewDate, setViewDate] = useState(new Date(selectedDate));
+
+  // Sync viewDate saat selectedDate berubah dari parent (misal klik "Hari Ini")
+  useEffect(() => {
+    setViewDate(new Date(selectedDate));
+  }, [selectedDate]);
   const year  = viewDate.getFullYear();
   const month = viewDate.getMonth();
   const rawFirstDay = new Date(year, month, 1).getDay();
@@ -114,7 +119,7 @@ export default function RecapitulationTable() {
       penyebab:d.penyebab??"—", rencana:d.rencana_tindakan??"—",
       hasil:d.hasil_tindakan??"—", tglPelaksanaan:fmtTgl(d.tanggal_pelaksanaan),
       statusReview:d.status_review??"", statusBoxing:d.status_boxing??"",
-      tglMasuk:d.created_at??null, isSelesai:true,
+      tglMasuk:d.created_at??null, isSelesai:d.status_boxing==="selesai",
     })),
     ...dipantauData.map(p=>({
       id_boxing:p.id_boxing, kode:p.kode_laporan, jenis:p.jenis_laporan??"—",
