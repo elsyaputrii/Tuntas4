@@ -1,4 +1,26 @@
 // FILE: backend/controllers/kepalaUnitController.js
+//
+// ── CATATAN PERBAIKAN (sesi ini) ────────────────────────────────────────
+// [getLaporanHasil] Sebelumnya query ini HANYA menerima boxing dengan
+// status='menunggu_pelaksanaan'. Tapi sekarang (lihat stafController.js)
+// laporan yang DITOLAK Staf P4M tetap berstatus 'di_staff' (bukan
+// 'menunggu_pelaksanaan') — supaya beda secara state dari laporan yang
+// memang baru pertama kali ditindaklanjuti Ka P4M. Akibatnya tanpa fix
+// ini, laporan yang ditolak Staf TIDAK AKAN PERNAH muncul lagi di tab
+// "Laporan Hasil" Kepala Unit untuk direvisi — padahal itu instruksi
+// dari approval_staf='ditolak'.
+//
+// FIX: query getLaporanHasil sekarang menerima DUA kondisi (OR):
+//   a) status_boxing = 'menunggu_pelaksanaan' DAN status_review =
+//      'ditindaklanjuti'  → kasus normal: pertama kali isi pelaksanaan.
+//   b) status_boxing = 'di_staff' DAN approval_staf = 'ditolak'
+//      → kasus revisi: Staf menolak hasil sebelumnya, Kepala Unit harus
+//        isi ulang pelaksanaan baru.
+//
+// Field approval_staf juga ditambahkan ke SELECT supaya frontend
+// (ResultReportTable.tsx) bisa menampilkan catatan "Ditolak Staf P4M,
+// silakan revisi" kalau perlu.
+
 const { pool } = require("../config/db");
 
 async function getKepalaInfo(id_pengguna) {
@@ -124,6 +146,9 @@ async function submitRancangan(req, res) {
   }
 }
 
+// ✅ FIX: query getLaporanHasil sekarang punya 2 kondisi (OR) — lihat
+// penjelasan di komentar atas file. Ditambahkan juga b.approval_staf ke
+// SELECT supaya frontend bisa kasih konteks "ditolak, perlu revisi".
 async function getLaporanHasil(req, res) {
   const id_pengguna = req.user.id;
   try {
@@ -136,7 +161,7 @@ async function getLaporanHasil(req, res) {
     }
     const [rows] = await pool.query(
       `SELECT
-        b.id_boxing, b.unit_tujuan, b.status AS status_boxing,
+        b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
@@ -148,8 +173,11 @@ async function getLaporanHasil(req, res) {
       JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
-        AND r.status_review = 'ditindaklanjuti'
-        AND b.status = 'menunggu_pelaksanaan'
+        AND (
+          (r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan')
+          OR
+          (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
+        )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala]
     );
@@ -195,14 +223,21 @@ async function submitPelaksanaan(req, res) {
       });
     }
 
+    // ✅ FIX: validasi sekarang juga menerima kasus revisi (di_staff +
+    // ditolak), bukan cuma 'menunggu_pelaksanaan'. Tanpa ini, submit
+    // ulang setelah ditolak Staf akan ditolak backend dengan 403.
     const [boxingRows] = await pool.query(
-      `SELECT b.id_boxing, b.id_laporan, l.created_at AS tanggal_laporan, r.updated_at AS tanggal_ditindaklanjuti
+      `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing, b.approval_staf,
+              l.created_at AS tanggal_laporan, r.updated_at AS tanggal_ditindaklanjuti
        FROM boxing_ketidaksesuaian b
        JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
        JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
        WHERE b.id_boxing = ? AND b.id_kepala = ?
          AND r.status_review = 'ditindaklanjuti'
-         AND b.status = 'menunggu_pelaksanaan'`,
+         AND (
+           b.status = 'menunggu_pelaksanaan'
+           OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
+         )`,
       [id_boxing, kepala.id_kepala]
     );
 
@@ -250,8 +285,11 @@ async function submitPelaksanaan(req, res) {
       );
     }
 
+    // ✅ FIX: reset approval_staf balik ke 'menunggu' setiap kali Kepala
+    // Unit submit ulang (penting untuk kasus revisi setelah ditolak),
+    // supaya Staf P4M tahu ini hasil BARU yang perlu di-review lagi.
     await pool.query(
-      `UPDATE boxing_ketidaksesuaian SET status = 'di_staff' WHERE id_boxing = ?`,
+      `UPDATE boxing_ketidaksesuaian SET status = 'di_staff', approval_staf = 'menunggu' WHERE id_boxing = ?`,
       [id_boxing]
     );
     await pool.query(
