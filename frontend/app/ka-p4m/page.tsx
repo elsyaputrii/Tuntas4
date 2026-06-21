@@ -39,26 +39,28 @@ export default function KaP4MPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 md:p-10">
-      <div className="max-w-[1200px] mx-auto">
-        <div className="bg-[#4E617A] p-8 shadow-md flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-white font-bold text-xl uppercase leading-tight tracking-wide">
-              Keputusan Ka P4M — Ditindaklanjuti atau Tidak
-            </h1>
-            {namaUser && (
-              <p className="text-[#5da0dd] text-sm mt-2">👤 {namaUser}</p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-semibold"
-          >
-            Logout
-          </button>
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <div className="bg-[#4E617A] px-4 py-5 sm:px-8 sm:py-8 shadow-md flex items-center justify-between">
+        <div className="flex-1 min-w-0 mr-3">
+          <h1 className="text-white font-bold text-sm sm:text-xl uppercase leading-tight tracking-wide">
+            Keputusan Ka P4M — Ditindaklanjuti atau Tidak
+          </h1>
+          {namaUser && (
+            <p className="text-[#5da0dd] text-xs sm:text-sm mt-1 sm:mt-2 truncate">👤 {namaUser}</p>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex-shrink-0 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white px-3 py-1.5 sm:px-5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all"
+        >
+          Logout
+        </button>
+      </div>
 
+      {/* Content */}
+      <div className="max-w-[1200px] mx-auto px-3 py-4 sm:px-6 sm:py-6 md:px-10 md:py-8">
         <KaP4MReviewTable />
       </div>
     </div>

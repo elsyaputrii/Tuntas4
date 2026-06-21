@@ -321,7 +321,7 @@ async function setKeputusanBoxing(req, res) {
 
   try {
     const [rows] = await pool.query(
-      `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing,
+      `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing, b.approval_staf,
               r.status_review, r.id_rancangan
        FROM boxing_ketidaksesuaian b
        LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
@@ -381,15 +381,29 @@ async function setKeputusanBoxing(req, res) {
     // pelaksanaan_tindakan lama, supaya Kepala Unit benar-benar
     // mulai dari "Ketidaksesuaian Masuk" lagi (isi rancangan baru),
     // bukan langsung lompat ke "Laporan Hasil" dengan rancangan basi.
+    //
+    // ✅ FIX BUG #3 (sesi ini): validasi bisaLanjut SEBELUMNYA hanya
+    // mengizinkan reopen untuk laporan yang sudah 'selesai' ATAU
+    // ditolak KA P4M (status_review='tidak_ditindaklanjuti'). Tapi
+    // sejak tombol ↻ sekarang SELALU tampil bersamaan dengan ✓/✗ di
+    // kolom "Keputusan Staf" (ProcessMonitorTable.tsx), staf bisa klik
+    // ↻ untuk laporan yang DITOLAK STAF SENDIRI (approval_staf=
+    // 'ditolak', status_boxing tetap 'di_staff') — kasus ini SEBELUMNYA
+    // tidak diakomodasi sama sekali, sehingga backend selalu menolak
+    // dengan pesan "Opsi 'lanjut' hanya untuk laporan selesai atau yang
+    // ditolak Ka P4M." walau row itu sudah jelas-jelas berstatus
+    // ditolak (oleh Staf, bukan Ka P4M). Sekarang ditambahkan kondisi
+    // ketiga: status_boxing='di_staff' DAN approval_staf='ditolak'.
     // ════════════════════════════════════════════════════════════
     const bisaLanjut =
       row.status_boxing === "selesai" ||
-      (row.status_boxing === "di_staff" && row.status_review === "tidak_ditindaklanjuti");
+      (row.status_boxing === "di_staff" && row.status_review === "tidak_ditindaklanjuti") ||
+      (row.status_boxing === "di_staff" && row.approval_staf === "ditolak");
 
     if (!bisaLanjut) {
       return res.status(400).json({
         success: false,
-        message: "Opsi 'lanjut' hanya untuk laporan selesai atau yang ditolak Ka P4M.",
+        message: "Opsi 'lanjut' hanya untuk laporan selesai, ditolak Ka P4M, atau ditolak Staf P4M.",
       });
     }
 

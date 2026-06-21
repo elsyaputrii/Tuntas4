@@ -10,14 +10,14 @@ export default function UnitNavigation({ activeTab, setActiveTab }: NavigationPr
   ];
 
   return (
-    <div className="flex gap-4 mb-6">
+    <div className="flex gap-2 sm:gap-4 mb-4 sm:mb-6 overflow-x-auto pb-1 scrollbar-none">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`px-6 py-2.5 rounded text-sm font-semibold flex items-center gap-2.5 transition-all shadow-sm
-            ${activeTab === tab.id 
-              ? 'bg-[#5da0dd] text-white' 
+          className={`flex-shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2.5 transition-all shadow-sm
+            ${activeTab === tab.id
+              ? 'bg-[#5da0dd] text-white'
               : 'bg-[#5da0dd]/10 text-[#3a75ad] hover:bg-[#5da0dd]/20'
             }`}
         >

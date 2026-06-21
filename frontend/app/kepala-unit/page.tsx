@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, startTransition } from "react"; // ← tambah startTransition
+import { useState, useEffect, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import UnitHero from "@/components/kepala-unit/UnitHero";
 import UnitNavigation from "@/components/kepala-unit/UnitNavigation";
@@ -14,14 +14,10 @@ export default function KepalaUnitPage() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     const role  = localStorage.getItem("role");
-
     if (!token || role !== "kepala_unit") {
       router.replace("/kepala-unit/login");
     } else {
-      // ✅ FIX: bungkus dengan startTransition agar tidak sinkron
-      startTransition(() => {
-        setIsChecking(false);
-      });
+      startTransition(() => { setIsChecking(false); });
     }
   }, [router]);
 
@@ -37,11 +33,11 @@ export default function KepalaUnitPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 md:p-12">
-      <div className="max-w-7xl mx-auto">
-        <UnitHero />
+    <main className="min-h-screen bg-gray-50">
+      <UnitHero />
+      <div className="max-w-7xl mx-auto px-3 pb-6 sm:px-6 md:px-12">
         <UnitNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
-        <div className="mt-6">
+        <div>
           {activeTab === "discrepancy" && <DiscrepancyTable />}
           {activeTab === "report"      && <ResultReportTable />}
         </div>

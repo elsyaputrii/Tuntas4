@@ -1,32 +1,22 @@
 "use client";
 // FILE: frontend/components/staff-p4m/tables/ProcessMonitorTable.tsx
 //
-// ── CATATAN PERBAIKAN ────────────────────────────────────────────────────
-// Permintaan terbaru: kolom "Keputusan Staf" SEKARANG selalu menampilkan
-// 3 tombol BERSAMAAN (✓ ✗ ↻) untuk setiap laporan yang sudah di_staff,
-// independen satu sama lain — Staf P4M bebas klik kapan saja:
+// ── CATATAN PERBAIKAN (revisi terakhir) ─────────────────────────────────
+// Permintaan terbaru: kolom "Keputusan Staf" di tab "Proses & Pantau"
+// SEKARANG HANYA punya 2 tombol (✓ ✗) — tombol ↻ "buka ulang" DIHAPUS
+// dari sini. Reopen laporan ("Tindak ulang" / "Buka ke Unit") sekarang
+// HANYA ada di tab Rekapitulasi (RecapitulationTable.tsx), supaya tidak
+// ada dua tempat berbeda yang bisa memicu validasi backend yang sama
+// dan membingungkan soal kapan boleh/tidak boleh reopen.
 //
 //   ✓ → terima hasil unit → backend otomatis set status_boxing='selesai'
 //       (lihat fix di stafController.js setApprovalStaf)
 //   ✗ → tolak hasil unit → status_boxing TETAP 'di_staff', approval_staf
 //       ='ditolak' → Kepala Unit lihat ini di tab "Laporan Hasil" untuk
 //       revisi HASIL PELAKSANAAN saja (rancangan tidak direset)
-//   ↻ → buka ulang TOTAL dari awal ke Kepala Unit (reset rancangan_tindakan
-//       ke 'menunggu_keputusan_ka', hapus pelaksanaan_tindakan lama,
-//       boxing.status → 'terdistribusi') — laporan muncul lagi di tab
-//       "Ketidaksesuaian Masuk" Kepala Unit, bukan "Laporan Hasil"
 //
-// Ketiga tombol ini SELALU ditampilkan bersamaan begitu
-// status_boxing='di_staff' DAN sudah ada hasil_tindakan dari unit — tidak
-// perlu menunggu approve/tolak diputuskan dulu sebelum ↻ muncul.
-//
-// Setelah Staf klik ✓ (otomatis selesai) atau ↻ (reset total), baris itu
-// akan PINDAH KELUAR dari section "aktif" pada fetch berikutnya — karena
-// status_boxing-nya berubah jadi 'selesai' (untuk ✓) atau 'terdistribusi'
-// (untuk ↻, yang berarti boxing balik ke alur paling awal Kepala Unit dan
-// TIDAK LAGI muncul di tab Staf P4M sampai siklusnya berputar lagi ke sini).
-// Klik ✗ (tolak) TIDAK memindahkan baris ke mana pun — laporan tetap
-// terlihat di section aktif dengan badge "Ditolak — Revisi Unit".
+// Untuk membuka laporan dari awal (reset total ke Kepala Unit), Staf P4M
+// sekarang HARUS pindah ke tab Rekapitulasi dan klik tombol ↻ di sana.
 
 import { useState, useEffect } from "react";
 import { stafApi } from "@/lib/api";
@@ -104,7 +94,6 @@ export default function ProcessMonitorTable() {
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<Record<number, "diterima"|"ditolak">>({});
-  const [pendingReopen, setPendingReopen] = useState<Set<number>>(new Set());
 
   useEffect(() => { fetchData(); }, []);
 
@@ -113,36 +102,10 @@ export default function ProcessMonitorTable() {
       setLoading(true);
       const res = await stafApi.getProsesMonitor();
       setData(res.data);
-      setPendingReopen(new Set());
     } catch {
       setError("Gagal memuat data proses.");
     } finally {
       setLoading(false);
-    }
-  }
-
-  // ✅ Tombol ↻ — bisa diklik kapan saja selama status_boxing='di_staff',
-  // independen dari status approval_staf. Backend menentukan aksi mana
-  // ("lanjut" vs "ditindak_lanjut") berdasarkan status_review laporan ini,
-  // tapi efeknya SAMA: reset total ke awal siklus Kepala Unit.
-  async function bukaUlang(id_boxing: number, statusReview: string | null) {
-    const aksi = statusReview === "ditindaklanjuti" ? "ditindak_lanjut" : "lanjut";
-    const ok = confirm(
-      "Laporan akan dibuka kembali DARI AWAL ke Kepala Unit (rancangan & hasil pelaksanaan sebelumnya akan direset, mulai dari tab Ketidaksesuaian Masuk). Lanjutkan?"
-    );
-    if (!ok) return;
-
-    setPendingReopen(prev => new Set(prev).add(id_boxing));
-    setError("");
-    try {
-      const res = await stafApi.setKeputusanBoxing(id_boxing, aksi);
-      setMsg(res.message);
-      setTimeout(() => setMsg(""), 4000);
-      fetchData();
-    } catch (err: unknown) {
-      setPendingReopen(prev => { const n = new Set(prev); n.delete(id_boxing); return n; });
-      setError(err instanceof Error ? err.message : "Gagal menyimpan.");
-      setTimeout(() => setError(""), 4000);
     }
   }
 
@@ -188,12 +151,9 @@ export default function ProcessMonitorTable() {
     setTimeout(() => setExportingId(null), 1200);
   }
 
-  // ✅ FIX UTAMA: kolom "Keputusan Staf" SEKARANG selalu render 3 tombol
-  // (✓ ✗ ↻) bersamaan untuk laporan status_boxing='di_staff', independen
-  // dari apakah approval_staf sudah diputuskan atau belum.
+  // ✅ FIX: kolom "Keputusan Staf" SEKARANG HANYA 2 tombol (✓ ✗).
+  // Tombol ↻ "buka ulang" sudah dipindah & hanya ada di Rekapitulasi.
   function renderKeputusanStaf(item: ProsesItem) {
-    const isPendingReopen = pendingReopen.has(item.id_boxing);
-
     if (item.status_boxing !== "di_staff") {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
     }
@@ -205,47 +165,28 @@ export default function ProcessMonitorTable() {
     const existingAppr = item.approval_staf;
     const apprVal = pendingAppr ?? (existingAppr && existingAppr !== "menunggu" ? existingAppr : null);
 
+    if (apprVal) {
+      return (
+        <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
+          apprVal === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
+        }`}>
+          {apprVal === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
+        </span>
+      );
+    }
+
     return (
-      <div className="flex flex-col items-center gap-2">
-        {/* Baris status approval (kalau sudah diputuskan) */}
-        {apprVal && (
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
-            apprVal === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
-          }`}>
-            {apprVal === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
-          </span>
-        )}
-
-        {/* ✅ 3 tombol selalu tampil bersamaan, terlepas dari apprVal */}
-        <div className="flex items-center gap-2">
-          <button type="button"
-            onClick={() => approvalStaf(item.id_boxing, "diterima")}
-            disabled={!!apprVal}
-            title="Terima hasil — laporan otomatis Selesai"
-            className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-green-200 disabled:cursor-not-allowed text-white text-base font-bold flex items-center justify-center shadow">
-            ✓
-          </button>
-          <button type="button"
-            onClick={() => approvalStaf(item.id_boxing, "ditolak")}
-            disabled={!!apprVal}
-            title="Tolak — kembalikan ke unit untuk revisi hasil"
-            className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 disabled:bg-red-200 disabled:cursor-not-allowed text-white text-base font-bold flex items-center justify-center shadow">
-            ✗
-          </button>
-          <button type="button"
-            onClick={() => bukaUlang(item.id_boxing, item.status_review)}
-            disabled={isPendingReopen}
-            title="Buka ulang dari awal ke Kepala Unit (reset rancangan & hasil pelaksanaan)"
-            className="w-8 h-8 rounded-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-200 disabled:cursor-not-allowed text-white text-base font-bold flex items-center justify-center shadow">
-            ↻
-          </button>
-        </div>
-
-        {isPendingReopen && (
-          <span className="text-[9px] text-orange-600 font-bold text-center italic">
-            ⏳ Sedang ditindak ulang
-          </span>
-        )}
+      <div className="flex gap-3">
+        <button type="button" onClick={() => approvalStaf(item.id_boxing, "diterima")}
+          title="Terima hasil — laporan otomatis Selesai"
+          className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold flex items-center justify-center shadow">
+          ✓
+        </button>
+        <button type="button" onClick={() => approvalStaf(item.id_boxing, "ditolak")}
+          title="Tolak — kembalikan ke unit untuk revisi hasil"
+          className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold flex items-center justify-center shadow">
+          ✗
+        </button>
       </div>
     );
   }
@@ -330,7 +271,7 @@ export default function ProcessMonitorTable() {
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Staf P4M: ✓ terima (otomatis Selesai) · ✗ tolak (revisi hasil unit) · ↻ buka ulang dari awal ke Kepala Unit. Klik 📄 untuk export PDF.
+          Staf P4M: ✓ terima (otomatis Selesai) · ✗ tolak (revisi hasil unit). Untuk membuka laporan dari awal, gunakan tab Rekapitulasi. Klik 📄 untuk export PDF.
         </p>
         {msg   && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msg}</p>}
         {error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
@@ -341,7 +282,7 @@ export default function ProcessMonitorTable() {
             <div className="w-120 border-r-2 border-black p-3">Laporan</div>
             <div className="w-40 border-r-2 border-black p-3">Keputusan Ka</div>
             <div className="w-85 border-r-2 border-black p-3">Hasil Unit</div>
-            <div className="w-44 border-r-2 border-black p-3">Keputusan Staf</div>
+            <div className="w-40 border-r-2 border-black p-3">Keputusan Staf</div>
             <div style={{width:"60px",padding:"8px",textAlign:"center"}}>PDF</div>
           </div>
 
@@ -380,8 +321,8 @@ export default function ProcessMonitorTable() {
                         </button>
                       )}
                     </div>
-                    {/* ✅ FIX UTAMA: 3 tombol (✓ ✗ ↻) tampil bersamaan di sini */}
-                    <div className="w-44 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center items-center">
+                    {/* ✅ FIX: hanya renderKeputusanStaf (✓ ✗), tidak ada ↻ di sini lagi */}
+                    <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center items-center">
                       {renderKeputusanStaf(item)}
                     </div>
                     <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -399,7 +340,7 @@ export default function ProcessMonitorTable() {
               {selesai.length > 0 && (
                 <>
                   <div className="bg-gray-100 px-3 py-1 text-[10px] font-bold uppercase border-t-2 border-black min-w-275">
-                    Sudah selesai
+                    Sudah selesai — gunakan tab Rekapitulasi untuk membuka kembali
                   </div>
                   {selesai.map((item) => {
                     const rev = item.status_review ? reviewBadge[item.status_review] : null;
@@ -432,7 +373,7 @@ export default function ProcessMonitorTable() {
                             </button>
                           )}
                         </div>
-                        <div className="w-44 border-r-2 border-black p-3 flex items-center justify-center">
+                        <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
                           <span className="text-[10px] text-green-600 font-bold">✓ Selesai</span>
                         </div>
                         <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>

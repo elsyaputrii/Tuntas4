@@ -97,7 +97,8 @@ export default function DiscrepancyTable() {
 
   return (
     <div className="w-full border-2 border-black bg-white overflow-hidden text-sm">
-      <div className="flex font-semibold uppercase bg-gray-50 border-b-2 border-black text-center">
+      {/* Header desktop */}
+      <div className="hidden sm:flex font-semibold uppercase bg-gray-50 border-b-2 border-black text-center">
         <div className="w-[40%] border-r-2 border-black p-3 text-[11px]">Kritik atau Pengaduan Terkait Polibatam</div>
         <div className="w-[22%] border-r-2 border-black p-3 text-[11px]">Penyebab</div>
         <div className="w-[22%] border-r-2 border-black p-3 text-[11px]">Rencana Tindak Lanjut</div>
@@ -108,57 +109,116 @@ export default function DiscrepancyTable() {
         const editable = isEditable(item.status_review);
         const badge    = item.status_review ? statusBadge[item.status_review] : null;
         return (
-          <div key={item.id_boxing} className={`flex min-h-[160px] ${idx > 0 ? "border-t-2 border-black" : ""}`}>
-            <div className="w-[40%] border-r-2 border-black p-5">
-              <div className="flex items-center gap-2 mb-2">
+          <div key={item.id_boxing} className={`${idx > 0 ? "border-t-2 border-black" : ""}`}>
+
+            {/* Mobile card */}
+            <div className="sm:hidden p-4 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.kode_laporan}</span>
                 <span className="text-[10px] text-gray-400 capitalize">{item.jenis_laporan}</span>
+                {badge && (
+                  <span className={`text-[9px] font-medium px-2 py-0.5 border rounded ${badge.cls}`}>{badge.label}</span>
+                )}
               </div>
               <p className="text-xs text-black leading-relaxed">{item.isi_laporan}</p>
-              {badge && (
-                <div className={`mt-3 px-2 py-1 border rounded text-[10px] font-medium ${badge.cls}`}>{badge.label}</div>
-              )}
               {item.status_review === "revisi" && item.catatan_review && (
-                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
+                <div className="p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
                   <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_review}
                 </div>
               )}
+              <div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
+                <textarea
+                  className="w-full h-20 border border-black p-2 text-xs outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
+                  placeholder={editable ? "Ketik penyebab di sini..." : "—"}
+                  value={penyebab[item.id_boxing] || ""}
+                  onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  disabled={!editable}
+                />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Tindak Lanjut</p>
+                <textarea
+                  className="w-full h-20 border border-black p-2 text-xs outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
+                  placeholder={editable ? "Ketik rencana di sini..." : "—"}
+                  value={rencana[item.id_boxing] || ""}
+                  onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  disabled={!editable}
+                />
+              </div>
+              <div className="flex justify-end">
+                {item.status_review === "disetujui" ? (
+                  <div className="text-center">
+                    <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
+                    <span className="text-[10px] text-gray-400">Lihat di Tab Laporan Hasil</span>
+                  </div>
+                ) : item.status_review === "menunggu_review" ? (
+                  <span className="text-blue-500 text-[10px]">⏳ Menunggu Review</span>
+                ) : (
+                  <button
+                    onClick={() => handleSend(item.id_boxing)}
+                    disabled={sending[item.id_boxing]}
+                    className="w-full bg-[#5da0dd] text-white py-2.5 rounded font-bold uppercase text-[11px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
+                  >
+                    {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="w-[22%] border-r-2 border-black p-5">
-              <textarea
-                className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
-                placeholder={editable ? "Ketik penyebab di sini..." : "—"}
-                value={penyebab[item.id_boxing] || ""}
-                onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                disabled={!editable}
-              />
-            </div>
-            <div className="w-[22%] border-r-2 border-black p-5">
-              <textarea
-                className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
-                placeholder={editable ? "Ketik rencana di sini..." : "—"}
-                value={rencana[item.id_boxing] || ""}
-                onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                disabled={!editable}
-              />
-            </div>
-            <div className="flex-1 p-5 flex items-center justify-center">
-              {item.status_review === "disetujui" ? (
-                <div className="text-center">
-                  <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
-                  <span className="text-[10px] text-gray-400">Lihat di Tab Laporan Hasil</span>
+
+            {/* Desktop row */}
+            <div className="hidden sm:flex min-h-[160px]">
+              <div className="w-[40%] border-r-2 border-black p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.kode_laporan}</span>
+                  <span className="text-[10px] text-gray-400 capitalize">{item.jenis_laporan}</span>
                 </div>
-              ) : item.status_review === "menunggu_review" ? (
-                <span className="text-blue-500 text-[10px] text-center">Menunggu<br />Review</span>
-              ) : (
-                <button
-                  onClick={() => handleSend(item.id_boxing)}
-                  disabled={sending[item.id_boxing]}
-                  className="bg-[#5da0dd] text-white px-8 py-2 rounded font-bold uppercase text-[10px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
-                >
-                  {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
-                </button>
-              )}
+                <p className="text-xs text-black leading-relaxed">{item.isi_laporan}</p>
+                {badge && (
+                  <div className={`mt-3 px-2 py-1 border rounded text-[10px] font-medium ${badge.cls}`}>{badge.label}</div>
+                )}
+                {item.status_review === "revisi" && item.catatan_review && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
+                    <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_review}
+                  </div>
+                )}
+              </div>
+              <div className="w-[22%] border-r-2 border-black p-5">
+                <textarea
+                  className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  placeholder={editable ? "Ketik penyebab di sini..." : "—"}
+                  value={penyebab[item.id_boxing] || ""}
+                  onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  disabled={!editable}
+                />
+              </div>
+              <div className="w-[22%] border-r-2 border-black p-5">
+                <textarea
+                  className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-[#5da0dd] resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  placeholder={editable ? "Ketik rencana di sini..." : "—"}
+                  value={rencana[item.id_boxing] || ""}
+                  onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  disabled={!editable}
+                />
+              </div>
+              <div className="flex-1 p-5 flex items-center justify-center">
+                {item.status_review === "disetujui" ? (
+                  <div className="text-center">
+                    <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
+                    <span className="text-[10px] text-gray-400">Lihat di Tab Laporan Hasil</span>
+                  </div>
+                ) : item.status_review === "menunggu_review" ? (
+                  <span className="text-blue-500 text-[10px] text-center">Menunggu<br />Review</span>
+                ) : (
+                  <button
+                    onClick={() => handleSend(item.id_boxing)}
+                    disabled={sending[item.id_boxing]}
+                    className="bg-[#5da0dd] text-white px-8 py-2 rounded font-bold uppercase text-[10px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
+                  >
+                    {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );
