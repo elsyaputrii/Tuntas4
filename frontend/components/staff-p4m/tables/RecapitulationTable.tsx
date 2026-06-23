@@ -1,49 +1,5 @@
 "use client";
 // FILE: frontend/components/staff-p4m/tables/RecapitulationTable.tsx
-//
-// ── CATATAN PERBAIKAN (revisi ke-3 — final) ─────────────────────────────
-//
-// 1. [BUG FIX] Tombol reopen ("↻ Tindak ulang") sebelumnya muncul HANYA
-//    berdasarkan status_review, tanpa cek status_boxing → bisa muncul
-//    untuk kombinasi status yang DITOLAK backend. FIX: getReopenAction()
-//    dari exportHelpers.ts meniru 1:1 validasi backend.
-//
-// 2. [BUG FIX - kalender] toLocalDate() di exportHelpers.ts diperbaiki
-//    supaya konversi UTC→lokal benar (laporan dini hari WIB tidak lagi
-//    nyangkut di tanggal kemarin).
-//
-// 3. [BUG FIX - cascading render] MiniCalendar tidak lagi pakai useEffect
-//    untuk sync viewDate; sekarang pakai key reset dari parent.
-//
-// 4. [FIX UTAMA] Label status "⏳ Dipantau" generik DIGANTI dengan label
-//    akurat berdasarkan tahap sebenarnya (labelStatusLengkap() di
-//    exportHelpers.ts):
-//      - "⏳ Menunggu Approval Staf" → Kepala Unit sudah kerja, tinggal
-//        Staf approve/tolak (tombol ✓/✗ langsung ada di kolom Tindakan,
-//        tidak perlu pindah ke tab "Proses & Pantau" lagi).
-//      - "✗ Ditolak — Revisi Unit" → Staf sudah tolak, menunggu Kepala
-//        Unit revisi di tab "Laporan Hasil".
-//      - "🔄 Diproses Kepala Unit" / "⏳ Menunggu Ka P4M" → masih di
-//        siklus awal sebelum sampai ke Staf.
-//      - "✓ Selesai" → backend SEKARANG otomatis set ini begitu Staf
-//        klik ✓ (diterima) — lihat fix di stafController.js.
-//
-// 5. [FITUR BARU] Tombol "↻ Tindak ulang" di kolom Tindakan: begitu
-//    diklik, baris itu MASUK STATE OPTIMISTIC lokal (tanpa nunggu
-//    refetch dari server) → kolom Tindakan langsung berubah jadi teks
-//    "⏳ Sedang ditindak ulang" dan kolom Status langsung berubah jadi
-//    badge kuning "Dipantau", supaya Staf P4M dapat feedback instan
-//    bahwa aksinya berhasil terkirim. Begitu fetchData() selesai, state
-//    optimistic ini otomatis dibuang (data asli dari server mengambil
-//    alih) — laporan akan benar-benar berstatus "🔄 Diproses Kepala Unit"
-//    begitu Kepala Unit membuka tab "Ketidaksesuaian Masuk"-nya.
-//
-// Fitur:
-//  1. Statistik ringkasan (total, selesai, dipantau, ditindaklanjuti, belum)
-//  2. Kalender interaktif → klik tanggal untuk filter
-//  3. Tabel rekap status (sudah vs belum ditindaklanjuti)
-//  4. Export EXCEL  → semua laporan (selesai + dipantau) via exportExcel.ts
-//  5. Export PDF    → per harian/mingguan/bulanan/tahunan via exportPdf.ts
 
 import { useState, useEffect, useCallback } from "react";
 import { stafApi } from "@/lib/api";
@@ -64,7 +20,6 @@ const BULAN_PANJANG = [
   "Juli","Agustus","September","Oktober","November","Desember",
 ];
 
-// ─── Kalender Mini ─────────────────────────────────────────────────────────
 interface CalendarProps {
   selectedDate: Date;
   onSelectDate: (d: Date) => void;
@@ -81,7 +36,7 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
   const today = new Date(); today.setHours(0,0,0,0);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm" style={{minWidth:228}}>
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
       <div className="flex items-center justify-between mb-2">
         <button onClick={()=>setViewDate(new Date(year,month-1,1))}
           className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 text-sm font-bold">‹</button>
@@ -119,7 +74,6 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
   );
 }
 
-// ─── Komponen Utama ─────────────────────────────────────────────────────────
 type FilterMode = "semua"|"harian"|"mingguan"|"bulanan"|"tahunan";
 
 export default function RecapitulationTable() {
@@ -135,6 +89,7 @@ export default function RecapitulationTable() {
   const [exportingPDF, setExportingPDF] = useState<PdfKategori|null>(null);
   const [pendingApproval, setPendingApproval] = useState<Record<number, "diterima"|"ditolak">>({});
   const [pendingReopen, setPendingReopen] = useState<Set<number>>(new Set());
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -209,11 +164,9 @@ export default function RecapitulationTable() {
   };
 
   async function bukaLagi(id_boxing:number, aksi: "ditindak_lanjut" | "lanjut"){
-    const ok=confirm("Laporan akan dibuka kembali dari awal ke Kepala Unit (mulai dari Ketidaksesuaian Masuk). Lanjutkan?");
+    const ok=confirm("Laporan akan dibuka kembali dari awal ke Kepala Unit. Lanjutkan?");
     if(!ok) return;
-
     setPendingReopen(prev => new Set(prev).add(id_boxing));
-
     try{
       const res=await stafApi.setKeputusanBoxing(id_boxing, aksi);
       setMsg(res.message); setTimeout(()=>setMsg(""),5000);
@@ -229,8 +182,7 @@ export default function RecapitulationTable() {
     setError("");
     try {
       const res = await stafApi.setApprovalBoxing(id_boxing, approval);
-      setMsg(res.message);
-      setTimeout(() => setMsg(""), 4000);
+      setMsg(res.message); setTimeout(() => setMsg(""), 4000);
       fetchData();
     } catch (err: unknown) {
       setPendingApproval(prev => { const n = { ...prev }; delete n[id_boxing]; return n; });
@@ -250,33 +202,43 @@ export default function RecapitulationTable() {
       {msg   &&<p className="text-green-700 text-xs font-bold px-3 py-2 bg-green-50 border border-green-200 rounded">{msg}</p>}
       {error &&<p className="text-red-500 text-xs font-bold px-3 py-2 bg-red-50 border border-red-200 rounded">❌ {error}</p>}
 
-      <div className="flex flex-wrap gap-4">
+      {/* Filter pill — scroll horizontal di HP */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {(["harian","mingguan","bulanan","tahunan","semua"] as FilterMode[]).map(mode=>(
+          <button key={mode} onClick={()=>{
+              setFilterMode(mode);
+              if (mode !== "harian") setCalendarResetKey(k => k + 1);
+            }}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
+              ${filterMode===mode?"bg-dark-header text-white border-dark-header shadow":"bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
+            {mode==="semua"?"📋 Semua":mode==="harian"?"📅 Harian":mode==="mingguan"?"🗓️ Mingguan":mode==="bulanan"?"📆 Bulanan":"🗃️ Tahunan"}
+          </button>
+        ))}
+      </div>
 
-        <div className="flex flex-col gap-3">
+      {/* Toggle kalender — mobile only */}
+      <button
+        onClick={()=>setShowCalendar(v=>!v)}
+        className="sm:hidden w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 shadow-sm"
+      >
+        <span>📅 {showCalendar ? "Sembunyikan Kalender" : "Tampilkan Kalender"}</span>
+        <span>{showCalendar ? "▲" : "▼"}</span>
+      </button>
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* Sidebar kalender */}
+        <div className={`${showCalendar ? "block" : "hidden"} sm:block sm:w-56 md:w-60 flex-shrink-0 space-y-3`}>
           <MiniCalendar
             key={calendarResetKey}
             selectedDate={selectedDate}
-            onSelectDate={(d)=>{setSelectedDate(d);setFilterMode("harian");}}
+            onSelectDate={(d)=>{setSelectedDate(d);setFilterMode("harian");setShowCalendar(false);}}
             highlightedDates={highlightedDates}
           />
-          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
-            <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Filter Tampilan</p>
-            <div className="flex flex-col gap-1">
-              {(["semua","harian","mingguan","bulanan","tahunan"] as FilterMode[]).map(mode=>(
-                <button key={mode} onClick={()=>{
-                    setFilterMode(mode);
-                    if (mode !== "harian") setCalendarResetKey(k => k + 1);
-                  }}
-                  className={`text-left px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${filterMode===mode?"bg-dark-header text-white":"hover:bg-gray-100 text-gray-600"}`}>
-                  {mode==="semua"?"🗂 Semua":mode==="harian"?"📅 Harian":mode==="mingguan"?"📆 Mingguan":mode==="bulanan"?"🗓 Bulanan":"📊 Tahunan"}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
+        {/* Statistik */}
         <div className="flex-1 min-w-0 space-y-3">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
             <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📊 Statistik — {labelFilter[filterMode]}</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {[
@@ -286,15 +248,15 @@ export default function RecapitulationTable() {
                 {label:"Ditindaklanjuti",val:ditindakCount,color:"text-blue-700",bg:"bg-blue-50 border-blue-200"},
                 {label:"Belum Ditindak",val:tidakDitindak+menungguCount,color:"text-red-700",bg:"bg-red-50 border-red-200"},
               ].map(s=>(
-                <div key={s.label} className={`border rounded-xl p-3 ${s.bg}`}>
-                  <p className="text-[9px] text-gray-500 uppercase tracking-wide">{s.label}</p>
-                  <p className={`text-2xl font-black mt-1 ${s.color}`}>{s.val}</p>
+                <div key={s.label} className={`border rounded-xl p-2 sm:p-3 ${s.bg}`}>
+                  <p className="text-[9px] text-gray-500 uppercase tracking-wide leading-tight">{s.label}</p>
+                  <p className={`text-xl sm:text-2xl font-black mt-1 ${s.color}`}>{s.val}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
             <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📋 Rekap Status Tindak Lanjut</p>
             <table className="w-full text-[10px] border-collapse">
               <thead>
@@ -325,14 +287,15 @@ export default function RecapitulationTable() {
         </div>
       </div>
 
+      {/* Export bar */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
-        <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">📥 Export:</span>
+        <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold w-full sm:w-auto">📥 Export:</span>
         <button
           onClick={()=>{
-            const filteredRekap   = rekapData.filter(d=>isInFilter(d.created_at??null));
+            const filteredRekap = rekapData.filter(d=>isInFilter(d.created_at??null));
             const filteredDipantau = prosesData.filter(p=>{
-              const selesaiIds=new Set(rekapData.map(d=>d.id_boxing));
-              return !selesaiIds.has(p.id_boxing)&&isInFilter(p.created_at??null);
+              const ids=new Set(rekapData.map(d=>d.id_boxing));
+              return !ids.has(p.id_boxing)&&isInFilter(p.created_at??null);
             });
             setExportingExcelLoading(true);
             exportExcel(filteredRekap, filteredDipantau);
@@ -340,29 +303,25 @@ export default function RecapitulationTable() {
           }}
           disabled={exportingExcelLoading||filteredItems.length===0}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white text-[10px] font-bold rounded transition-all">
-          {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel ({filterMode==="semua"?"Semua":labelFilter[filterMode]})
+          {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel
         </button>
-        <span className="text-[9px] text-gray-400 ml-1">PDF per periode:</span>
+        <span className="text-[9px] text-gray-400">PDF:</span>
         {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
           <button key={kat}
-            onClick={()=>{
-              setExportingPDF(kat);
-              exportPDFRekap(rekapData,prosesData,kat,selectedDate);
-              setExportingPDF(null);
-            }}
+            onClick={()=>{ setExportingPDF(kat); exportPDFRekap(rekapData,prosesData,kat,selectedDate); setExportingPDF(null); }}
             disabled={exportingPDF===kat}
             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
-            {"📄"}
-            {kat.charAt(0).toUpperCase()+kat.slice(1)}
+            📄 {kat.charAt(0).toUpperCase()+kat.slice(1)}
           </button>
         ))}
-        <span className="text-[9px] text-gray-400 ml-auto italic">
+        <span className="text-[9px] text-gray-400 ml-auto italic hidden sm:block">
           {filteredItems.length} laporan · {labelFilter[filterMode]}
         </span>
       </div>
 
-      <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
-        <div className="flex min-w-275 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
+      {/* Tabel — DESKTOP */}
+      <div className="hidden md:block w-full border-2 border-black bg-white overflow-x-auto text-xs">
+        <div className="flex min-w-[700px] font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
           <div className="w-10 border-r-2 border-black p-2">No</div>
           <div className="flex-1 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
           <div className="w-36 border-r-2 border-black p-2">Penyebab</div>
@@ -371,102 +330,147 @@ export default function RecapitulationTable() {
           <div className="flex-1 border-r-2 border-black p-2">Hasil Tindak Lanjut</div>
           <div className="w-32 p-2">Tindakan</div>
         </div>
-
         {filteredItems.length===0?(
-          <div className="flex min-w-275 p-8 justify-center border-t-2 border-black">
+          <div className="flex p-8 justify-center border-t-2 border-black">
             <p className="text-gray-400 italic text-sm">Tidak ada data untuk periode ini.</p>
           </div>
         ):(
           filteredItems.map((item,index)=>{
             const isReopenPending = pendingReopen.has(item.id_boxing);
             const reopenAction = getReopenAction(item.statusBoxing, item.statusReview);
-
             const statusInfo = isReopenPending
               ? { label: "⏳ Dipantau", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: false }
               : item.isSelesai
                 ? { label: "✓ Selesai", cls: "bg-green-100 text-green-700", butuhAksiStaf: false }
                 : labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
-
             const pendingAppr = pendingApproval[item.id_boxing];
-
             return (
-            <div key={`${item.id_boxing}-${index}`} className="flex min-w-275 border-t-2 border-black text-[11px]">
-              <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
-                <span className="font-bold text-sm">{index+1}</span>
-              </div>
-              <div className="flex-1 border-r-2 border-black p-3">
-                <p className="text-[9px] text-gray-400 italic mb-1 flex items-center gap-1 flex-wrap">
-                  <span>{item.kode}</span>
-                  {item.unit!=="—"&&<span>· {item.unit}</span>}
-                </p>
-                <div className="border border-gray-400 p-2 h-20 font-bold text-[10px] overflow-auto uppercase">{item.uraian}</div>
-              </div>
-              <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
-                <span className="italic text-gray-500 text-center text-[10px]">{item.penyebab}</span>
-              </div>
-              <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
-                <span className="italic text-gray-500 text-center text-[10px]">{item.rencana}</span>
-              </div>
-
-              <div className="w-28 border-r-2 border-black p-3 flex flex-col items-center justify-center gap-1">
-                <span
-                  title={statusInfo.butuhAksiStaf ? "Kepala Unit sudah selesai mengerjakan. Menunggu kamu approve/tolak." : undefined}
-                  className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls} ${statusInfo.butuhAksiStaf ? "cursor-help" : ""}`}>
-                  {statusInfo.label}
-                </span>
-              </div>
-
-              <div className="flex-1 border-r-2 border-black p-3">
-                <div className="border border-gray-400 p-2 h-20 italic text-gray-500 overflow-auto">
-                  {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
-                  {item.hasil}
+              <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-[700px] border-t-2 border-black text-[11px]">
+                <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
+                  <span className="font-bold text-sm">{index+1}</span>
+                </div>
+                <div className="flex-1 border-r-2 border-black p-3">
+                  <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
+                  <div className="border border-gray-400 p-2 h-20 font-bold text-[10px] overflow-auto uppercase">{item.uraian}</div>
+                </div>
+                <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
+                  <span className="italic text-gray-500 text-center text-[10px]">{item.penyebab}</span>
+                </div>
+                <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
+                  <span className="italic text-gray-500 text-center text-[10px]">{item.rencana}</span>
+                </div>
+                <div className="w-28 border-r-2 border-black p-3 flex items-center justify-center">
+                  <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>{statusInfo.label}</span>
+                </div>
+                <div className="flex-1 border-r-2 border-black p-3">
+                  <div className="border border-gray-400 p-2 h-20 italic text-gray-500 overflow-auto">
+                    {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
+                    {item.hasil}
+                  </div>
+                </div>
+                <div className="w-32 p-3 flex flex-col justify-center gap-1.5">
+                  {isReopenPending ? (
+                    <span className="text-[9px] text-orange-600 font-bold text-center italic">⏳ Sedang ditindak ulang</span>
+                  ) : statusInfo.butuhAksiStaf ? (
+                    pendingAppr ? (
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${pendingAppr==="diterima"?"text-green-700 bg-green-50 border-green-300":"text-red-700 bg-red-50 border-red-300"}`}>
+                        {pendingAppr==="diterima"?"✓ Disetujui":"✗ Ditolak"}
+                      </span>
+                    ) : (
+                      <div className="flex gap-1.5 justify-center">
+                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"diterima")}
+                          className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow">✓</button>
+                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"ditolak")}
+                          className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow">✗</button>
+                      </div>
+                    )
+                  ) : reopenAction ? (
+                    <button onClick={()=>bukaLagi(item.id_boxing,reopenAction)}
+                      className={`w-full border-2 text-[9px] font-bold py-1.5 leading-tight transition-all ${reopenAction==="ditindak_lanjut"?"border-orange-500 bg-orange-50 text-orange-800 hover:bg-orange-100":"border-gray-400 text-gray-600 hover:bg-gray-50"}`}>
+                      {reopenAction==="ditindak_lanjut"?"↻ Tindak ulang":"↻ Buka ke Unit"}
+                    </button>
+                  ) : (
+                    <span className="text-[9px] text-gray-400 italic text-center">Menunggu proses</span>
+                  )}
                 </div>
               </div>
+            );
+          })
+        )}
+      </div>
 
-              <div className="w-32 p-3 flex flex-col justify-center gap-1.5">
-                {isReopenPending ? (
-                  <span className="text-[9px] text-orange-600 font-bold text-center italic">
-                    ⏳ Sedang ditindak ulang
-                  </span>
-                ) : statusInfo.butuhAksiStaf ? (
-                  pendingAppr ? (
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
-                      pendingAppr === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
-                    }`}>
-                      {pendingAppr === "diterima" ? "✓ Disetujui" : "✗ Ditolak"}
-                    </span>
+      {/* Tabel — MOBILE card */}
+      <div className="md:hidden w-full border-2 border-black bg-white text-xs">
+        <div className="border-b-2 border-black px-3 py-2 bg-gray-50 text-[10px] font-bold uppercase text-gray-500">
+          Daftar Laporan · {filteredItems.length} item
+        </div>
+        {filteredItems.length===0 ? (
+          <div className="p-8 text-center text-gray-400 italic">Tidak ada data untuk periode ini.</div>
+        ) : (
+          filteredItems.map((item,index)=>{
+            const isReopenPending = pendingReopen.has(item.id_boxing);
+            const reopenAction = getReopenAction(item.statusBoxing, item.statusReview);
+            const statusInfo = isReopenPending
+              ? { label: "⏳ Dipantau", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: false }
+              : item.isSelesai
+                ? { label: "✓ Selesai", cls: "bg-green-100 text-green-700", butuhAksiStaf: false }
+                : labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
+            const pendingAppr = pendingApproval[item.id_boxing];
+            return (
+              <div key={`m-${item.id_boxing}-${index}`} className="border-t-2 border-black p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-600">{index+1}. {item.kode}</span>
+                    {item.unit!=="—"&&<span className="text-[10px] text-gray-400 ml-1">· {item.unit}</span>}
+                  </div>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${statusInfo.cls}`}>{statusInfo.label}</span>
+                </div>
+                <div className="border border-gray-300 p-2 text-[11px] font-semibold uppercase bg-gray-50 rounded max-h-20 overflow-auto">
+                  {item.uraian}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Penyebab</p>
+                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-[40px]">{item.penyebab}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana</p>
+                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-[40px]">{item.rencana}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
+                  <div className="border border-gray-200 p-2 text-[10px] italic text-gray-600 rounded max-h-16 overflow-auto">
+                    {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1">{item.tglPelaksanaan}</span>}
+                    {item.hasil}
+                  </div>
+                </div>
+                <div>
+                  {isReopenPending ? (
+                    <span className="text-[10px] text-orange-600 font-bold italic">⏳ Sedang ditindak ulang</span>
+                  ) : statusInfo.butuhAksiStaf ? (
+                    pendingAppr ? (
+                      <span className={`text-[10px] font-bold px-3 py-1.5 rounded border ${pendingAppr==="diterima"?"text-green-700 bg-green-50 border-green-300":"text-red-700 bg-red-50 border-red-300"}`}>
+                        {pendingAppr==="diterima"?"✓ Disetujui":"✗ Ditolak"}
+                      </span>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"diterima")}
+                          className="flex-1 py-2 rounded bg-green-500 hover:bg-green-600 text-white text-xs font-bold shadow">✓ Terima</button>
+                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"ditolak")}
+                          className="flex-1 py-2 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow">✗ Tolak</button>
+                      </div>
+                    )
+                  ) : reopenAction ? (
+                    <button onClick={()=>bukaLagi(item.id_boxing,reopenAction)}
+                      className={`w-full border-2 text-xs font-bold py-2 rounded transition-all ${reopenAction==="ditindak_lanjut"?"border-orange-500 bg-orange-50 text-orange-800":"border-gray-400 text-gray-600"}`}>
+                      {reopenAction==="ditindak_lanjut"?"↻ Tindak ulang":"↻ Buka ke Unit"}
+                    </button>
                   ) : (
-                    <div className="flex gap-1.5 justify-center">
-                      <button type="button" onClick={() => approvalStaf(item.id_boxing, "diterima")}
-                        title="Terima hasil — laporan otomatis Selesai"
-                        className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow">
-                        ✓
-                      </button>
-                      <button type="button" onClick={() => approvalStaf(item.id_boxing, "ditolak")}
-                        title="Tolak — kembalikan ke unit untuk revisi"
-                        className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow">
-                        ✗
-                      </button>
-                    </div>
-                  )
-                ) : reopenAction ? (
-                  <button onClick={()=>bukaLagi(item.id_boxing,reopenAction)}
-                    className={`w-full border-2 text-[9px] font-bold py-1.5 leading-tight transition-all ${
-                      reopenAction==="ditindak_lanjut"
-                        ?"border-orange-500 bg-orange-50 text-orange-800 hover:bg-orange-100"
-                        :"border-gray-400 text-gray-600 hover:bg-gray-50"
-                    }`}>
-                    {reopenAction==="ditindak_lanjut"?"↻ Tindak ulang":"↻ Buka ke Unit"}
-                  </button>
-                ) : (
-                  <span
-                    title="Laporan masih berjalan di tahap Kepala Unit / Ka P4M."
-                    className="text-[9px] text-gray-400 italic text-center cursor-help">
-                    Menunggu proses
-                  </span>
-                )}
+                    <span className="text-[10px] text-gray-400 italic">Menunggu proses</span>
+                  )}
+                </div>
               </div>
-            </div>
             );
           })
         )}
