@@ -140,6 +140,7 @@ export default function ProcessMonitorTable() {
       nama_unit: item.nama_unit,
       status_boxing: item.status_boxing,
       status_review: item.status_review,
+      approval_staf: item.approval_staf,
       aksi_masukan: item.aksi_masukan,
       penyebab: item.penyebab,
       rencana_tindakan: item.rencana_tindakan,

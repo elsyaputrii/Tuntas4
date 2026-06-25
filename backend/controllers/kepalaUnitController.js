@@ -55,7 +55,11 @@ async function getLaporanMasuk(req, res) {
       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
         AND b.status NOT IN ('selesai')
-        AND (r.id_rancangan IS NULL OR r.status_review = 'menunggu_keputusan_ka')
+        AND (
+          r.id_rancangan IS NULL
+          OR r.status_review = 'menunggu_keputusan_ka'
+          OR b.approval_staf = 'ditolak'
+        )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala]
     );

@@ -245,6 +245,7 @@ export interface ProsesDetailItem {
   nama_unit: string | null;
   status_boxing: string | null;
   status_review: string | null;
+  approval_staf: string | null;
   aksi_masukan: string | null;
   penyebab: string | null;
   rencana_tindakan: string | null;
@@ -282,7 +283,7 @@ export function exportPDFProses(item: ProsesDetailItem) {
   <div class="field"><span class="lbl">Unit Tujuan</span><span class="val">${item.nama_unit ?? "—"}</span></div>
   <div class="field"><span class="lbl">Tanggal Masuk</span><span class="val">${fmtTgl(item.created_at ?? null)}</span></div>
   <div class="field"><span class="lbl">Status Boxing</span><span class="val">${labelStatusBoxing(item.status_boxing)}</span></div>
-  <div class="field"><span class="lbl">Status Review</span><span class="val">${labelStatusReview(item.status_review)}</span></div>
+  <div class="field"><span class="lbl">Status Review</span><span class="val">${item.approval_staf === "ditolak" ? "Ditolak Staf P4M — Revisi Unit" : labelStatusReview(item.status_review)}</span></div>
 </div>
 
 <div class="section">
