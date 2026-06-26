@@ -74,12 +74,38 @@ export default function StaffP4MLayout({
     }
   };
 
+  // ========== MENU BARU (sesuai permintaan) ==========
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/staff-p4m' },
-    { id: 'pengaduan', label: 'Pengaduan', icon: <ClipboardList size={18} />, path: '/staff-p4m/pengaduan' },
-    { id: 'status', label: 'Status Pengaduan', icon: <BarChart3 size={18} />, path: '/staff-p4m/status' },
-    { id: 'laporan', label: 'Laporan', icon: <FileText size={18} />, path: '/staff-p4m/laporan' },
-    { id: 'data_akun', label: 'Data Akun', icon: <Users size={18} />, path: '/staff-p4m/data-akun' },
+    { 
+      id: 'dashboard', 
+      label: 'Dashboard', 
+      icon: <LayoutDashboard size={18} />, 
+      path: '/staff-p4m' 
+    },
+    { 
+      id: 'laporan-masuk', 
+      label: 'Laporan Masuk', 
+      icon: <ClipboardList size={18} />, 
+      path: '/staff-p4m/laporan-masuk' 
+    },
+    { 
+      id: 'proses-pantau', 
+      label: 'Proses & Pantau', 
+      icon: <BarChart3 size={18} />, 
+      path: '/staff-p4m/proses-pantau' 
+    },
+    { 
+      id: 'rekapitulasi', 
+      label: 'Rekapitulasi', 
+      icon: <FileText size={18} />, 
+      path: '/staff-p4m/rekapitulasi' 
+    },
+    { 
+      id: 'data-akun', 
+      label: 'Data Akun', 
+      icon: <Users size={18} />, 
+      path: '/staff-p4m/data-akun' 
+    },
   ];
 
   const isActive = (path: string) => pathname === path;
@@ -92,9 +118,9 @@ export default function StaffP4MLayout({
 
   return (
     <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
-      {/* ========== SIDEBAR ========== */}
+      {/* ========== SIDEBAR BIRU NAVY (tidak terlalu gelap/terang) ========== */}
       <aside
-        className={`bg-gradient-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
+        className={`bg-gradient-to-b from-[#1a2a4a] to-[#2a4a6a] dark:from-slate-800 dark:to-slate-900
         text-white transition-all duration-300 flex flex-col shadow-2xl
         ${sidebarOpen ? 'w-[260px]' : 'w-[85px]'}`}
       >
@@ -133,8 +159,8 @@ export default function StaffP4MLayout({
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm w-full text-left
               ${
                 isActive(item.path)
-                  ? 'bg-white/10 text-white'
-                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  ? 'bg-white/20 text-white'  // lebih terang biar keliatan active
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               {item.icon}
@@ -150,7 +176,7 @@ export default function StaffP4MLayout({
               localStorage.clear();
               router.push('/staff-p4m/login');
             }}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:bg-white/5 transition"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:bg-white/10 transition"
           >
             <LogOut size={18} />
             {sidebarOpen && <span className="text-sm">Logout</span>}
@@ -166,13 +192,12 @@ export default function StaffP4MLayout({
             {/* Judul Kiri */}
             <div>
               <h1 className="text-[20px] font-bold leading-tight">
-                Selamat Datang Di Transformasi Tata Kelola Organisasi:
+                Transformasi Tata Kelola Organisasi:
                 <br />
                 Aplikasi Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                {activeMenu?.icon}
-                <span>{activeMenu?.label || 'Dashboard'}</span>
+                👤 Admin Staf P4M
               </p>
             </div>
 
