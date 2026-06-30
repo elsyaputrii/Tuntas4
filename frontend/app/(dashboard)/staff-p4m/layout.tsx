@@ -3,19 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
+  LayoutDashboard,
   ClipboardList,
   BarChart3,
   FileText,
+  Users,
   LogOut,
   Menu,
   X,
   Sun,
   Moon,
+  Bell,
   User,
   ChevronDown,
-  Bell,
-  LayoutDashboard,
-  Users,
 } from 'lucide-react';
 
 export default function StaffP4MLayout({
@@ -25,21 +25,21 @@ export default function StaffP4MLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // State
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [showNotifikasi, setShowNotifikasi] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
 
-  // Cek login
+  // Auth check
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
-    
     if (!token || !userRaw) {
       router.push('/staff-p4m/login');
       return;
     }
-    
     try {
       const user = JSON.parse(userRaw);
       if (user.role !== 'staf_p4m') {
@@ -55,77 +55,44 @@ export default function StaffP4MLayout({
     const saved = localStorage.getItem('darkMode');
     const isDark = saved === 'true';
     setDarkMode(isDark);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', isDark);
   }, []);
 
   const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('darkMode', 'true');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('darkMode', 'false');
-    }
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem('darkMode', String(newMode));
+    document.documentElement.classList.toggle('dark', newMode);
   };
 
-  // ========== MENU BARU (sesuai permintaan) ==========
+  // Menu
   const menuItems = [
-    { 
-      id: 'dashboard', 
-      label: 'Dashboard', 
-      icon: <LayoutDashboard size={18} />, 
-      path: '/staff-p4m' 
-    },
-    { 
-      id: 'laporan-masuk', 
-      label: 'Laporan Masuk', 
-      icon: <ClipboardList size={18} />, 
-      path: '/staff-p4m/laporan-masuk' 
-    },
-    { 
-      id: 'proses-pantau', 
-      label: 'Proses & Pantau', 
-      icon: <BarChart3 size={18} />, 
-      path: '/staff-p4m/proses-pantau' 
-    },
-    { 
-      id: 'rekapitulasi', 
-      label: 'Rekapitulasi', 
-      icon: <FileText size={18} />, 
-      path: '/staff-p4m/rekapitulasi' 
-    },
-    { 
-      id: 'data-akun', 
-      label: 'Data Akun', 
-      icon: <Users size={18} />, 
-      path: '/staff-p4m/data-akun' 
-    },
+    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/staff-p4m' },
+    { id: 'laporan-masuk', label: 'Laporan Masuk', icon: <ClipboardList size={18} />, path: '/staff-p4m/laporan-masuk' },
+    { id: 'proses-pantau', label: 'Proses & Pantau', icon: <BarChart3 size={18} />, path: '/staff-p4m/proses-pantau' },
+    { id: 'rekapitulasi', label: 'Rekapitulasi', icon: <FileText size={18} />, path: '/staff-p4m/rekapitulasi' },
+    { id: 'data-akun', label: 'Data Akun', icon: <Users size={18} />, path: '/staff-p4m/data-akun' },
   ];
 
   const isActive = (path: string) => pathname === path;
-  const activeMenu = menuItems.find((item) => isActive(item.path));
 
-  // Halaman login ga pake sidebar
+  // Login page = no sidebar
   if (pathname?.includes('/login')) {
     return <>{children}</>;
   }
 
   return (
+    // ===== BACKGROUND UTAMA (abu-abu terang) =====
     <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
-      {/* ========== SIDEBAR BIRU NAVY (tidak terlalu gelap/terang) ========== */}
+      
+      {/* ========== SIDEBAR (biru tua gelap) ========== */}
       <aside
-        className={`bg-gradient-to-b from-[#1a2a4a] to-[#2a4a6a] dark:from-slate-800 dark:to-slate-900
+        className={`bg-gradient-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
         text-white transition-all duration-300 flex flex-col shadow-2xl
         ${sidebarOpen ? 'w-[260px]' : 'w-[85px]'}`}
       >
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/10 flex items-start justify-between">
+        <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
           {sidebarOpen ? (
             <div className="flex items-center gap-2">
               <img src="/politeknik logo.png" alt="Logo" className="w-9 h-9" />
@@ -142,10 +109,7 @@ export default function StaffP4MLayout({
           ) : (
             <img src="/politeknik logo.png" alt="Logo" className="w-8 h-8 mx-auto" />
           )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-slate-400 hover:text-white"
-          >
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-white">
             {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
           </button>
         </div>
@@ -157,10 +121,9 @@ export default function StaffP4MLayout({
               key={item.id}
               onClick={() => router.push(item.path)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm w-full text-left
-              ${
-                isActive(item.path)
-                  ? 'bg-white/20 text-white'  // lebih terang biar keliatan active
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+              ${isActive(item.path)
+                ? 'bg-white/10 text-white'
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
               }`}
             >
               {item.icon}
@@ -176,7 +139,7 @@ export default function StaffP4MLayout({
               localStorage.clear();
               router.push('/staff-p4m/login');
             }}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:bg-white/10 transition"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:bg-white/5 transition"
           >
             <LogOut size={18} />
             {sidebarOpen && <span className="text-sm">Logout</span>}
@@ -186,10 +149,11 @@ export default function StaffP4MLayout({
 
       {/* ========== AREA KANAN ========== */}
       <div className="flex-1 flex flex-col">
-        {/* HEADER / NAVBAR */}
+        
+        {/* ===== NAVBAR (gradient biru abu) ===== */}
         <div className="bg-gradient-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
           <div className="flex justify-between items-center">
-            {/* Judul Kiri */}
+            {/* Kiri: Title */}
             <div>
               <h1 className="text-[20px] font-bold leading-tight">
                 Transformasi Tata Kelola Organisasi:
@@ -197,78 +161,55 @@ export default function StaffP4MLayout({
                 Aplikasi Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👤 Admin Staf P4M
+                👤 Admin Staff P4M
               </p>
             </div>
 
-            {/* Kanan: Ikon-ikon */}
+            {/* Kanan: Ikon */}
             <div className="flex items-center gap-2">
               {/* Dark Mode */}
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-full hover:bg-white/10 transition"
-              >
+              <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-white/10 transition">
                 {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
               {/* Notifikasi */}
               <div className="relative">
-                <button
-                  onClick={() => setShowNotifikasi(!showNotifikasi)}
-                  className="relative p-2 rounded-full hover:bg-white/10 transition"
-                >
+                <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
                   <Bell size={18} />
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
                     3
                   </span>
                 </button>
-                {showNotifikasi && (
+                {showNotif && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b dark:border-slate-700 font-semibold text-slate-700 dark:text-white flex justify-between">
                       <span>Notifikasi</span>
-                      <button onClick={() => setShowNotifikasi(false)}>
-                        <X size={16} />
-                      </button>
+                      <button onClick={() => setShowNotif(false)}><X size={16} /></button>
                     </div>
                     <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
                   </div>
                 )}
               </div>
 
-              {/* Profile Dropdown */}
+              {/* Profile */}
               <div className="relative">
-                <button
-                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                  className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition"
-                >
+                <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                     <User size={16} />
                   </div>
                   <ChevronDown size={14} />
                 </button>
-                {showProfileDropdown && (
+                {showProfile && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b dark:border-slate-700">
                       <p className="text-sm font-semibold text-slate-700 dark:text-white">Admin Staff</p>
                       <p className="text-xs text-slate-400">staff@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
-                      <button
-                        onClick={() => {
-                          setShowProfileDropdown(false);
-                          router.push('/staff-p4m/profil');
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-                      >
+                      <button className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
                         Profil Saya
                       </button>
-                      <button
-                        onClick={() => {
-                          setShowProfileDropdown(false);
-                          router.push('/staff-p4m/pengaturan');
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-                      >
+                      <button className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
                         Pengaturan
                       </button>
                     </div>
@@ -279,9 +220,9 @@ export default function StaffP4MLayout({
           </div>
         </div>
 
-        {/* KONTEN UTAMA */}
+        {/* ===== KONTEN UTAMA ===== */}
         <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
-          <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-[500px] p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-[500px]">
             {children}
           </div>
         </div>
