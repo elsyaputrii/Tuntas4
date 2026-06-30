@@ -139,3 +139,16 @@ export const kepalaUnitApi = {
   submitPelaksanaan: (formData: FormData) =>
     apiFetch("/kepala-unit/pelaksanaan", { method: "POST", body: formData }),
 };
+
+// ─────────────────────────────────────────────
+// USERS — kelola akun (Data Akun), khusus staf_p4m
+// ─────────────────────────────────────────────
+export const userApi = {
+  getUsers: () => apiFetch("/users"),
+  createUser: (body: Record<string, unknown>) =>
+    apiFetch("/users", { method: "POST", body: JSON.stringify(body) }),
+  updateUser: (id: number, body: Record<string, unknown>) =>
+    apiFetch(`/users/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteUser: (id: number) =>
+    apiFetch(`/users/${id}`, { method: "DELETE" }),
+};

@@ -178,9 +178,7 @@ async function getLaporanHasil(req, res) {
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
         AND (
-          (r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan')
-          OR
-          (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
+          r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan'
         )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala]

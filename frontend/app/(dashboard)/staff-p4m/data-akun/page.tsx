@@ -15,6 +15,7 @@ import {
   UserCog,
   X,
 } from "lucide-react";
+import { userApi } from "@/lib/api";
 
 interface User {
   id: number;
@@ -60,15 +61,11 @@ export default function DataAkunPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/users');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await userApi.getUsers();
       setUsers(data);
     } catch (error) {
       console.error('Gagal ambil data:', error);
-      setError('Gagal memuat data akun. Pastikan backend berjalan di http://localhost:5000');
+      setError('Gagal memuat data akun. Pastikan backend berjalan dan kamu login sebagai Staf P4M.');
       setUsers([]);
     } finally {
       setLoading(false);
@@ -104,44 +101,29 @@ export default function DataAkunPage() {
     }
 
     try {
-      const url = selectedUser 
-        ? `http://localhost:5000/api/users/${selectedUser.id}`
-        : 'http://localhost:5000/api/users';
-      const method = selectedUser ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        fetchUsers(); // Refresh data
-        closeModal();
+      if (selectedUser) {
+        await userApi.updateUser(selectedUser.id, formData);
       } else {
-        const errorData = await response.json();
-        alert(`Gagal menyimpan data: ${errorData.message || 'Silakan coba lagi'}`);
+        await userApi.createUser(formData);
       }
-    } catch (error) {
+      fetchUsers(); // Refresh data
+      closeModal();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
       console.error("Error:", error);
-      alert("Terjadi kesalahan. Silakan coba lagi.");
+      alert(`Gagal menyimpan data: ${error.message || 'Silakan coba lagi'}`);
     }
   };
 
   const handleDelete = async () => {
     if (selectedUser) {
       try {
-        const response = await fetch(`http://localhost:5000/api/users/${selectedUser.id}`, {
-          method: "DELETE",
-        });
-        if (response.ok) {
-          setUsers(users.filter((user) => user.id !== selectedUser.id));
-        } else {
-          alert("Gagal menghapus akun. Silakan coba lagi.");
-        }
+        await userApi.deleteUser(selectedUser.id);
+        setUsers(users.filter((user) => user.id !== selectedUser.id));
       } catch (error) {
         console.error("Error:", error);
-        alert("Terjadi kesalahan. Silakan coba lagi.");
+        alert("Gagal menghapus akun. Silakan coba lagi.");
       }
       setIsDeleteModalOpen(false);
       setSelectedUser(null);
@@ -249,7 +231,7 @@ export default function DataAkunPage() {
         </div>
 
         {/* Statistik Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-gradient-to-r from-slate-400 to-slate-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
                onClick={() => setSelectedRoleFilter("all")}>
             <div className="flex justify-between items-start">

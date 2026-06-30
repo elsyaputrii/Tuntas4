@@ -640,11 +640,23 @@ async function setApprovalStaf(req, res) {
       );
       await syncStatusLaporan(row.id_laporan);
     } else {
-      // "ditolak" → tetap di 'di_staff', tapi tandai ditolak supaya
-      // Kepala Unit tahu harus merevisi hasil pelaksanaannya.
+      // "ditolak" → reset rancangan & pelaksanaan supaya Kepala Unit
+      // bisa isi ulang dari awal (penyebab, rencana, dan hasil).
       await pool.query(
         `UPDATE boxing_ketidaksesuaian SET approval_staf = ? WHERE id_boxing = ?`,
         [approval, id_boxing]
+      );
+      // Reset rancangan: kosongkan penyebab & rencana, kembalikan ke menunggu_keputusan_ka
+      await pool.query(
+        `UPDATE rancangan_tindakan
+         SET penyebab = NULL, deskripsi = NULL, status_review = 'menunggu_keputusan_ka', updated_at = NOW()
+         WHERE id_boxing = ?`,
+        [id_boxing]
+      );
+      // Hapus pelaksanaan lama supaya tab Laporan Hasil bersih
+      await pool.query(
+        `DELETE FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
+        [id_boxing]
       );
     }
 

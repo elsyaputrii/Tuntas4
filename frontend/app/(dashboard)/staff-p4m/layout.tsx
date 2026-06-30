@@ -83,7 +83,7 @@ export default function StaffP4MLayout({
 
   return (
     // ===== BACKGROUND UTAMA (abu-abu terang) =====
-    <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
+    <div className="h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
       
       {/* ========== SIDEBAR (biru tua gelap) ========== */}
       <aside
@@ -95,7 +95,9 @@ export default function StaffP4MLayout({
         <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
           {sidebarOpen ? (
             <div className="flex items-center gap-2">
-              <img src="/politeknik logo.png" alt="Logo" className="w-9 h-9" />
+              <div className="w-11 h-11 rounded-full overflow-hidden bg-white flex items-center justify-center">
+  <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
+</div>
               <div>
                 <h1 className="font-bold text-base tracking-wide">
                   <span className="bg-gradient-to-r from-[#d4af37] via-yellow-200 to-[#d4af37] bg-[length:200%_auto] bg-clip-text text-transparent animate-shine">
@@ -107,7 +109,9 @@ export default function StaffP4MLayout({
               </div>
             </div>
           ) : (
-            <img src="/politeknik logo.png" alt="Logo" className="w-8 h-8 mx-auto" />
+            <div className="w-10 h-10 mx-auto rounded-full overflow-hidden bg-white flex items-center justify-center">
+  <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
+</div>
           )}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-white">
             {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
@@ -148,7 +152,7 @@ export default function StaffP4MLayout({
       </aside>
 
       {/* ========== AREA KANAN ========== */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         
         {/* ===== NAVBAR (gradient biru abu) ===== */}
         <div className="bg-gradient-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
@@ -221,7 +225,7 @@ export default function StaffP4MLayout({
         </div>
 
         {/* ===== KONTEN UTAMA ===== */}
-        <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
+        <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5 min-w-0 overflow-x-auto">
           <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-[500px]">
             {children}
           </div>

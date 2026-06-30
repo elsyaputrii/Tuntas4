@@ -23,8 +23,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { stafApi } from "@/lib/api";
 
 export default function DashboardStaff() {
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dataLaporan, setDataLaporan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("semua");
@@ -59,11 +62,51 @@ export default function DashboardStaff() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/laporan');
-      const data = await response.json();
+      // Gabungkan laporan yang masih baru (belum dibox) + yang sudah diproses,
+      // karena gak ada satu endpoint yang nampung semua laporan sekaligus.
+      const [masuk, proses] = await Promise.all([
+        stafApi.getLaporanMasuk(),   // { success, data: [...] } — status 'menunggu'
+        stafApi.getProsesMonitor(),  // { success, data: [...] } — sudah dibox/diproses
+      ]);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapStatusProses = (row: any) => {
+        if (row.status_boxing === "selesai") return "Close";
+        if (row.status_review && row.status_review !== "disetujui" && row.status_review !== "tidak_disetujui") {
+          return "Review Ka-P4M";
+        }
+        if (row.status_boxing === "terdistribusi") return "Distribusi";
+        return "Diproses";
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dataMasuk = (masuk.data || []).map((row: any) => ({
+        id: `l-${row.id_laporan}`,
+        isi_laporan: row.deskripsi,
+        penyebab: null,
+        rencana_tindak_lanjut: null,
+        hasil_tindak_lanjut: null,
+        status: "Diterima",
+        tanggal_submit: row.created_at,
+      }));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dataProses = (proses.data || []).map((row: any) => ({
+        id: `b-${row.id_boxing}`,
+        isi_laporan: row.isi_laporan,
+        penyebab: row.penyebab,
+        rencana_tindak_lanjut: row.rencana_tindakan,
+        hasil_tindak_lanjut: row.hasil_tindakan,
+        status: mapStatusProses(row),
+        tanggal_submit: row.created_at,
+      }));
+
+      const data = [...dataMasuk, ...dataProses];
       setDataLaporan(data);
-      
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bulanMap: { [key: string]: any } = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data.forEach((item: any) => {
         const bulan = new Date(item.tanggal_submit).toLocaleString('id-ID', { month: 'short' });
         if (!bulanMap[bulan]) {
@@ -85,9 +128,13 @@ export default function DashboardStaff() {
       }));
       setChartData(newChartData);
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const diproses = data.filter((d: any) => d.status !== "Close" && d.status !== "Diterima").length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const review = data.filter((d: any) => d.status === "Review Ka-P4M").length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tindakLanjut = data.filter((d: any) => d.status === "Tindak Lanjut").length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const selesai = data.filter((d: any) => d.status === "Close").length;
       setStatusData([
         { name: "Diproses", value: diproses, color: "#f59e0b" },

@@ -25,8 +25,10 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { kaP4MApi } from "@/lib/api";
 
 export default function DashboardKaP4MPage() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dataLaporan, setDataLaporan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,12 +59,23 @@ export default function DashboardKaP4MPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:5000/api/laporan');
-        const data = await response.json();
+        const response = await kaP4MApi.getProsesMonitor(); // { success, data: [...] }
+        const mapStatus = (statusReview: string | null) => {
+          if (statusReview === "ditindaklanjuti") return "Tindak Lanjut";
+          if (statusReview === "tidak_ditindaklanjuti") return "Revisi";
+          return "Review Ka-P4M"; // termasuk 'menunggu_keputusan_ka' / belum ada rancangan
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = (response.data || []).map((row: any) => ({
+          ...row,
+          status: mapStatus(row.status_review),
+          tanggal_submit: row.created_at,
+        }));
         setDataLaporan(data);
 
-        // Proses data untuk chart per bulan
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bulanMap: { [key: string]: any } = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data.forEach((item: any) => {
           const bulan = new Date(item.tanggal_submit).toLocaleString('id-ID', { month: 'short' });
           if (!bulanMap[bulan]) {
@@ -85,8 +98,12 @@ export default function DashboardKaP4MPage() {
         setChartData(newChartData);
 
         // Update status pie chart
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const disetujui = data.filter((d: any) => d.status === "Tindak Lanjut").length;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const ditolak = data.filter((d: any) => d.status === "Revisi").length;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const menunggu = data.filter((d: any) => d.status === "Review Ka-P4M").length;
         setStatusData([
           { name: "Disetujui", value: disetujui, color: "#10b981" },
