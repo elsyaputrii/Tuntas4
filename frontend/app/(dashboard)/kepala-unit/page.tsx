@@ -79,14 +79,14 @@ export default function DashboardKepalaUnitPage() {
        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dataMasuk = (masuk.data || []).map((row: any) => ({
           ...row,
-          id: row.id_boxing,
+          id: `masuk-${row.id_boxing}`,
           status: mapStatusMasuk(row),
           tanggal_submit: row.created_at,
         }));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dataHasil = (hasil.data || []).map((row: any) => ({
           ...row,
-          id: row.id_boxing,
+          id: `hasil-${row.id_boxing}`,
           status: mapStatusHasil(row),
           tanggal_submit: row.tanggal_laporan,
         }));

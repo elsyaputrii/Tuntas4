@@ -19,10 +19,9 @@ interface LaporanItem {
 }
 
 const statusBadge: Record<string, { label: string; cls: string }> = {
-  menunggu_review:  { label: "⏳ Menunggu Review Staf P4M", cls: "text-blue-500 bg-blue-50 border-blue-200" },
-  disetujui:        { label: "✓ Disetujui",                 cls: "text-green-600 bg-green-50 border-green-200" },
-  tidak_disetujui:  { label: "✗ Tidak Disetujui",           cls: "text-red-500 bg-red-50 border-red-200" },
-  revisi:           { label: "⚠ Perlu Revisi",              cls: "text-yellow-600 bg-yellow-50 border-yellow-200" },
+  menunggu_keputusan_ka: { label: "⏳ Siap Dikirim", cls: "text-blue-500 bg-blue-50 border-blue-200" },
+  ditindaklanjuti:        { label: "✓ Ditindaklanjuti Staf P4M", cls: "text-green-600 bg-green-50 border-green-200" },
+  tidak_ditindaklanjuti:  { label: "✗ Tidak Ditindaklanjuti", cls: "text-red-500 bg-red-50 border-red-200" },
 };
 
 export default function DiscrepancyTable() {
@@ -73,7 +72,7 @@ export default function DiscrepancyTable() {
   };
 
   const isEditable = (status: string | null) =>
-    !status || status === "revisi" || status === "tidak_disetujui";
+    !status || status === "menunggu_keputusan_ka";
 
   if (loading) return (
     <div className="w-full border-2 border-black bg-white p-12 text-center">
@@ -121,7 +120,7 @@ export default function DiscrepancyTable() {
                 )}
               </div>
               <p className="text-xs text-black leading-relaxed">{item.isi_laporan}</p>
-              {item.status_review === "revisi" && item.catatan_review && (
+              {item.status_review === "tidak_ditindaklanjuti" && item.catatan_review && (
                 <div className="p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
                   <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_review}
                 </div>
@@ -147,13 +146,13 @@ export default function DiscrepancyTable() {
                 />
               </div>
               <div className="flex justify-end">
-                {item.status_review === "disetujui" ? (
+                {item.status_review === "ditindaklanjuti" ? (
                   <div className="text-center">
                     <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
                     <span className="text-[10px] text-gray-400">Lihat di Tab Laporan Hasil</span>
                   </div>
-                ) : item.status_review === "menunggu_review" ? (
-                  <span className="text-blue-500 text-[10px]">⏳ Menunggu Review</span>
+                ) : item.status_review === "tidak_ditindaklanjuti" ? (
+                  <span className="text-red-500 text-[10px]">✗ Ditolak — Isi Ulang</span>
                 ) : (
                   <button
                     onClick={() => handleSend(item.id_boxing)}
@@ -177,7 +176,7 @@ export default function DiscrepancyTable() {
                 {badge && (
                   <div className={`mt-3 px-2 py-1 border rounded text-[10px] font-medium ${badge.cls}`}>{badge.label}</div>
                 )}
-                {item.status_review === "revisi" && item.catatan_review && (
+                {item.status_review === "tidak_ditindaklanjuti" && item.catatan_review && (
                   <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
                     <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_review}
                   </div>
@@ -202,12 +201,12 @@ export default function DiscrepancyTable() {
                 />
               </div>
               <div className="flex-1 p-5 flex items-center justify-center">
-                {item.status_review === "disetujui" ? (
+                {item.status_review === "ditindaklanjuti" ? (
                   <div className="text-center">
                     <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
                     <span className="text-[10px] text-gray-400">Lihat di Tab Laporan Hasil</span>
                   </div>
-                ) : item.status_review === "menunggu_review" ? (
+                ) : item.status_review === "tidak_ditindaklanjuti" ? (
                   <span className="text-blue-500 text-[10px] text-center">Menunggu<br />Review</span>
                 ) : (
                   <button
