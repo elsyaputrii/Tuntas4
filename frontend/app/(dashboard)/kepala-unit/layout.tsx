@@ -2,17 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import {
   LayoutDashboard,
   ClipboardList,
   CheckCircle2,
-  User,
-  Settings,
   LogOut,
   Menu,
   X,
   Sun,
   Moon,
+  User,
   ChevronDown,
   Bell,
 } from 'lucide-react';
@@ -26,7 +26,13 @@ export default function KepalaUnitLayout({
   const pathname = usePathname();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  // ✅ Initialize langsung dari localStorage
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('darkMode') === 'true';
+    }
+    return false;
+  });
   const [showProfile, setShowProfile] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
@@ -48,22 +54,18 @@ export default function KepalaUnitLayout({
     }
   }, [router]);
 
-  // Dark mode
+  // ✅ Effect hanya untuk sinkronisasi DOM
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    const isDark = saved === 'true';
-    setDarkMode(isDark);
-    document.documentElement.classList.toggle('dark', isDark);
-  }, []);
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
     localStorage.setItem('darkMode', String(newMode));
-    document.documentElement.classList.toggle('dark', newMode);
   };
 
-  // ========== MENU KEPALA UNIT (LENGKAP) ==========
+  // ========== MENU KEPALA UNIT ==========
   const menuItems = [
     {
       id: 'dashboard',
@@ -83,18 +85,6 @@ export default function KepalaUnitLayout({
       icon: <CheckCircle2 size={18} />,
       path: '/kepala-unit/laporan-hasil'
     },
-    {
-      id: 'profil',
-      label: 'Profil',
-      icon: <User size={18} />,
-      path: '/kepala-unit/profil'
-    },
-    {
-      id: 'pengaturan',
-      label: 'Pengaturan',
-      icon: <Settings size={18} />,
-      path: '/kepala-unit/pengaturan'
-    },
   ];
 
   const isActive = (path: string) => pathname === path;
@@ -106,31 +96,37 @@ export default function KepalaUnitLayout({
 
   return (
     <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
-      
       {/* ========== SIDEBAR ========== */}
       <aside
-        className={`bg-gradient-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
+        className={`bg-linear-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
         text-white transition-all duration-300 flex flex-col shadow-2xl
-        ${sidebarOpen ? 'w-[260px]' : 'w-[85px]'}`}
+        ${sidebarOpen ? 'w-65' : 'w-21.25'}`}
       >
-        {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
-          {sidebarOpen ? (
-            <div className="flex items-center gap-2">
-              <img src="/politeknik logo.png" alt="Logo" className="w-9 h-9" />
+        {/* Logo - Gaya KA-P4M dengan Image */}
+        <div className={`px-5 py-5 border-b border-white/10 flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col justify-center gap-3'}`}>
+          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'flex-col'}`}>
+            <div className={`shrink-0 ${sidebarOpen ? 'w-11 h-11' : 'w-10 h-10'} rounded-full overflow-hidden bg-white flex items-center justify-center`}>
+              <Image 
+                src="/LogoTuntas.png" 
+                alt="Logo" 
+                width={44}
+                height={44}
+                className="w-full h-full object-cover scale-125" 
+                priority
+              />
+            </div>
+            {sidebarOpen && (
               <div>
                 <h1 className="font-bold text-base tracking-wide">
-                  <span className="bg-gradient-to-r from-[#d4af37] via-yellow-200 to-[#d4af37] bg-[length:200%_auto] bg-clip-text text-transparent animate-shine">
+                  <span className="bg-linear-to-r from-[#d4af37] via-yellow-200 to-[#d4af37] bg-size-[200%_auto] bg-clip-text text-transparent animate-shine">
                     TUNTAS
                   </span>
                   <span className="ml-1 text-white">Polibatam</span>
                 </h1>
                 <p className="text-[9px] text-slate-300">Sistem Pengaduan Kampus</p>
               </div>
-            </div>
-          ) : (
-            <img src="/politeknik logo.png" alt="Logo" className="w-8 h-8 mx-auto" />
-          )}
+            )}
+          </div>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-white">
             {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
           </button>
@@ -171,9 +167,8 @@ export default function KepalaUnitLayout({
 
       {/* ========== AREA KANAN ========== */}
       <div className="flex-1 flex flex-col">
-        
         {/* NAVBAR */}
-        <div className="bg-gradient-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
+        <div className="bg-linear-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-[20px] font-bold leading-tight">
@@ -187,33 +182,26 @@ export default function KepalaUnitLayout({
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Dark Mode Toggle */}
               <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-white/10 transition">
                 {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
-              {/* Notifikasi */}
               <div className="relative">
                 <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
                   <Bell size={18} />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                    3
-                  </span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                 </button>
                 {showNotif && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b flex justify-between">
                       <span className="font-semibold">Notifikasi</span>
-                      <button onClick={() => setShowNotif(false)}>
-                        <X size={16} />
-                      </button>
+                      <button onClick={() => setShowNotif(false)}><X size={16} /></button>
                     </div>
                     <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
                   </div>
                 )}
               </div>
 
-              {/* Profile Dropdown */}
               <div className="relative">
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -256,7 +244,7 @@ export default function KepalaUnitLayout({
 
         {/* KONTEN */}
         <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
-          <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-[500px] p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-125 p-6">
             {children}
           </div>
         </div>

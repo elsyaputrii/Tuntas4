@@ -1,118 +1,15 @@
 @import "tailwindcss";
 
-/* Variabel warna */
+/* Aktifkan mode dark berbasis class ".dark" di <html>, bukan
+   berdasarkan pengaturan sistem (prefers-color-scheme). Tanpa baris
+   ini, semua utility "dark:" di Tailwind v4 akan default ngikutin
+   preferensi OS, sehingga tombol toggle lampu di tiap layout aktor
+   (staff-p4m, ka-p4m, kepala-unit) tidak akan berefek sama sekali
+   walaupun class "dark" sudah ditambahkan ke <html> lewat JS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Jika ingin menambahkan variabel warna figma tadi di v4 */
 @theme {
   --color-blue-polibatam: #5da0dd;
   --color-dark-header: #4d5e71;
-}
-
-/* ======================================== */
-/* DARK MODE - PAKE CLASS .dark MANUAL */
-/* ======================================== */
-
-/* Default (light mode) */
-body {
-  background-color: #ececec;
-  color: #1e293b;
-}
-
-.bg-white {
-  background-color: #ffffff;
-}
-
-.bg-slate-50 {
-  background-color: #f8fafc;
-}
-
-.text-slate-700 {
-  color: #334155;
-}
-
-.text-slate-600 {
-  color: #475569;
-}
-
-.text-gray-800 {
-  color: #1e293b;
-}
-
-.border-slate-200 {
-  border-color: #e2e8f0;
-}
-
-/* ===== DARK MODE ===== */
-.dark body {
-  background-color: #0f172a !important;
-  color: #f1f5f9 !important;
-}
-
-.dark .bg-white {
-  background-color: #1e293b !important;
-}
-
-.dark .bg-slate-50 {
-  background-color: #1e293b !important;
-}
-
-.dark .bg-slate-100 {
-  background-color: #334155 !important;
-}
-
-.dark .text-slate-700 {
-  color: #e2e8f0 !important;
-}
-
-.dark .text-slate-600 {
-  color: #cbd5e1 !important;
-}
-
-.dark .text-slate-500 {
-  color: #94a3b8 !important;
-}
-
-.dark .text-gray-800 {
-  color: #f1f5f9 !important;
-}
-
-.dark .text-gray-700 {
-  color: #e2e8f0 !important;
-}
-
-.dark .text-gray-600 {
-  color: #cbd5e1 !important;
-}
-
-.dark .border-slate-200 {
-  border-color: #334155 !important;
-}
-
-.dark .border-slate-300 {
-  border-color: #475569 !important;
-}
-
-.dark .border-gray-200 {
-  border-color: #334155 !important;
-}
-
-.dark input,
-.dark select,
-.dark textarea {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
-  border-color: #475569 !important;
-}
-
-.dark input::placeholder {
-  color: #94a3b8 !important;
-}
-
-/* Animasi shine */
-.animate-shine {
-  background-size: 200% auto;
-  animation: shine 3s linear infinite;
-}
-
-@keyframes shine {
-  0% { background-position: 0% center; }
-  100% { background-position: 200% center; }
 }
