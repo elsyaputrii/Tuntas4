@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image'; // ✅ Import Image dari next/image
 import {
   LayoutDashboard,
   ClipboardList,
@@ -24,7 +25,13 @@ export default function KaP4MLayout({
   const pathname = usePathname();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  // ✅ Inisialisasi langsung dari localStorage
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('darkMode') === 'true';
+    }
+    return false;
+  });
   const [showProfile, setShowProfile] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
@@ -46,19 +53,15 @@ export default function KaP4MLayout({
     }
   }, [router]);
 
-  // Dark mode
+  // ✅ Effect hanya untuk sinkronisasi DOM, bukan setState
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    const isDark = saved === 'true';
-    setDarkMode(isDark);
-    document.documentElement.classList.toggle('dark', isDark);
-  }, []);
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
     localStorage.setItem('darkMode', String(newMode));
-    document.documentElement.classList.toggle('dark', newMode);
   };
 
   // ========== MENU KA-P4M (2 MENU) ==========
@@ -89,28 +92,35 @@ export default function KaP4MLayout({
       
       {/* ========== SIDEBAR ========== */}
       <aside
-        className={`bg-gradient-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
+        className={`bg-linear-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
         text-white transition-all duration-300 flex flex-col shadow-2xl
-        ${sidebarOpen ? 'w-[260px]' : 'w-[85px]'}`}
+        ${sidebarOpen ? 'w-65' : 'w-21.25'}`}
       >
-        {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
-          {sidebarOpen ? (
-            <div className="flex items-center gap-2">
-              <img src="/politeknik logo.png" alt="Logo" className="w-9 h-9" />
+        {/* Logo - Dengan Image dari Next.js */}
+        <div className={`px-5 py-5 border-b border-white/10 flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col justify-center gap-3'}`}>
+          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'flex-col'}`}>
+            <div className={`shrink-0 ${sidebarOpen ? 'w-11 h-11' : 'w-10 h-10'} rounded-full overflow-hidden bg-white flex items-center justify-center`}>
+              <Image 
+                src="/LogoTuntas.png" 
+                alt="Logo" 
+                width={44}  // w-11 = 44px
+                height={44} // h-11 = 44px
+                className="w-full h-full object-cover scale-125" 
+                priority // Untuk LCP optimization
+              />
+            </div>
+            {sidebarOpen && (
               <div>
                 <h1 className="font-bold text-base tracking-wide">
-                  <span className="bg-gradient-to-r from-[#d4af37] via-yellow-200 to-[#d4af37] bg-[length:200%_auto] bg-clip-text text-transparent animate-shine">
+                  <span className="bg-linear-to-r from-[#d4af37] via-yellow-200 to-[#d4af37] bg-size[200%_auto] bg-clip-text text-transparent animate-shine">
                     TUNTAS
                   </span>
                   <span className="ml-1 text-white">Polibatam</span>
                 </h1>
                 <p className="text-[9px] text-slate-300">Sistem Pengaduan Kampus</p>
               </div>
-            </div>
-          ) : (
-            <img src="/politeknik logo.png" alt="Logo" className="w-8 h-8 mx-auto" />
-          )}
+            )}
+          </div>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-white">
             {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
           </button>
@@ -153,7 +163,7 @@ export default function KaP4MLayout({
       <div className="flex-1 flex flex-col">
         
         {/* NAVBAR */}
-        <div className="bg-gradient-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
+        <div className="bg-linear-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-[20px] font-bold leading-tight">
@@ -201,8 +211,24 @@ export default function KaP4MLayout({
                       <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
-                      <button className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 rounded-lg">Profil Saya</button>
-                      <button className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 rounded-lg">Pengaturan</button>
+                      <button 
+                        onClick={() => {
+                          setShowProfile(false);
+                          router.push('/ka-p4m/profil');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                      >
+                        Profil Saya
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setShowProfile(false);
+                          router.push('/ka-p4m/pengaturan');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                      >
+                        Pengaturan
+                      </button>
                     </div>
                   </div>
                 )}
@@ -213,7 +239,7 @@ export default function KaP4MLayout({
 
         {/* KONTEN */}
         <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
-          <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-[500px] p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-125 p-6">
             {children}
           </div>
         </div>

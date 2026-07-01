@@ -1,25 +1,35 @@
 // FILE: backend/controllers/kepalaUnitController.js
 //
-// ── CATATAN PERBAIKAN (sesi ini) ────────────────────────────────────────
-// [getLaporanHasil] Sebelumnya query ini HANYA menerima boxing dengan
-// status='menunggu_pelaksanaan'. Tapi sekarang (lihat stafController.js)
-// laporan yang DITOLAK Staf P4M tetap berstatus 'di_staff' (bukan
-// 'menunggu_pelaksanaan') — supaya beda secara state dari laporan yang
-// memang baru pertama kali ditindaklanjuti Ka P4M. Akibatnya tanpa fix
-// ini, laporan yang ditolak Staf TIDAK AKAN PERNAH muncul lagi di tab
-// "Laporan Hasil" Kepala Unit untuk direvisi — padahal itu instruksi
-// dari approval_staf='ditolak'.
+// ── ALUR "DITOLAK STAF P4M" (baca ini sebelum ubah query di bawah) ──────
+// Kalau Staf P4M menolak hasil tindak lanjut unit (lihat
+// stafController.js → setApprovalStaf, approval='ditolak'), laporan itu
+// TIDAK langsung balik ke tab "Laporan Hasil" untuk isi ulang bukti
+// pelaksanaan saja. Sebaliknya, backend me-reset TOTAL rancangan
+// tindakannya:
+//   - boxing_ketidaksesuaian.approval_staf → 'ditolak'
+//     (status_boxing TETAP 'di_staff', tidak diubah)
+//   - rancangan_tindakan.penyebab & deskripsi → NULL
+//   - rancangan_tindakan.status_review → 'menunggu_keputusan_ka'
+//   - pelaksanaan_tindakan lama → DIHAPUS
 //
-// FIX: query getLaporanHasil sekarang menerima DUA kondisi (OR):
-//   a) status_boxing = 'menunggu_pelaksanaan' DAN status_review =
-//      'ditindaklanjuti'  → kasus normal: pertama kali isi pelaksanaan.
-//   b) status_boxing = 'di_staff' DAN approval_staf = 'ditolak'
-//      → kasus revisi: Staf menolak hasil sebelumnya, Kepala Unit harus
-//        isi ulang pelaksanaan baru.
+// Efeknya: laporan tersebut otomatis muncul LAGI di getLaporanMasuk
+// (tab "Ketidaksesuaian Masuk" Kepala Unit) — bukan di getLaporanHasil —
+// seolah-olah laporan baru, kosong, siap diisi ulang dari awal
+// (penyebab + rencana tindak lanjut), lalu harus lewat keputusan Ka P4M
+// lagi sebelum kepala unit bisa isi pelaksanaan baru di "Laporan Hasil".
 //
-// Field approval_staf juga ditambahkan ke SELECT supaya frontend
-// (ResultReportTable.tsx) bisa menampilkan catatan "Ditolak Staf P4M,
-// silakan revisi" kalau perlu.
+// Query getLaporanMasuk menangkap kasus ini lewat kondisi:
+//   r.status_review = 'menunggu_keputusan_ka' OR b.approval_staf = 'ditolak'
+//
+// Sedangkan getLaporanHasil di bawah HANYA menampilkan laporan yang
+// status_review-nya 'ditindaklanjuti' DAN status_boxing-nya
+// 'menunggu_pelaksanaan' — kondisi ini otomatis TIDAK terpenuhi lagi
+// setelah reset di atas, jadi laporan yang baru saja ditolak Staf tidak
+// akan nyangkut/duplikat di tab "Laporan Hasil".
+//
+// Field approval_staf tetap disertakan di SELECT getLaporanHasil supaya
+// frontend (ResultReportTable.tsx) masih bisa menampilkan riwayat
+// "pernah ditolak Staf P4M" untuk laporan yang sudah lolos revisi.
 
 const { pool } = require("../config/db");
 

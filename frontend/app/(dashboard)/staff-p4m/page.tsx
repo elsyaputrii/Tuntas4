@@ -171,7 +171,7 @@ export default function DashboardStaff() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[500px]">
+      <div className="flex items-center justify-center h-125">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-500">Memuat data laporan...</p>
@@ -184,25 +184,25 @@ export default function DashboardStaff() {
     <>
       {/* CARD STATISTIK */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg">
+        <div className="bg-linear-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg">
           <div className="flex justify-between items-start">
             <div><p className="text-blue-100 text-sm">Total Laporan</p><p className="text-3xl font-bold mt-2">{totalLaporan}</p></div>
             <div className="bg-white/20 p-3 rounded-2xl"><FileText size={24} /></div>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-5 text-white shadow-lg">
+        <div className="bg-linear-to-br from-yellow-500 to-yellow-600 rounded-2xl p-5 text-white shadow-lg">
           <div className="flex justify-between items-start">
             <div><p className="text-yellow-100 text-sm">Diproses</p><p className="text-3xl font-bold mt-2">{prosesCount}</p></div>
             <div className="bg-white/20 p-3 rounded-2xl"><Clock size={24} /></div>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white shadow-lg">
+        <div className="bg-linear-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white shadow-lg">
           <div className="flex justify-between items-start">
             <div><p className="text-green-100 text-sm">Selesai</p><p className="text-3xl font-bold mt-2">{selesaiCount}</p></div>
             <div className="bg-white/20 p-3 rounded-2xl"><CheckCircle2 size={24} /></div>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-5 text-white shadow-lg">
+        <div className="bg-linear-to-br from-red-500 to-red-600 rounded-2xl p-5 text-white shadow-lg">
           <div className="flex justify-between items-start">
             <div><p className="text-red-100 text-sm">Overdue</p><p className="text-3xl font-bold mt-2">{overdueCount}</p></div>
             <div className="bg-white/20 p-3 rounded-2xl"><Clock size={24} /></div>

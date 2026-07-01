@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Aktifkan mode dark berbasis class ".dark" di <html>, bukan
+   berdasarkan pengaturan sistem (prefers-color-scheme). Tanpa baris
+   ini, semua utility "dark:" di Tailwind v4 akan default ngikutin
+   preferensi OS, sehingga tombol toggle lampu di tiap layout aktor
+   (staff-p4m, ka-p4m, kepala-unit) tidak akan berefek sama sekali
+   walaupun class "dark" sudah ditambahkan ke <html> lewat JS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Jika ingin menambahkan variabel warna figma tadi di v4 */
 @theme {
   --color-blue-polibatam: #5da0dd;

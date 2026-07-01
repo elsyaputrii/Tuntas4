@@ -239,7 +239,7 @@ export default function IncomingReportTable() {
                       disabled={loadingKirim === item.id_laporan}
                       className="bg-blue-polibatam text-white px-10 py-2 font-bold shadow-md hover:bg-blue-600 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
                     >
-                      {loadingKirim === item.id_laporan ? "MENGIRIM..." : "SEND"}
+                      {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
                     </button>
                   </div>
                 </div>
@@ -279,7 +279,7 @@ export default function IncomingReportTable() {
                   disabled={loadingKirim === item.id_laporan}
                   className="w-full bg-blue-polibatam text-white py-2.5 font-bold shadow-md hover:bg-blue-600 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
                 >
-                  {loadingKirim === item.id_laporan ? "MENGIRIM..." : "SEND"}
+                  {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
                 </button>
               </div>
             ))
