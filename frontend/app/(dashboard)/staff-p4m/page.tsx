@@ -7,6 +7,7 @@ import {
   Clock,
   TrendingUp,
   BarChart3,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   LineChart,
@@ -24,6 +25,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { stafApi } from "@/lib/api";
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function DashboardStaff() {
   
@@ -62,11 +66,9 @@ export default function DashboardStaff() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Gabungkan laporan yang masih baru (belum dibox) + yang sudah diproses,
-      // karena gak ada satu endpoint yang nampung semua laporan sekaligus.
       const [masuk, proses] = await Promise.all([
-        stafApi.getLaporanMasuk(),   // { success, data: [...] } — status 'menunggu'
-        stafApi.getProsesMonitor(),  // { success, data: [...] } — sudah dibox/diproses
+        stafApi.getLaporanMasuk(),
+        stafApi.getProsesMonitor(),
       ]);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,6 +150,55 @@ export default function DashboardStaff() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ========== EXPORT EXCEL ==========
+  const exportToExcel = () => {
+    const exportData = dataLaporan.map((item, idx) => ({
+      No: idx + 1,
+      Uraian: item.isi_laporan || '-',
+      Penyebab: item.penyebab || '-',
+      RTL: item.rencana_tindak_lanjut || '-',
+      Status: item.status || '-',
+      Hasil: item.hasil_tindak_lanjut || '-',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
+    XLSX.writeFile(wb, `Laporan_Staff_P4M_${new Date().toLocaleDateString('id-ID')}.xlsx`);
+  };
+
+  // ========== EXPORT PDF ==========
+  const exportToPDF = () => {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFontSize(16);
+    doc.text('Laporan Staff P4M', pageWidth / 2, 15, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 22, { align: 'center' });
+
+    const tableData = dataLaporan.map((item, idx) => [
+      (idx + 1).toString(),
+      item.isi_laporan?.substring(0, 50) || '-',
+      item.penyebab || '-',
+      item.rencana_tindak_lanjut || '-',
+      item.status || '-',
+      item.hasil_tindak_lanjut || '-',
+    ]);
+
+    autoTable(doc, {
+      head: [['No', 'Uraian', 'Penyebab', 'RTL', 'Status', 'Hasil']],
+      body: tableData,
+      startY: 30,
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [59, 75, 101] },
+      alternateRowStyles: { fillColor: [240, 240, 240] },
+      margin: { left: 10, right: 10 },
+    });
+
+    doc.save(`Laporan_Staff_P4M_${new Date().toLocaleDateString('id-ID')}.pdf`);
   };
 
   const totalLaporan = dataLaporan.length;
@@ -271,8 +322,18 @@ export default function DashboardStaff() {
       {/* FILTER */}
       <div className="mt-6 flex flex-wrap justify-between items-center gap-3">
         <div className="flex gap-2">
-          <button className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs">Excel</button>
-          <button className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs">PDF</button>
+          <button 
+            onClick={exportToExcel}
+            className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition"
+          >
+            <FileSpreadsheet size={14} /> Excel
+          </button>
+          <button 
+            onClick={exportToPDF}
+            className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition"
+          >
+            <FileText size={14} /> PDF
+          </button>
         </div>
         <div className="flex gap-2">
           <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border">

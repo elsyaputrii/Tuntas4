@@ -6,12 +6,13 @@ import {
   LayoutDashboard,
   ClipboardList,
   CheckCircle2,
+  User,
+  Settings,
   LogOut,
   Menu,
   X,
   Sun,
   Moon,
-  User,
   ChevronDown,
   Bell,
 } from 'lucide-react';
@@ -62,7 +63,7 @@ export default function KepalaUnitLayout({
     document.documentElement.classList.toggle('dark', newMode);
   };
 
-  // ========== MENU KEPALA UNIT (BARU) ==========
+  // ========== MENU KEPALA UNIT (LENGKAP) ==========
   const menuItems = [
     {
       id: 'dashboard',
@@ -81,6 +82,18 @@ export default function KepalaUnitLayout({
       label: 'Laporan Hasil',
       icon: <CheckCircle2 size={18} />,
       path: '/kepala-unit/laporan-hasil'
+    },
+    {
+      id: 'profil',
+      label: 'Profil',
+      icon: <User size={18} />,
+      path: '/kepala-unit/profil'
+    },
+    {
+      id: 'pengaturan',
+      label: 'Pengaturan',
+      icon: <Settings size={18} />,
+      path: '/kepala-unit/pengaturan'
     },
   ];
 
@@ -174,26 +187,33 @@ export default function KepalaUnitLayout({
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Dark Mode Toggle */}
               <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-white/10 transition">
                 {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
+              {/* Notifikasi */}
               <div className="relative">
                 <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
                   <Bell size={18} />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    3
+                  </span>
                 </button>
                 {showNotif && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b flex justify-between">
                       <span className="font-semibold">Notifikasi</span>
-                      <button onClick={() => setShowNotif(false)}><X size={16} /></button>
+                      <button onClick={() => setShowNotif(false)}>
+                        <X size={16} />
+                      </button>
                     </div>
                     <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
                   </div>
                 )}
               </div>
 
+              {/* Profile Dropdown */}
               <div className="relative">
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">

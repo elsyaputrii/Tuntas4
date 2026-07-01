@@ -8,13 +8,14 @@ import {
   BarChart3,
   FileText,
   Users,
+  User,
+  Settings,
   LogOut,
   Menu,
   X,
   Sun,
   Moon,
   Bell,
-  User,
   ChevronDown,
 } from 'lucide-react';
 
@@ -65,7 +66,7 @@ export default function StaffP4MLayout({
     document.documentElement.classList.toggle('dark', newMode);
   };
 
-  // Menu
+  // ========== MENU STAFF P4M (LENGKAP) ==========
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/staff-p4m' },
     { id: 'laporan-masuk', label: 'Laporan Masuk', icon: <ClipboardList size={18} />, path: '/staff-p4m/laporan-masuk' },
@@ -96,8 +97,8 @@ export default function StaffP4MLayout({
           {sidebarOpen ? (
             <div className="flex items-center gap-2">
               <div className="w-11 h-11 rounded-full overflow-hidden bg-white flex items-center justify-center">
-  <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
-</div>
+                <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
+              </div>
               <div>
                 <h1 className="font-bold text-base tracking-wide">
                   <span className="bg-gradient-to-r from-[#d4af37] via-yellow-200 to-[#d4af37] bg-[length:200%_auto] bg-clip-text text-transparent animate-shine">
@@ -110,8 +111,8 @@ export default function StaffP4MLayout({
             </div>
           ) : (
             <div className="w-10 h-10 mx-auto rounded-full overflow-hidden bg-white flex items-center justify-center">
-  <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
-</div>
+              <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
+            </div>
           )}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-white">
             {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
@@ -210,10 +211,22 @@ export default function StaffP4MLayout({
                       <p className="text-xs text-slate-400">staff@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
-                      <button className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
+                      <button
+                        onClick={() => {
+                          setShowProfile(false);
+                          router.push('/staff-p4m/profil');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                      >
                         Profil Saya
                       </button>
-                      <button className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
+                      <button
+                        onClick={() => {
+                          setShowProfile(false);
+                          router.push('/staff-p4m/pengaturan');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                      >
                         Pengaturan
                       </button>
                     </div>
