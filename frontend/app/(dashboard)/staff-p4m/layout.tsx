@@ -26,7 +26,6 @@ export default function StaffP4MLayout({
   const router = useRouter();
   const pathname = usePathname();
 
-  // State
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -65,7 +64,7 @@ export default function StaffP4MLayout({
     document.documentElement.classList.toggle('dark', newMode);
   };
 
-  // Menu
+  // Menu (TETAP 5 MENU, TANPA PROFIL & PENGATURAN)
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/staff-p4m' },
     { id: 'laporan-masuk', label: 'Laporan Masuk', icon: <ClipboardList size={18} />, path: '/staff-p4m/laporan-masuk' },
@@ -76,22 +75,19 @@ export default function StaffP4MLayout({
 
   const isActive = (path: string) => pathname === path;
 
-  // Login page = no sidebar
   if (pathname?.includes('/login')) {
     return <>{children}</>;
   }
 
   return (
-    // ===== BACKGROUND UTAMA (abu-abu terang) =====
     <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
       
-      {/* ========== SIDEBAR (biru tua gelap) ========== */}
+      {/* SIDEBAR */}
       <aside
         className={`bg-gradient-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
         text-white transition-all duration-300 flex flex-col shadow-2xl
         ${sidebarOpen ? 'w-[260px]' : 'w-[85px]'}`}
       >
-        {/* Logo */}
         <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
           {sidebarOpen ? (
             <div className="flex items-center gap-2">
@@ -114,7 +110,6 @@ export default function StaffP4MLayout({
           </button>
         </div>
 
-        {/* Menu */}
         <nav className="flex-1 mt-6 px-3 flex flex-col gap-1">
           {menuItems.map((item) => (
             <button
@@ -132,7 +127,6 @@ export default function StaffP4MLayout({
           ))}
         </nav>
 
-        {/* Logout */}
         <div className="p-4 border-t border-white/10 mt-auto">
           <button
             onClick={() => {
@@ -147,13 +141,12 @@ export default function StaffP4MLayout({
         </div>
       </aside>
 
-      {/* ========== AREA KANAN ========== */}
+      {/* AREA KANAN */}
       <div className="flex-1 flex flex-col">
         
-        {/* ===== NAVBAR (gradient biru abu) ===== */}
+        {/* NAVBAR */}
         <div className="bg-gradient-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
           <div className="flex justify-between items-center">
-            {/* Kiri: Title */}
             <div>
               <h1 className="text-[20px] font-bold leading-tight">
                 Transformasi Tata Kelola Organisasi:
@@ -165,25 +158,20 @@ export default function StaffP4MLayout({
               </p>
             </div>
 
-            {/* Kanan: Ikon */}
             <div className="flex items-center gap-2">
-              {/* Dark Mode */}
               <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-white/10 transition">
                 {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
-              {/* Notifikasi */}
               <div className="relative">
                 <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
                   <Bell size={18} />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                    3
-                  </span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                 </button>
                 {showNotif && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
-                    <div className="p-3 border-b dark:border-slate-700 font-semibold text-slate-700 dark:text-white flex justify-between">
-                      <span>Notifikasi</span>
+                    <div className="p-3 border-b flex justify-between">
+                      <span className="font-semibold">Notifikasi</span>
                       <button onClick={() => setShowNotif(false)}><X size={16} /></button>
                     </div>
                     <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
@@ -191,7 +179,7 @@ export default function StaffP4MLayout({
                 )}
               </div>
 
-              {/* Profile */}
+              {/* ===== PROFILE DROPDOWN (INI YANG DIUBAH) ===== */}
               <div className="relative">
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -206,10 +194,22 @@ export default function StaffP4MLayout({
                       <p className="text-xs text-slate-400">staff@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
-                      <button className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
+                      <button
+                        onClick={() => {
+                          setShowProfile(false);
+                          router.push('/staff-p4m/profil');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                      >
                         Profil Saya
                       </button>
-                      <button className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition">
+                      <button
+                        onClick={() => {
+                          setShowProfile(false);
+                          router.push('/staff-p4m/pengaturan');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                      >
                         Pengaturan
                       </button>
                     </div>
@@ -220,7 +220,7 @@ export default function StaffP4MLayout({
           </div>
         </div>
 
-        {/* ===== KONTEN UTAMA ===== */}
+        {/* KONTEN */}
         <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
           <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-[500px]">
             {children}
