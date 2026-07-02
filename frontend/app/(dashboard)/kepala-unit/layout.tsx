@@ -5,7 +5,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   ClipboardList,
-  CheckCircle2,
   LogOut,
   Menu,
   X,
@@ -14,9 +13,10 @@ import {
   User,
   ChevronDown,
   Bell,
+  Settings,
 } from 'lucide-react';
 
-export default function KepalaUnitLayout({
+export default function KaP4MLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -34,16 +34,16 @@ export default function KepalaUnitLayout({
     const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
     if (!token || !userRaw) {
-      router.push('/kepala-unit/login');
+      router.push('/ka-p4m/login');
       return;
     }
     try {
       const user = JSON.parse(userRaw);
-      if (user.role !== 'kepala_unit') {
-        router.push('/kepala-unit/login');
+      if (user.role !== 'ka_p4m') {
+        router.push('/ka-p4m/login');
       }
     } catch {
-      router.push('/kepala-unit/login');
+      router.push('/ka-p4m/login');
     }
   }, [router]);
 
@@ -62,25 +62,19 @@ export default function KepalaUnitLayout({
     document.documentElement.classList.toggle('dark', newMode);
   };
 
-  // ========== MENU KEPALA UNIT (BARU) ==========
+  // ========== MENU KA-P4M ==========
   const menuItems = [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: <LayoutDashboard size={18} />,
-      path: '/kepala-unit'
+      path: '/ka-p4m'
     },
     {
-      id: 'ketidaksesuaian-masuk',
-      label: 'Ketidaksesuaian Masuk',
+      id: 'proses-pengaduan',
+      label: 'Proses Pengaduan',
       icon: <ClipboardList size={18} />,
-      path: '/kepala-unit/ketidaksesuaian-masuk'
-    },
-    {
-      id: 'laporan-hasil',
-      label: 'Laporan Hasil',
-      icon: <CheckCircle2 size={18} />,
-      path: '/kepala-unit/laporan-hasil'
+      path: '/ka-p4m/proses-pengaduan'
     },
   ];
 
@@ -104,7 +98,9 @@ export default function KepalaUnitLayout({
         <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
           {sidebarOpen ? (
             <div className="flex items-center gap-2">
-              <img src="/politeknik logo.png" alt="Logo" className="w-9 h-9" />
+              <div className="w-11 h-11 rounded-full overflow-hidden bg-white flex items-center justify-center">
+                <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
+              </div>
               <div>
                 <h1 className="font-bold text-base tracking-wide">
                   <span className="bg-gradient-to-r from-[#d4af37] via-yellow-200 to-[#d4af37] bg-[length:200%_auto] bg-clip-text text-transparent animate-shine">
@@ -116,7 +112,9 @@ export default function KepalaUnitLayout({
               </div>
             </div>
           ) : (
-            <img src="/politeknik logo.png" alt="Logo" className="w-8 h-8 mx-auto" />
+            <div className="w-10 h-10 mx-auto rounded-full overflow-hidden bg-white flex items-center justify-center">
+              <img src="/LogoTuntas.png" alt="Logo" className="w-full h-full object-cover scale-125" />
+            </div>
           )}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-white">
             {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
@@ -146,7 +144,7 @@ export default function KepalaUnitLayout({
           <button
             onClick={() => {
               localStorage.clear();
-              router.push('/kepala-unit/login');
+              router.push('/ka-p4m/login');
             }}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:bg-white/5 transition"
           >
@@ -164,29 +162,33 @@ export default function KepalaUnitLayout({
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-[20px] font-bold leading-tight">
-                Selamat Datang Di Transformasi Tata Kelola Organisasi:
+                Transformasi Tata Kelola Organisasi:
                 <br />
                 Aplikasi Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👤 Kepala Unit
+                👤 KA-P4M
               </p>
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Dark Mode */}
               <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-white/10 transition">
                 {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
+              {/* Notifikasi */}
               <div className="relative">
                 <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
                   <Bell size={18} />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    3
+                  </span>
                 </button>
                 {showNotif && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
-                    <div className="p-3 border-b flex justify-between">
-                      <span className="font-semibold">Notifikasi</span>
+                    <div className="p-3 border-b dark:border-slate-700 font-semibold text-slate-700 dark:text-white flex justify-between">
+                      <span>Notifikasi</span>
                       <button onClick={() => setShowNotif(false)}><X size={16} /></button>
                     </div>
                     <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
@@ -194,6 +196,7 @@ export default function KepalaUnitLayout({
                 )}
               </div>
 
+              {/* Profile Dropdown */}
               <div className="relative">
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -203,28 +206,28 @@ export default function KepalaUnitLayout({
                 </button>
                 {showProfile && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
-                    <div className="p-3 border-b">
-                      <p className="text-sm font-semibold">Kepala Unit</p>
-                      <p className="text-xs text-slate-400">kepala@polibatam.ac.id</p>
+                    <div className="p-3 border-b dark:border-slate-700">
+                      <p className="text-sm font-semibold text-slate-700 dark:text-white">KA-P4M</p>
+                      <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
                       <button
                         onClick={() => {
                           setShowProfile(false);
-                          router.push('/kepala-unit/profil');
+                          router.push('/ka-p4m/profil');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
-                        Profil Saya
+                        <User size={16} className="inline mr-2" /> Profil Saya
                       </button>
                       <button
                         onClick={() => {
                           setShowProfile(false);
-                          router.push('/kepala-unit/pengaturan');
+                          router.push('/ka-p4m/pengaturan');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
-                        Pengaturan
+                        <Settings size={16} className="inline mr-2" /> Pengaturan
                       </button>
                     </div>
                   </div>
