@@ -29,13 +29,11 @@ export default function StaffP4MLayout({
 
   // State
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  // ✅ Inisialisasi langsung dari localStorage
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('darkMode') === 'true';
-    }
-    return false;
-  });
+
+  // ✅ FIX: default sama antara server & client, biar tidak hydration mismatch
+  const [darkMode, setDarkMode] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
   const [showProfile, setShowProfile] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
@@ -57,10 +55,19 @@ export default function StaffP4MLayout({
     }
   }, [router]);
 
-  // ✅ Effect hanya untuk sinkronisasi DOM, bukan setState
+  // ✅ FIX: baca localStorage HANYA setelah mount (setelah hydration selesai)
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-  }, [darkMode]);
+    setMounted(true);
+    const saved = localStorage.getItem('darkMode') === 'true';
+    setDarkMode(saved);
+  }, []);
+
+  // ✅ Sinkronisasi ke DOM, hanya jalan setelah mounted supaya tidak konflik
+  useEffect(() => {
+    if (mounted) {
+      document.documentElement.classList.toggle('dark', darkMode);
+    }
+  }, [darkMode, mounted]);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -179,7 +186,8 @@ export default function StaffP4MLayout({
             <div className="flex items-center gap-2">
               {/* Dark Mode */}
               <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-white/10 transition">
-                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+                {/* ✅ FIX: sebelum mounted, selalu render Moon (sama seperti server) */}
+                {mounted ? (darkMode ? <Sun size={18} /> : <Moon size={18} />) : <Moon size={18} />}
               </button>
 
               {/* Notifikasi */}

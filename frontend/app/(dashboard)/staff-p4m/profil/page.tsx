@@ -43,6 +43,7 @@ export default function ProfilStaffPage() {
   // Auth check
   useEffect(() => {
     const token = localStorage.getItem('token');
+     alert('Token yang dipakai: ' + token); 
     const role = localStorage.getItem('role');
     if (!token || role !== 'staf_p4m') {
       router.replace('/staff-p4m/login');
