@@ -63,7 +63,6 @@ export const authApi = {
 // STAF P4M — semua endpoint butuh role = staf_p4m
 // ─────────────────────────────────────────────
 export const stafApi = {
-  // Tab Laporan Masuk
   getLaporanMasuk: () =>
     apiFetch("/staf/laporan"),
   getKepalaUnit: () =>
@@ -71,7 +70,6 @@ export const stafApi = {
   distribusiLaporan: (body: { id_laporan: number; unit_tujuan: string[] }) =>
     apiFetch("/staf/boxing", { method: "POST", body: JSON.stringify(body) }),
 
-  // Tab Proses & Pantau (pantau saja — tutup laporan hanya Ka P4M)
   getProsesMonitor: () =>
     apiFetch("/staf/proses"),
 
@@ -94,11 +92,12 @@ export const stafApi = {
 
   setApprovalBoxing: (
     id_boxing: number,
-    approval: "diterima" | "ditolak"
+    approval: "diterima" | "ditolak",
+    catatan: string
   ) =>
     apiFetch("/staf/approval-boxing", {
       method: "PATCH",
-      body: JSON.stringify({ id_boxing, approval }),
+      body: JSON.stringify({ id_boxing, approval, catatan }),
     }),
 
   getRekapitulasi: () =>
@@ -107,13 +106,6 @@ export const stafApi = {
 
 // ─────────────────────────────────────────────
 // KA P4M — semua endpoint butuh role = ka_p4m
-//
-// PERBAIKAN UTAMA:
-// Sebelumnya KaP4MReviewTable.tsx dan KaP4MHasilTable.tsx
-// memanggil stafApi.getProsesMonitor() dan stafApi.reviewRancangan()
-// → Ini salah! Ka P4M bukan Staf P4M → kena 403 Forbidden
-//
-// Sekarang Ka P4M punya endpoint sendiri: /api/ka-p4m/...
 // ─────────────────────────────────────────────
 export const kaP4MApi = {
   getProsesMonitor: () => apiFetch("/ka-p4m/proses"),
@@ -138,4 +130,8 @@ export const kepalaUnitApi = {
     apiFetch("/kepala-unit/laporan-hasil"),
   submitPelaksanaan: (formData: FormData) =>
     apiFetch("/kepala-unit/pelaksanaan", { method: "POST", body: formData }),
+  getLaporanDitolakStaf: () =>
+    apiFetch("/kepala-unit/laporan-ditolak-staf"),
+  submitRevisiRancangan: (body: { id_boxing: number; penyebab: string; rencana_tindakan: string }) =>
+    apiFetch("/kepala-unit/revisi-rancangan", { method: "POST", body: JSON.stringify(body) }),
 };

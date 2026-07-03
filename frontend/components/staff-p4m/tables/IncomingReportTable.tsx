@@ -16,6 +16,7 @@ interface LaporanMasuk {
   deskripsi:     string;
   lampiran:      string | null;
   status:        string;
+  created_at:    string;  // ✅ PAKE created_at (dari database)
 }
 
 function MultiSelectUnit({
@@ -177,6 +178,20 @@ export default function IncomingReportTable() {
     }
   }
 
+  // ===== FORMAT TANGGAL =====
+  function formatTanggal(dateStr: string) {
+    if (!dateStr) return "-";
+    try {
+      return new Date(dateStr).toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+    } catch {
+      return "-";
+    }
+  }
+
   if (loading) {
     return (
       <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-gray-400 italic">
@@ -197,7 +212,7 @@ export default function IncomingReportTable() {
           <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b border-red-200">{error}</p>
         )}
 
-        {/* DESKTOP: tabel asli */}
+        {/* ===== DESKTOP: Tabel Asli ===== */}
         <div className="hidden md:block min-w-150">
           <div className="flex font-bold uppercase text-xs border-b-2 border-black">
             <div className="flex-1 border-r-2 border-black p-3 text-center">
@@ -213,8 +228,17 @@ export default function IncomingReportTable() {
           ) : (
             laporan.map((item) => (
               <div key={item.id_laporan} className="flex min-h-45 border-t-2 border-black">
+                {/* ===== Sisi Kiri: Informasi Laporan ===== */}
                 <div className="flex-1 border-r-2 border-black p-5">
-                  <p className="text-[9px] text-gray-400 italic mb-1">{item.kode_laporan} · {item.jenis_laporan}</p>
+                  {/* ✅ TANGGAL MASUK PAKE created_at */}
+                  <div className="mb-2">
+                    <p className="text-[9px] text-gray-400 italic">
+                      {item.kode_laporan} · {item.jenis_laporan}
+                    </p>
+                    <p className="text-[10px] font-bold text-blue-600 mt-0.5">
+                      📅 Tanggal Masuk: {formatTanggal(item.created_at)}
+                    </p>
+                  </div>
                   <div className="border border-gray-400 p-4 h-28 text-xs bg-gray-50 overflow-auto">{item.deskripsi}</div>
                   {item.lampiran && (
                     <button
@@ -225,6 +249,8 @@ export default function IncomingReportTable() {
                     </button>
                   )}
                 </div>
+
+                {/* ===== Sisi Kanan: Pilih Unit ===== */}
                 <div className="w-80 p-5 flex flex-col justify-between">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold uppercase block text-center mb-2">Pilih Unit :</label>
@@ -239,7 +265,7 @@ export default function IncomingReportTable() {
                       disabled={loadingKirim === item.id_laporan}
                       className="bg-blue-polibatam text-white px-10 py-2 font-bold shadow-md hover:bg-blue-600 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
                     >
-                      {loadingKirim === item.id_laporan ? "MENGIRIM..." : "SEND"}
+                      {loadingKirim === item.id_laporan ? "MENGIRIM..." : "kirim"}
                     </button>
                   </div>
                 </div>
@@ -248,7 +274,7 @@ export default function IncomingReportTable() {
           )}
         </div>
 
-        {/* MOBILE: card layout */}
+        {/* ===== MOBILE: Card Layout ===== */}
         <div className="md:hidden">
           {laporan.length === 0 ? (
             <div className="p-8 text-center">
@@ -257,7 +283,15 @@ export default function IncomingReportTable() {
           ) : (
             laporan.map((item) => (
               <div key={item.id_laporan} className="border-t-2 border-black p-4 space-y-3">
-                <p className="text-[10px] text-gray-400 italic">{item.kode_laporan} · {item.jenis_laporan}</p>
+                {/* ✅ TANGGAL MASUK PAKE created_at */}
+                <div className="mb-1">
+                  <p className="text-[10px] text-gray-400 italic">
+                    {item.kode_laporan} · {item.jenis_laporan}
+                  </p>
+                  <p className="text-[10px] font-bold text-blue-600">
+                    📅 Tanggal Masuk: {formatTanggal(item.created_at)}
+                  </p>
+                </div>
                 <div className="border border-gray-400 p-4 text-xs bg-gray-50 max-h-32 overflow-auto">{item.deskripsi}</div>
                 {item.lampiran && (
                   <button

@@ -9,18 +9,24 @@ const {
   submitRancangan,
   getLaporanHasil,
   submitPelaksanaan,
+  getLaporanDitolakStaf,
+  submitRevisiRancangan,
 } = require("../controllers/kepalaUnitController");
 
 // Semua route di bawah wajib: token valid + role = kepala_unit
 router.use(authMiddleware);
 router.use(roleMiddleware("kepala_unit"));
 
-// Tab Ketidaksesuaian Masuk
-router.get("/laporan",    getLaporanMasuk);   // GET  /api/kepala-unit/laporan
-router.post("/rancangan", submitRancangan);   // POST /api/kepala-unit/rancangan
+// ── TAB KETIDAKSESUAIAN MASUK ──
+router.get("/laporan",    getLaporanMasuk);        
+router.post("/rancangan", submitRancangan);        
 
-// Tab Laporan Hasil
-router.get("/laporan-hasil", getLaporanHasil);                          // GET  /api/kepala-unit/laporan-hasil
-router.post("/pelaksanaan",  upload.single("lampiran"), submitPelaksanaan); // POST /api/kepala-unit/pelaksanaan
+// ── TAB LAPORAN HASIL ──
+router.get("/laporan-hasil", getLaporanHasil);                          
+router.post("/pelaksanaan",  upload.single("lampiran"), submitPelaksanaan); 
+
+// ── TAB KEPUTUSAN STAF ──
+router.get("/laporan-ditolak-staf", getLaporanDitolakStaf);   
+router.post("/revisi-rancangan", submitRevisiRancangan);      
 
 module.exports = router;

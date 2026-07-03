@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   ClipboardList,
+  CheckCircle2,
   LogOut,
   Menu,
   X,
@@ -16,7 +17,7 @@ import {
   Settings,
 } from 'lucide-react';
 
-export default function KaP4MLayout({
+export default function KepalaUnitLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -29,21 +30,21 @@ export default function KaP4MLayout({
   const [showProfile, setShowProfile] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
 
-  // Auth check
+  // ========== AUTH CHECK KEPALA UNIT ==========
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
     if (!token || !userRaw) {
-      router.push('/ka-p4m/login');
+      router.push('/kepala-unit/login');
       return;
     }
     try {
       const user = JSON.parse(userRaw);
-      if (user.role !== 'ka_p4m') {
-        router.push('/ka-p4m/login');
+      if (user.role !== 'kepala_unit') {
+        router.push('/kepala-unit/login');
       }
     } catch {
-      router.push('/ka-p4m/login');
+      router.push('/kepala-unit/login');
     }
   }, [router]);
 
@@ -62,19 +63,25 @@ export default function KaP4MLayout({
     document.documentElement.classList.toggle('dark', newMode);
   };
 
-  // ========== MENU KA-P4M ==========
+  // ========== MENU KEPALA UNIT ==========
   const menuItems = [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: <LayoutDashboard size={18} />,
-      path: '/ka-p4m'
+      path: '/kepala-unit'
     },
     {
-      id: 'proses-pengaduan',
-      label: 'Proses Pengaduan',
+      id: 'ketidaksesuaian-masuk',
+      label: 'Ketidaksesuaian Masuk',
       icon: <ClipboardList size={18} />,
-      path: '/ka-p4m/proses-pengaduan'
+      path: '/kepala-unit/ketidaksesuaian-masuk'
+    },
+    {
+      id: 'laporan-hasil',
+      label: 'Laporan Hasil',
+      icon: <CheckCircle2 size={18} />,
+      path: '/kepala-unit/laporan-hasil'
     },
   ];
 
@@ -144,7 +151,7 @@ export default function KaP4MLayout({
           <button
             onClick={() => {
               localStorage.clear();
-              router.push('/ka-p4m/login');
+              router.push('/kepala-unit/login');
             }}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:bg-white/5 transition"
           >
@@ -167,7 +174,7 @@ export default function KaP4MLayout({
                 Aplikasi Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👤 KA-P4M
+                👤 Kepala Unit
               </p>
             </div>
 
@@ -207,14 +214,14 @@ export default function KaP4MLayout({
                 {showProfile && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b dark:border-slate-700">
-                      <p className="text-sm font-semibold text-slate-700 dark:text-white">KA-P4M</p>
-                      <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-white">Kepala Unit</p>
+                      <p className="text-xs text-slate-400">kepala@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
                       <button
                         onClick={() => {
                           setShowProfile(false);
-                          router.push('/ka-p4m/profil');
+                          router.push('/kepala-unit/profil');
                         }}
                         className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
@@ -223,7 +230,7 @@ export default function KaP4MLayout({
                       <button
                         onClick={() => {
                           setShowProfile(false);
-                          router.push('/ka-p4m/pengaturan');
+                          router.push('/kepala-unit/pengaturan');
                         }}
                         className="w-full text-left px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >

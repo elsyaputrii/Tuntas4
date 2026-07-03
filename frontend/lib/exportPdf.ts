@@ -52,13 +52,11 @@ const BASE_CSS = `
   .badge-gray   { background:#f3f4f6; color:#374151; }
   .footer { margin-top:16px; display:flex; justify-content:space-between; font-size:9pt; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:8px; }
   .ttd { text-align:center; }
-  .ttd .name { margin-top:48px; font-weight:700; border-top:1px solid #333; padding-top:4px; width:180px; margin:48px auto 0; }
+  .ttd .name { margin-top:40px; font-weight:700; border-top:1px solid #333; padding-top:6px; width:180px; margin-left:auto; margin-right:auto; }
   @media print { body { padding:8px; } @page { size:A4 landscape; margin:12mm; } }
 `;
 
 // ─── FIX: printWindow sekarang auto-close popup setelah print ───
-// Sebelumnya popup tidak pernah ditutup → menyebabkan Next.js
-// router bingung dan halaman parent loading terus / hilang.
 function printWindow(html: string) {
   const win = window.open("", "_blank", "width=1100,height=750");
   if (!win) {
@@ -68,16 +66,11 @@ function printWindow(html: string) {
   win.document.write(html);
   win.document.close();
 
-  // Tutup popup otomatis setelah user selesai dengan dialog print
-  // (baik print maupun cancel)
   win.addEventListener("afterprint", () => {
     win.close();
   });
 }
 
-// ─── Script tag yang dipakai di setiap HTML template ────────
-// afterprint sudah handle close, tapi tambah fallback kecil
-// via focus kembali ke parent supaya Next.js tidak kehilangan context
 const PRINT_SCRIPT = `
 <script>
   window.onload = function() {
@@ -223,10 +216,10 @@ export function exportPDFRekap(
     <p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p>
     <p>Periode: ${labelKat[kategori]}</p>
   </div>
+  <!-- ✅ TANDA TANGAN REKAPITULASI (Kepala P4M) -->
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
-    <p>Kepala P4M,</p>
-    <div class="name">( _________________ )</div>
+    <div class="name">(Kepala P4M)</div>
   </div>
 </div>
 ${PRINT_SCRIPT}
@@ -317,10 +310,10 @@ ${item.aksi_masukan ? `
 
 <div class="footer">
   <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p></div>
+  <!-- ✅ TANDA TANGAN PROSES & PANTAU (Staf P4M) -->
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
-    <p>Staf P4M,</p>
-    <div class="name">( _________________ )</div>
+    <div class="name">(Staf P4M)</div>
   </div>
 </div>
 ${PRINT_SCRIPT}

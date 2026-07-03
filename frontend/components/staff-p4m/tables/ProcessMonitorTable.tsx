@@ -1,22 +1,5 @@
 "use client";
 // FILE: frontend/components/staff-p4m/tables/ProcessMonitorTable.tsx
-//
-// ── CATATAN PERBAIKAN (revisi terakhir) ─────────────────────────────────
-// Permintaan terbaru: kolom "Keputusan Staf" di tab "Proses & Pantau"
-// SEKARANG HANYA punya 2 tombol (✓ ✗) — tombol ↻ "buka ulang" DIHAPUS
-// dari sini. Reopen laporan ("Tindak ulang" / "Buka ke Unit") sekarang
-// HANYA ada di tab Rekapitulasi (RecapitulationTable.tsx), supaya tidak
-// ada dua tempat berbeda yang bisa memicu validasi backend yang sama
-// dan membingungkan soal kapan boleh/tidak boleh reopen.
-//
-//   ✓ → terima hasil unit → backend otomatis set status_boxing='selesai'
-//       (lihat fix di stafController.js setApprovalStaf)
-//   ✗ → tolak hasil unit → status_boxing TETAP 'di_staff', approval_staf
-//       ='ditolak' → Kepala Unit lihat ini di tab "Laporan Hasil" untuk
-//       revisi HASIL PELAKSANAAN saja (rancangan tidak direset)
-//
-// Untuk membuka laporan dari awal (reset total ke Kepala Unit), Staf P4M
-// sekarang HARUS pindah ke tab Rekapitulasi dan klik tombol ↻ di sana.
 
 import { useState, useEffect } from "react";
 import { stafApi } from "@/lib/api";
@@ -72,10 +55,11 @@ interface ProsesItem {
   created_at?: string | null;
 }
 
+// ✅ STATUS KEPUTUSAN KA
 const reviewBadge: Record<string, { label: string; cls: string }> = {
   menunggu_keputusan_ka: { label: "⏳ Ke Ka P4M", cls: "text-blue-600 bg-blue-50" },
-  ditindaklanjuti: { label: "✓ Ditindaklanjuti", cls: "text-green-600 bg-green-50" },
-  tidak_ditindaklanjuti: { label: "✗ Tidak", cls: "text-red-600 bg-red-50" },
+  ditindaklanjuti:       { label: "🔄 Perbaikan Berkelanjutan", cls: "text-red-600 bg-red-50 border-red-200" },
+  tidak_ditindaklanjuti: { label: "✅ Sesuai", cls: "text-green-600 bg-green-50 border-green-200" },
 };
 
 const boxingLabel: Record<string, string> = {
@@ -95,6 +79,19 @@ export default function ProcessMonitorTable() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<Record<number, "diterima"|"ditolak">>({});
 
+  // ✅ STATE UNTUK MODAL KOMENTAR
+  const [modalApproval, setModalApproval] = useState<{
+    open: boolean;
+    id_boxing: number | null;
+    keputusan: "diterima" | "ditolak" | null;
+    catatan: string;
+  }>({
+    open: false,
+    id_boxing: null,
+    keputusan: null,
+    catatan: "",
+  });
+
   useEffect(() => { fetchData(); }, []);
 
   async function fetchData() {
@@ -109,13 +106,31 @@ export default function ProcessMonitorTable() {
     }
   }
 
-  async function approvalStaf(id_boxing: number, approval: "diterima" | "ditolak") {
-    setPendingApproval(prev => ({ ...prev, [id_boxing]: approval }));
+  // ✅ FUNGSI BUKA MODAL
+  function openApprovalModal(id_boxing: number, keputusan: "diterima" | "ditolak") {
+    setModalApproval({
+      open: true,
+      id_boxing,
+      keputusan,
+      catatan: "",
+    });
+  }
+
+  async function handleApprovalSubmit() {
+    const { id_boxing, keputusan, catatan } = modalApproval;
+    if (!id_boxing || !keputusan) return;
+    if (!catatan.trim()) {
+      alert("Catatan / alasan wajib diisi!");
+      return;
+    }
+
+    setPendingApproval(prev => ({ ...prev, [id_boxing]: keputusan }));
     setError("");
     try {
-      const res = await stafApi.setApprovalBoxing(id_boxing, approval);
+      const res = await stafApi.setApprovalBoxing(id_boxing, keputusan, catatan.trim());
       setMsg(res.message);
       setTimeout(() => setMsg(""), 4000);
+      setModalApproval({ open: false, id_boxing: null, keputusan: null, catatan: "" });
       fetchData();
     } catch (err: unknown) {
       setPendingApproval(prev => { const n = {...prev}; delete n[id_boxing]; return n; });
@@ -152,8 +167,6 @@ export default function ProcessMonitorTable() {
     setTimeout(() => setExportingId(null), 1200);
   }
 
-  // ✅ FIX: kolom "Keputusan Staf" SEKARANG HANYA 2 tombol (✓ ✗).
-  // Tombol ↻ "buka ulang" sudah dipindah & hanya ada di Rekapitulasi.
   function renderKeputusanStaf(item: ProsesItem) {
     if (item.status_boxing !== "di_staff") {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
@@ -178,18 +191,31 @@ export default function ProcessMonitorTable() {
 
     return (
       <div className="flex gap-3">
-        <button type="button" onClick={() => approvalStaf(item.id_boxing, "diterima")}
+        <button type="button" onClick={() => openApprovalModal(item.id_boxing, "diterima")}
           title="Terima hasil — laporan otomatis Selesai"
           className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold flex items-center justify-center shadow">
           ✓
         </button>
-        <button type="button" onClick={() => approvalStaf(item.id_boxing, "ditolak")}
+        <button type="button" onClick={() => openApprovalModal(item.id_boxing, "ditolak")}
           title="Tolak — kembalikan ke unit untuk revisi hasil"
           className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold flex items-center justify-center shadow">
           ✗
         </button>
       </div>
     );
+  }
+
+  function formatTanggal(dateStr: string | null | undefined) {
+    if (!dateStr) return "-";
+    try {
+      return new Date(dateStr).toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "-";
+    }
   }
 
   const aktif = data.filter((d) => d.status_boxing !== "selesai");
@@ -219,8 +245,22 @@ export default function ProcessMonitorTable() {
           </div>
         </div>
 
-        <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-20 overflow-auto bg-gray-50">
-          {item.isi_laporan}
+        <div>
+          <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-20 overflow-auto bg-gray-50">
+            {item.isi_laporan}
+          </div>
+          <p className="text-[9px] text-gray-400 mt-1">
+            📅 Tanggal Masuk: {formatTanggal(item.created_at)}
+          </p>
+          {item.lampiran_laporan && (
+            <button
+              type="button"
+              onClick={() => setSelectedImage(getImageUrl(item.lampiran_laporan))}
+              className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+            >
+              🖼️ Lihat Gambar Awal
+            </button>
+          )}
         </div>
 
         {item.aksi_masukan && (
@@ -268,7 +308,53 @@ export default function ProcessMonitorTable() {
 
   return (
     <>
+      {/* ── IMAGE MODAL ── */}
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
+
+      {/* ── MODAL KOMENTAR KEPUTUSAN STAF ── */}
+      {modalApproval.open && modalApproval.id_boxing && modalApproval.keputusan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white border-2 border-black w-full max-w-md p-6 shadow-2xl">
+            <h3 className="font-bold text-sm uppercase border-b-2 border-black pb-2 mb-3">
+              {modalApproval.keputusan === "diterima" ? "✅ Terima Hasil" : "✗ Tolak Hasil"} — Konfirmasi
+            </h3>
+            <p className="text-[11px] text-gray-500 mb-3">
+              ID Boxing: <strong>{modalApproval.id_boxing}</strong>
+            </p>
+            <div className="mb-4">
+              <label className="text-[11px] font-bold uppercase block mb-1">
+                Catatan / Alasan <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                className="w-full border border-black p-2 text-xs h-24 outline-none resize-none"
+                placeholder={modalApproval.keputusan === "diterima" 
+                  ? "Tuliskan alasan menerima hasil ini..." 
+                  : "Tuliskan alasan menolak hasil ini (wajib untuk revisi)..."
+                }
+                value={modalApproval.catatan}
+                onChange={(e) => setModalApproval(prev => ({ ...prev, catatan: e.target.value }))}
+              />
+              <p className="text-[9px] text-gray-400 mt-1">* Wajib diisi</p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setModalApproval({ open: false, id_boxing: null, keputusan: null, catatan: "" })}
+                className="px-4 py-2 border border-black text-[11px]"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleApprovalSubmit}
+                className="px-6 py-2 bg-[#5da0dd] text-white text-[11px] font-bold disabled:opacity-50"
+              >
+                Kirim Keputusan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
@@ -295,17 +381,32 @@ export default function ProcessMonitorTable() {
                 const rev = item.status_review ? reviewBadge[item.status_review] : null;
                 return (
                   <div key={`${item.id_laporan}-${item.id_boxing}`} className="flex min-w-275 border-t-2 border-black">
+                    {/* Kolom Laporan + Tanggal + Gambar */}
                     <div className="w-120 border-r-2 border-black p-3">
                       <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                         <span className="font-bold">{item.kode_laporan}</span><br />
                         {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}</span>
                       </p>
                       <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">{item.isi_laporan}</div>
+                      <p className="text-[9px] text-gray-400 mt-1">
+                        📅 {formatTanggal(item.created_at)}
+                      </p>
+                      {item.lampiran_laporan && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedImage(getImageUrl(item.lampiran_laporan))}
+                          className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+                        >
+                          🖼️ Lihat Gambar Awal
+                        </button>
+                      )}
                     </div>
+
                     <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
                       {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>{rev.label}</span>}
                       {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
                     </div>
+
                     <div className="w-85 border-r-2 border-black p-3">
                       <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
                         {item.hasil_tindakan || (item.status_review === "tidak_ditindaklanjuti" ? "— (tidak ditindaklanjuti)" : "Belum ada hasil")}
@@ -322,7 +423,7 @@ export default function ProcessMonitorTable() {
                         </button>
                       )}
                     </div>
-                    {/* ✅ FIX: hanya renderKeputusanStaf (✓ ✗), tidak ada ↻ di sini lagi */}
+
                     <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center items-center">
                       {renderKeputusanStaf(item)}
                     </div>
@@ -353,11 +454,25 @@ export default function ProcessMonitorTable() {
                             {item.nama_unit} · <span className="italic">Selesai</span>
                           </p>
                           <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">{item.isi_laporan}</div>
+                          <p className="text-[9px] text-gray-400 mt-1">
+                            📅 {formatTanggal(item.created_at)}
+                          </p>
+                          {item.lampiran_laporan && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedImage(getImageUrl(item.lampiran_laporan))}
+                              className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+                            >
+                              🖼️ Lihat Gambar Awal
+                            </button>
+                          )}
                         </div>
+
                         <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
                           {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>{rev.label}</span>}
                           {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
                         </div>
+
                         <div className="w-85 border-r-2 border-black p-3">
                           <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
                             {item.hasil_tindakan || "— (tidak ditindaklanjuti)"}
@@ -374,6 +489,7 @@ export default function ProcessMonitorTable() {
                             </button>
                           )}
                         </div>
+
                         <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
                           <span className="text-[10px] text-green-600 font-bold">✓ Selesai</span>
                         </div>
