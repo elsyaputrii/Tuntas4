@@ -44,6 +44,22 @@
 //   "lahir ulang" dari awal di tab "Ketidaksesuaian Masuk" Kepala Unit —
 //   sesuai alur yang diminta: Kepala Unit isi rancangan baru → Ka P4M
 //   putuskan lagi → Kepala Unit isi pelaksanaan baru → balik ke Staf P4M.
+//
+// BUG #3 — [setApprovalStaf, approval='ditolak'] penyebab & rencana
+//   ikut dikosongkan (di-NULL-kan) saat reset.
+//   Sebelumnya, waktu Staf P4M menolak hasil tindak lanjut, backend
+//   ikut menghapus ISI penyebab & rencana tindak lanjut yang sudah
+//   ditulis Kepala Unit sebelumnya — padahal itu belum tentu salah,
+//   yang salah biasanya cuma HASIL PELAKSANAANNYA (buktinya, laporan
+//   hasilnya). Ini bikin Kepala Unit harus ngetik ulang semuanya dari
+//   nol walau penyebab/rencananya sebenarnya masih valid.
+//   FIX: saat "ditolak", penyebab & rencana yang SUDAH ADA dibiarkan
+//   apa adanya (tidak di-NULL-kan) — laporan cuma "dibuka lagi" lewat
+//   status_review → 'menunggu_keputusan_ka' supaya kotaknya jadi bisa
+//   diedit lagi. Kepala Unit tinggal koreksi kalau memang ada yang
+//   salah, atau kirim ulang apa adanya kalau penyebab/rencananya sudah
+//   benar. pelaksanaan_tindakan (hasil unit) tetap dihapus, karena itu
+//   memang bagian yang mau direvisi.
 
 const { pool } = require("../config/db");
 const { UNITS_UMUM } = require("../constants/unitsUmum");
@@ -601,6 +617,14 @@ async function getRekapitulasi(req, res) {
 //    lagi. Kalau "ditolak", laporan TETAP di status 'di_staff' supaya
 //    Kepala Unit bisa merevisi hasil pelaksanaannya di tab "Laporan
 //    Hasil" (lihat juga fix terkait di kepalaUnitController.js).
+//
+//    ✅ FIX BUG #3: "ditolak" TIDAK LAGI mengosongkan penyebab &
+//    rencana tindak lanjut yang sudah ditulis Kepala Unit. Laporan
+//    hanya "dibuka lagi" (status_review → 'menunggu_keputusan_ka')
+//    supaya kotaknya bisa diedit ulang — isinya tetap ada, Kepala
+//    Unit tinggal koreksi kalau memang ada yang salah. Yang dihapus
+//    hanya pelaksanaan_tindakan (hasil unit), karena itu memang
+//    bagian yang direvisi.
 // ============================================================
 async function setApprovalStaf(req, res) {
   const { id_boxing, approval } = req.body;
@@ -640,20 +664,24 @@ async function setApprovalStaf(req, res) {
       );
       await syncStatusLaporan(row.id_laporan);
     } else {
-      // "ditolak" → reset rancangan & pelaksanaan supaya Kepala Unit
-      // bisa isi ulang dari awal (penyebab, rencana, dan hasil).
+      // "ditolak" → laporan dibuka lagi supaya Kepala Unit bisa isi
+      // ULANG di tab "Ketidaksesuaian Masuk". Penyebab & rencana yang
+      // SUDAH ADA dibiarkan (TIDAK di-NULL-kan) — Kepala Unit tinggal
+      // edit kalau memang ada yang salah, atau kirim ulang apa adanya
+      // kalau sudah benar. Hanya status_review yang direset supaya
+      // kotaknya jadi editable lagi.
       await pool.query(
         `UPDATE boxing_ketidaksesuaian SET approval_staf = ? WHERE id_boxing = ?`,
         [approval, id_boxing]
       );
-      // Reset rancangan: kosongkan penyebab & rencana, kembalikan ke menunggu_keputusan_ka
       await pool.query(
         `UPDATE rancangan_tindakan
-         SET penyebab = NULL, deskripsi = NULL, status_review = 'menunggu_keputusan_ka', updated_at = NOW()
+         SET status_review = 'menunggu_keputusan_ka', updated_at = NOW()
          WHERE id_boxing = ?`,
         [id_boxing]
       );
-      // Hapus pelaksanaan lama supaya tab Laporan Hasil bersih
+      // Hapus pelaksanaan lama supaya tab Laporan Hasil bersih —
+      // ini yang memang mau direvisi, bukan penyebab/rencananya.
       await pool.query(
         `DELETE FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
         [id_boxing]
@@ -663,7 +691,7 @@ async function setApprovalStaf(req, res) {
     const pesan =
       approval === "diterima"
         ? "Hasil tindak lanjut unit DITERIMA. Laporan otomatis ditandai SELESAI dan masuk Rekapitulasi."
-        : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Unit perlu perbaikan di tab Laporan Hasil.";
+        : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dibuka kembali ke Kepala Unit untuk direvisi.";
     return res.status(200).json({ success: true, message: pesan });
   } catch (error) {
     console.error("Error setApprovalStaf:", error);

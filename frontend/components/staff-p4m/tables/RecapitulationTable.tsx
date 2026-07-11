@@ -151,7 +151,6 @@ export default function RecapitulationTable() {
   const filteredItems   = allItems.filter(d=>isInFilter(d.tglMasuk));
   const totalAll        = filteredItems.length;
   const selesaiCount    = filteredItems.filter(d=>d.isSelesai).length;
-  const dipantauCount   = filteredItems.filter(d=>!d.isSelesai).length;
   const ditindakCount   = filteredItems.filter(d=>d.statusReview==="ditindaklanjuti").length;
   const tidakDitindak   = filteredItems.filter(d=>d.statusReview==="tidak_ditindaklanjuti").length;
   const menungguCount   = filteredItems.filter(d=>!["ditindaklanjuti","tidak_ditindaklanjuti"].includes(d.statusReview)).length;
@@ -209,7 +208,7 @@ export default function RecapitulationTable() {
               setFilterMode(mode);
               if (mode !== "harian") setCalendarResetKey(k => k + 1);
             }}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
+            className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
               ${filterMode===mode?"bg-dark-header text-white border-dark-header shadow":"bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
             {mode==="semua"?"📋 Semua":mode==="harian"?"📅 Harian":mode==="mingguan"?"🗓️ Mingguan":mode==="bulanan"?"📆 Bulanan":"🗃️ Tahunan"}
           </button>
@@ -227,7 +226,7 @@ export default function RecapitulationTable() {
 
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Sidebar kalender */}
-        <div className={`${showCalendar ? "block" : "hidden"} sm:block sm:w-56 md:w-60 flex-shrink-0 space-y-3`}>
+        <div className={`${showCalendar ? "block" : "hidden"} sm:block sm:w-56 md:w-60 shrink-0 space-y-3`}>
           <MiniCalendar
             key={calendarResetKey}
             selectedDate={selectedDate}
@@ -238,24 +237,6 @@ export default function RecapitulationTable() {
 
         {/* Statistik */}
         <div className="flex-1 min-w-0 space-y-3">
-          <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
-            <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📊 Statistik — {labelFilter[filterMode]}</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {[
-                {label:"Total Laporan",val:totalAll,color:"text-[#4d5e71]",bg:"bg-slate-50 border-slate-200"},
-                {label:"Selesai",val:selesaiCount,color:"text-green-700",bg:"bg-green-50 border-green-200"},
-                {label:"Dipantau",val:dipantauCount,color:"text-amber-700",bg:"bg-amber-50 border-amber-200"},
-                {label:"Ditindaklanjuti",val:ditindakCount,color:"text-blue-700",bg:"bg-blue-50 border-blue-200"},
-                {label:"Belum Ditindak",val:tidakDitindak+menungguCount,color:"text-red-700",bg:"bg-red-50 border-red-200"},
-              ].map(s=>(
-                <div key={s.label} className={`border rounded-xl p-2 sm:p-3 ${s.bg}`}>
-                  <p className="text-[9px] text-gray-500 uppercase tracking-wide leading-tight">{s.label}</p>
-                  <p className={`text-xl sm:text-2xl font-black mt-1 ${s.color}`}>{s.val}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
             <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📋 Rekap Status Tindak Lanjut</p>
             <table className="w-full text-[10px] border-collapse">
@@ -321,7 +302,7 @@ export default function RecapitulationTable() {
 
       {/* Tabel — DESKTOP */}
       <div className="hidden md:block w-full border-2 border-black bg-white overflow-x-auto text-xs">
-        <div className="flex min-w-[700px] font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
+        <div className="flex min-w-175 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
           <div className="w-10 border-r-2 border-black p-2">No</div>
           <div className="flex-1 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
           <div className="w-36 border-r-2 border-black p-2">Penyebab</div>
@@ -345,7 +326,7 @@ export default function RecapitulationTable() {
                 : labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
             const pendingAppr = pendingApproval[item.id_boxing];
             return (
-              <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-[700px] border-t-2 border-black text-[11px]">
+              <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-175 border-t-2 border-black text-[11px]">
                 <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
                   <span className="font-bold text-sm">{index+1}</span>
                 </div>
@@ -431,11 +412,11 @@ export default function RecapitulationTable() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Penyebab</p>
-                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-[40px]">{item.penyebab}</p>
+                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">{item.penyebab}</p>
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana</p>
-                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-[40px]">{item.rencana}</p>
+                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">{item.rencana}</p>
                   </div>
                 </div>
                 <div>

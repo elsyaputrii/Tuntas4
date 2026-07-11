@@ -29,15 +29,9 @@ const BASE_CSS = `
   .header h1 { font-size:15pt; font-weight:900; color:#4d5e71; }
   .header h2 { font-size:12pt; font-weight:700; color:#222; margin-top:4px; }
   .header p  { font-size:9pt; color:#555; margin-top:3px; }
-  .stats { display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
-  .stat { flex:1; min-width:100px; border:1.5px solid #e5e7eb; border-radius:6px; padding:8px 12px; }
-  .stat .lbl { font-size:8pt; color:#6b7280; text-transform:uppercase; }
-  .stat .val { font-size:20pt; font-weight:900; margin-top:2px; }
-  .stat.total   .val { color:#4d5e71; }
-  .stat.selesai .val { color:#059669; }
-  .stat.pantau  .val { color:#d97706; }
-  .stat.ditindak .val { color:#1d4ed8; }
-  .stat.tidak   .val { color:#dc2626; }
+  .footer { margin-top:16px; display:flex; justify-content:space-between; align-items:flex-end; font-size:9pt; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:8px; }
+  .ttd { text-align:center; }
+  .ttd .name { margin-top:64px; font-weight:700; border-top:1px solid #333; padding-top:4px; width:180px; margin:64px auto 0; }
   table { width:100%; border-collapse:collapse; font-size:9pt; }
   thead tr { background:#4d5e71; color:#fff; }
   thead th { padding:6px 5px; text-align:center; font-weight:700; border:1px solid #3a4d5e; }
@@ -50,9 +44,6 @@ const BASE_CSS = `
   .badge-yellow { background:#fef3c7; color:#92400e; }
   .badge-blue   { background:#dbeafe; color:#1e40af; }
   .badge-gray   { background:#f3f4f6; color:#374151; }
-  .footer { margin-top:16px; display:flex; justify-content:space-between; font-size:9pt; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:8px; }
-  .ttd { text-align:center; }
-  .ttd .name { margin-top:48px; font-weight:700; border-top:1px solid #333; padding-top:4px; width:180px; margin:48px auto 0; }
   @media print { body { padding:8px; } @page { size:A4 landscape; margin:12mm; } }
 `;
 
@@ -155,8 +146,6 @@ export function exportPDFRekap(
   }));
 
   const allRows = [...selesaiRows, ...dipantauRows];
-  const ditindak = allRows.filter((r) => r.statusReview === "ditindaklanjuti").length;
-  const tidakDitindak = allRows.filter((r) => r.statusReview === "tidak_ditindaklanjuti").length;
 
   function badgeReview(sr: string) {
     if (sr === "ditindaklanjuti")       return `<span class="badge badge-green">✓ Ditindaklanjuti</span>`;
@@ -195,13 +184,6 @@ export function exportPDFRekap(
   <p>Periode: <strong>${labelKat[kategori]}</strong></p>
   <p>Dicetak: ${fmtTglWaktu(new Date().toISOString())}</p>
 </div>
-<div class="stats">
-  <div class="stat total">  <div class="lbl">Total Laporan</div><div class="val">${allRows.length}</div></div>
-  <div class="stat selesai"><div class="lbl">Selesai</div>      <div class="val">${filteredSelesai.length}</div></div>
-  <div class="stat pantau"> <div class="lbl">Dipantau</div>     <div class="val">${filteredDipantau.length}</div></div>
-  <div class="stat ditindak"><div class="lbl">Ditindaklanjuti</div><div class="val">${ditindak}</div></div>
-  <div class="stat tidak">  <div class="lbl">Tidak Ditindak</div><div class="val">${tidakDitindak}</div></div>
-</div>
 <table>
   <thead><tr>
     <th style="width:28px">No</th>
@@ -225,8 +207,8 @@ export function exportPDFRekap(
   </div>
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
-    <p>Kepala P4M,</p>
     <div class="name">( _________________ )</div>
+    <p style="margin-top:4px;">Kepala P4M,</p>
   </div>
 </div>
 ${PRINT_SCRIPT}
@@ -319,8 +301,8 @@ ${item.aksi_masukan ? `
   <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p></div>
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
-    <p>Staf P4M,</p>
     <div class="name">( _________________ )</div>
+    <p style="margin-top:4px;">Staff P4M,</p>
   </div>
 </div>
 ${PRINT_SCRIPT}

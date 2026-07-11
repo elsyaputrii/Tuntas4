@@ -15,10 +15,10 @@ export default function UnitNavigation({ activeTab, setActiveTab }: NavigationPr
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`flex-shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2.5 transition-all shadow-sm
+          className={`shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2.5 transition-all shadow-sm
             ${activeTab === tab.id
-              ? 'bg-[#5da0dd] text-white'
-              : 'bg-[#5da0dd]/10 text-[#3a75ad] hover:bg-[#5da0dd]/20'
+              ? 'bg-blue-polibatam text-white'
+              : 'bg-blue-polibatam/10 text-[#3a75ad] hover:bg-blue-polibatam/20'
             }`}
         >
           <span>{tab.icon}</span>

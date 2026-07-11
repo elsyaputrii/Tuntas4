@@ -43,7 +43,7 @@ export default function UnitSearchSelect() {
       {/* Box Pilihan (Menampilkan unit-unit yang dipilih) */}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-[35px]"
+        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-8.75"
       >
         <div className="flex flex-wrap gap-1">
           {selectedUnits.length > 0 ? (
@@ -96,9 +96,9 @@ export default function UnitSearchSelect() {
                     type="checkbox" 
                     checked={selectedUnits.includes(unit)} 
                     readOnly 
-                    className="w-3 h-3 accent-[#5da0dd] pointer-events-none"
+                    className="w-3 h-3 accent-blue-polibatam pointer-events-none"
                   />
-                  <span className={selectedUnits.includes(unit) ? "text-[#5da0dd]" : "text-gray-700"}>
+                  <span className={selectedUnits.includes(unit) ? "text-blue-polibatam" : "text-gray-700"}>
                     {unit}
                   </span>
                 </div>

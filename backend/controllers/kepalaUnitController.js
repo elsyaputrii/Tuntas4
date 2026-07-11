@@ -53,7 +53,7 @@ async function getLaporanMasuk(req, res) {
     }
     const [rows] = await pool.query(
       `SELECT
-        b.id_boxing, b.unit_tujuan, b.status AS status_boxing,
+        b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
         b.created_at AS tanggal_distribusi,
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         l.lampiran AS lampiran_laporan, l.status AS status_laporan,

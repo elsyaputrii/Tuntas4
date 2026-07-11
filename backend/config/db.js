@@ -28,6 +28,13 @@ const pool = mysql.createPool({
   waitForConnections: true,  // tunggu jika semua koneksi sedang dipakai
   connectionLimit: 10,       // maksimal 10 koneksi bersamaan
   queueLimit: 0,             // antrian tidak dibatasi (0 = unlimited)
+
+  // ✅ FIX: paksa koneksi Node.js ↔ MySQL pakai WIB (+07:00).
+  // Dump SQL kamu punya `SET time_zone = "+00:00"`, artinya kolom
+  // created_at/updated_at (tipe timestamp) dibaca sebagai UTC kalau
+  // koneksi tidak dikasih tahu timezone-nya. Ini yang bikin filter
+  // HARI INI / MINGGU INI / BULAN INI di Laporan Masuk meleset.
+  timezone: "+07:00",
 });
 
 // ============================================================

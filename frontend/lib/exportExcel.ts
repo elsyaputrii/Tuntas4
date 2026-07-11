@@ -17,7 +17,8 @@ interface KolomTabel {
 const KOLOM: KolomTabel[] = [
   { header: "No",                    key: "no",          width: 5  },
   { header: "Kode Laporan",          key: "kode",        width: 14 },
-  { header: "Jenis",                 key: "jenis",       width: 12 },
+  { header: "Jenis Laporan",         key: "jenis",       width: 12 },
+  { header: "Tgl Masuk",             key: "tglMasuk",    width: 14 },
   { header: "Uraian Ketidaksesuaian",key: "uraian",      width: 40 },
   { header: "Unit",                  key: "unit",        width: 16 },
   { header: "Penyebab",              key: "penyebab",    width: 30 },
@@ -25,8 +26,7 @@ const KOLOM: KolomTabel[] = [
   { header: "Hasil Tindak Lanjut",   key: "hasil",       width: 30 },
   { header: "Tgl Pelaksanaan",       key: "tglPelaks",   width: 16 },
   { header: "Status Review",         key: "statusReview",width: 20 },
-  { header: "Status Boxing",         key: "statusBoxing",width: 18 },
-  { header: "Tgl Masuk",             key: "tglMasuk",    width: 14 },
+  { header: "Status Proses",         key: "statusBoxing",width: 18 },
 ];
 
 // ─── Baris data laporan ────────────────────────────────────
@@ -240,9 +240,9 @@ export async function exportExcel(
     // Baris data
     baris.forEach((b) => {
       const row = ws.addRow([
-        b.no, b.kode, b.jenis, b.uraian, b.unit,
+        b.no, b.kode, b.jenis, b.tglMasuk, b.uraian, b.unit,
         b.penyebab, b.rencana, b.hasil,
-        b.tglPelaks, b.statusReview, b.statusBoxing, b.tglMasuk,
+        b.tglPelaks, b.statusReview, b.statusBoxing,
       ]);
       row.height = 40;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -252,10 +252,11 @@ export async function exportExcel(
       row.getCell(1).alignment = { horizontal: "center", vertical: "top" };
       // Kolom Kode rata tengah
       row.getCell(2).alignment = { horizontal: "center", vertical: "top" };
-      // Kolom tanggal rata tengah
-      row.getCell(9).alignment  = { horizontal: "center", vertical: "top" };
-      row.getCell(10).alignment = { horizontal: "center", vertical: "top", wrapText: true };
-      row.getCell(11).alignment = { horizontal: "center", vertical: "top" };
+      // Kolom Tgl Masuk rata tengah
+      row.getCell(4).alignment  = { horizontal: "center", vertical: "top" };
+      // Kolom tanggal pelaksanaan rata tengah
+      row.getCell(10).alignment = { horizontal: "center", vertical: "top" };
+      row.getCell(11).alignment = { horizontal: "center", vertical: "top", wrapText: true };
       row.getCell(12).alignment = { horizontal: "center", vertical: "top" };
     });
 
