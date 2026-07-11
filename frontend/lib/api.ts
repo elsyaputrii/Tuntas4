@@ -124,6 +124,10 @@ export const kaP4MApi = {
     aksi_masukan?: string;
   }) =>
     apiFetch("/ka-p4m/keputusan", { method: "PATCH", body: JSON.stringify(body) }),
+
+  // ✅ FITUR BARU: Ka P4M memantau data Kepala Unit (read-only, semua unit)
+  getKepalaUnitLaporanMasuk: () => apiFetch("/ka-p4m/kepala-unit/laporan-masuk"),
+  getKepalaUnitLaporanHasil: () => apiFetch("/ka-p4m/kepala-unit/laporan-hasil"),
 };
 
 // ─────────────────────────────────────────────

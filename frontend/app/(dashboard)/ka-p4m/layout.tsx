@@ -13,6 +13,8 @@ import {
   Moon,
   User,
   ChevronDown,
+  ChevronRight,
+  Building2,
   Bell,
 } from 'lucide-react';
 
@@ -34,6 +36,7 @@ export default function KaP4MLayout({
   });
   const [showProfile, setShowProfile] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
+  const [kepalaUnitMenuOpen, setKepalaUnitMenuOpen] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -58,6 +61,13 @@ export default function KaP4MLayout({
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
+  // ✅ Auto-expand submenu "Kepala Unit" kalau sedang berada di salah satu halamannya
+  useEffect(() => {
+    if (pathname?.startsWith('/ka-p4m/kepala-unit')) {
+      setKepalaUnitMenuOpen(true);
+    }
+  }, [pathname]);
+
   const toggleDarkMode = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
@@ -77,6 +87,20 @@ export default function KaP4MLayout({
       label: 'Proses Pengaduan',
       icon: <ClipboardList size={18} />,
       path: '/ka-p4m/proses-pengaduan'
+    },
+  ];
+
+  // ✅ FITUR BARU: submenu "Kepala Unit" (read-only monitor semua unit)
+  const kepalaUnitSubMenu = [
+    {
+      id: 'ku-ketidaksesuaian-masuk',
+      label: 'Ketidaksesuaian Masuk',
+      path: '/ka-p4m/kepala-unit/ketidaksesuaian-masuk',
+    },
+    {
+      id: 'ku-laporan-hasil',
+      label: 'Laporan Hasil',
+      path: '/ka-p4m/kepala-unit/laporan-hasil',
     },
   ];
 
@@ -142,6 +166,45 @@ export default function KaP4MLayout({
               {sidebarOpen && <span>{item.label}</span>}
             </button>
           ))}
+
+          {/* ✅ FITUR BARU: Dropdown "Kepala Unit" */}
+          <button
+            onClick={() => {
+              if (!sidebarOpen) setSidebarOpen(true);
+              setKepalaUnitMenuOpen((prev) => !prev);
+            }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm w-full text-left
+            ${pathname?.startsWith('/ka-p4m/kepala-unit')
+              ? 'bg-white/10 text-white'
+              : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Building2 size={18} />
+            {sidebarOpen && (
+              <>
+                <span className="flex-1">Kepala Unit</span>
+                {kepalaUnitMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </>
+            )}
+          </button>
+
+          {sidebarOpen && kepalaUnitMenuOpen && (
+            <div className="ml-4 pl-4 border-l border-white/10 flex flex-col gap-1 mt-1">
+              {kepalaUnitSubMenu.map((sub) => (
+                <button
+                  key={sub.id}
+                  onClick={() => router.push(sub.path)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 text-xs w-full text-left
+                  ${isActive(sub.path)
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <span>{sub.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </nav>
 
         {/* Logout */}

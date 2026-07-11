@@ -146,4 +146,73 @@ router.patch("/keputusan", async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────
+// FITUR BARU: KA-P4M → Kepala Unit (read-only, semua unit)
+// Tujuan: Ka P4M bisa memantau semua data yang berkaitan dengan
+// Kepala Unit (bukan cuma unit tertentu), tanpa bisa mengubah apa-apa.
+// ─────────────────────────────────────────────────────────────
+
+// Mirror dari getLaporanMasuk milik Kepala Unit, tapi TANPA filter
+// per id_kepala (jadi menampilkan laporan dari SEMUA unit).
+router.get("/kepala-unit/laporan-masuk", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+        b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
+        b.created_at AS tanggal_distribusi,
+        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        l.lampiran AS lampiran_laporan, l.status AS status_laporan,
+        l.created_at,
+        r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
+        r.status_review, r.aksi_masukan, r.catatan AS catatan_review
+      FROM boxing_ketidaksesuaian b
+      JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
+      LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+      ORDER BY b.created_at DESC`
+    );
+
+    const data = rows.map((row) => ({
+      ...row,
+      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
+    }));
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Error kaP4M getKepalaUnitLaporanMasuk:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengambil data laporan masuk kepala unit." });
+  }
+});
+
+// Mirror dari getLaporanHasil milik Kepala Unit, tapi TANPA filter
+// per id_kepala (jadi menampilkan laporan hasil dari SEMUA unit).
+router.get("/kepala-unit/laporan-hasil", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+        b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
+        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
+        r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
+        l.created_at AS tanggal_laporan,
+        p.id_pelaksanaan, p.deskripsi AS hasil_tindakan,
+        p.lampiran AS lampiran_hasil, p.tanggal AS tanggal_pelaksanaan
+      FROM boxing_ketidaksesuaian b
+      JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
+      JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+      LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
+      ORDER BY b.created_at DESC`
+    );
+
+    const data = rows.map((row) => ({
+      ...row,
+      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
+    }));
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Error kaP4M getKepalaUnitLaporanHasil:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengambil data laporan hasil kepala unit." });
+  }
+});
+
 module.exports = router;

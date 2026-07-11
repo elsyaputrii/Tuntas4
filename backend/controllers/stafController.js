@@ -627,12 +627,18 @@ async function getRekapitulasi(req, res) {
 //    bagian yang direvisi.
 // ============================================================
 async function setApprovalStaf(req, res) {
-  const { id_boxing, approval } = req.body;
+  const { id_boxing, approval, catatan } = req.body;
   const validApproval = ["diterima", "ditolak"];
   if (!id_boxing || !validApproval.includes(approval)) {
     return res.status(400).json({
       success: false,
       message: "id_boxing dan approval (diterima|ditolak) wajib diisi.",
+    });
+  }
+  if (!catatan || !String(catatan).trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Catatan / alasan approval wajib diisi.",
     });
   }
   try {
@@ -659,8 +665,10 @@ async function setApprovalStaf(req, res) {
     if (approval === "diterima") {
       // ✅ FIX: langsung selesai, sekali jalan.
       await pool.query(
-        `UPDATE boxing_ketidaksesuaian SET approval_staf = ?, status = 'selesai' WHERE id_boxing = ?`,
-        [approval, id_boxing]
+        `UPDATE boxing_ketidaksesuaian
+         SET approval_staf = ?, catatan_approval = ?, status = 'selesai'
+         WHERE id_boxing = ?`,
+        [approval, catatan.trim(), id_boxing]
       );
       await syncStatusLaporan(row.id_laporan);
     } else {
@@ -671,8 +679,10 @@ async function setApprovalStaf(req, res) {
       // kalau sudah benar. Hanya status_review yang direset supaya
       // kotaknya jadi editable lagi.
       await pool.query(
-        `UPDATE boxing_ketidaksesuaian SET approval_staf = ? WHERE id_boxing = ?`,
-        [approval, id_boxing]
+        `UPDATE boxing_ketidaksesuaian
+         SET approval_staf = ?, catatan_approval = ?
+         WHERE id_boxing = ?`,
+        [approval, catatan.trim(), id_boxing]
       );
       await pool.query(
         `UPDATE rancangan_tindakan

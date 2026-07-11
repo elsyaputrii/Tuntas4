@@ -54,6 +54,7 @@ async function getLaporanMasuk(req, res) {
     const [rows] = await pool.query(
       `SELECT
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
+        b.catatan_approval,
         b.created_at AS tanggal_distribusi,
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         l.lampiran AS lampiran_laporan, l.status AS status_laporan,
@@ -176,6 +177,7 @@ async function getLaporanHasil(req, res) {
     const [rows] = await pool.query(
       `SELECT
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
+        b.catatan_approval,
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,

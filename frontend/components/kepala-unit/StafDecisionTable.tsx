@@ -43,14 +43,21 @@ export default function StafDecisionTable() {
     setLoading(true);
     setErrMsg("");
     try {
-      const result = await kepalaUnitApi.getLaporanDitolakStaf();
+      // ✅ FIX: tidak ada endpoint terpisah untuk "laporan ditolak staf".
+      // Data ini sudah termasuk dalam getLaporanMasuk (lihat kepalaUnitController.js),
+      // jadi kita filter sendiri di frontend berdasarkan approval_staf === "ditolak".
+      const result = await kepalaUnitApi.getLaporanMasuk();
       if (result.success) {
-        setData(result.data);
+        const ditolakStaf = (result.data as StafDecisionItem[]).filter(
+          (item) => item.approval_staf === "ditolak"
+        );
+
+        setData(ditolakStaf);
         const initP: Record<number, string> = {};
         const initR: Record<number, string> = {};
         const initT: Record<number, string> = {};
         const initU: Record<number, string> = {};
-        result.data.forEach((item: StafDecisionItem) => {
+        ditolakStaf.forEach((item: StafDecisionItem) => {
           initP[item.id_boxing] = item.penyebab || "";
           initR[item.id_boxing] = item.rencana_tindakan || "";
           initT[item.id_boxing] = item.tanggal_pelaksanaan || "";
@@ -86,7 +93,11 @@ export default function StafDecisionTable() {
 
     setSubmitting((prev) => ({ ...prev, [id_boxing]: true }));
     try {
-      await kepalaUnitApi.submitRevisiRancangan({
+      // ✅ FIX: backend menangani resubmit setelah ditolak lewat endpoint
+      // /kepala-unit/rancangan yang sama (lihat submitRancangan di
+      // kepalaUnitController.js — sudah menerima kasus status='di_staff'
+      // AND approval_staf='ditolak'), jadi tidak perlu endpoint terpisah.
+      await kepalaUnitApi.submitRancangan({
         id_boxing,
         penyebab: penyebab[id_boxing].trim(),
         rencana_tindakan: rencana[id_boxing].trim(),
