@@ -40,13 +40,13 @@ const { pool } = require("../config/db");
 async function getKepalaInfo(req) {
   if (req.user.role === "ka_p4m") {
     const [rows] = await pool.query(
-      `SELECT id_kepala, unit FROM kepala_unit WHERE unit = 'P4M' LIMIT 1`
+      `SELECT id_kepala, unit FROM kepala_unit WHERE unit = 'P4M' LIMIT 1`,
     );
     return rows[0] || null;
   }
   const [rows] = await pool.query(
     `SELECT id_kepala, unit FROM kepala_unit WHERE id_pengguna = ?`,
-    [req.user.id]
+    [req.user.id],
   );
   return rows[0] || null;
 }
@@ -81,7 +81,7 @@ async function getLaporanMasuk(req, res) {
           OR b.approval_staf = 'ditolak'
         )
       ORDER BY b.created_at DESC`,
-      [kepala.id_kepala]
+      [kepala.id_kepala],
     );
     const data = rows.map((row) => ({
       ...row,
@@ -119,7 +119,7 @@ async function submitRancangan(req, res) {
     const [boxingRows] = await pool.query(
       `SELECT id_boxing, status FROM boxing_ketidaksesuaian
        WHERE id_boxing = ? AND id_kepala = ?`,
-      [id_boxing, kepala.id_kepala]
+      [id_boxing, kepala.id_kepala],
     );
     if (boxingRows.length === 0) {
       return res.status(403).json({
@@ -130,42 +130,46 @@ async function submitRancangan(req, res) {
 
     const [existing] = await pool.query(
       `SELECT id_rancangan, status_review FROM rancangan_tindakan WHERE id_boxing = ?`,
-      [id_boxing]
+      [id_boxing],
     );
 
     if (existing.length > 0) {
       if (existing[0].status_review !== "menunggu_keputusan_ka") {
         return res.status(400).json({
           success: false,
-          message: "Rancangan sudah diputuskan Ka P4M dan tidak bisa diubah dari sini.",
+          message:
+            "Rancangan sudah diputuskan Ka P4M dan tidak bisa diubah dari sini.",
         });
       }
       await pool.query(
         `UPDATE rancangan_tindakan
          SET penyebab = ?, deskripsi = ?, updated_at = NOW()
          WHERE id_boxing = ?`,
-        [penyebab, rencana_tindakan, id_boxing]
+        [penyebab, rencana_tindakan, id_boxing],
       );
     } else {
       await pool.query(
         `INSERT INTO rancangan_tindakan (id_boxing, penyebab, deskripsi, status_review)
          VALUES (?, ?, ?, 'menunggu_keputusan_ka')`,
-        [id_boxing, penyebab, rencana_tindakan]
+        [id_boxing, penyebab, rencana_tindakan],
       );
     }
 
     await pool.query(
       `UPDATE boxing_ketidaksesuaian SET status = 'diproses' WHERE id_boxing = ?`,
-      [id_boxing]
+      [id_boxing],
     );
 
     return res.status(200).json({
       success: true,
-      message: "Rancangan dikirim ke Ka P4M untuk keputusan ditindaklanjuti atau tidak.",
+      message:
+        "Rancangan dikirim ke Ka P4M untuk keputusan ditindaklanjuti atau tidak.",
     });
   } catch (error) {
     console.error("Error submitRancangan:", error);
-    return res.status(500).json({ success: false, message: "Gagal menyimpan rancangan." });
+    return res
+      .status(500)
+      .json({ success: false, message: "Gagal menyimpan rancangan." });
   }
 }
 
@@ -200,7 +204,7 @@ async function getLaporanHasil(req, res) {
           r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan'
         )
       ORDER BY b.created_at DESC`,
-      [kepala.id_kepala]
+      [kepala.id_kepala],
     );
     const data = rows.map((row) => ({
       ...row,
@@ -258,13 +262,14 @@ async function submitPelaksanaan(req, res) {
            b.status = 'menunggu_pelaksanaan'
            OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
          )`,
-      [id_boxing, kepala.id_kepala]
+      [id_boxing, kepala.id_kepala],
     );
 
     if (boxingRows.length === 0) {
       return res.status(403).json({
         success: false,
-        message: "Laporan tidak ditemukan atau belum disetujui untuk ditindaklanjuti oleh Ka P4M.",
+        message:
+          "Laporan tidak ditemukan atau belum disetujui untuk ditindaklanjuti oleh Ka P4M.",
       });
     }
 
@@ -275,19 +280,23 @@ async function submitPelaksanaan(req, res) {
       ? new Date(boxingRows[0].tanggal_ditindaklanjuti)
       : tanggalLaporan;
     tanggalDitindaklanjuti.setHours(0, 0, 0, 0);
-    const minTanggal = tanggalDitindaklanjuti >= tanggalLaporan ? tanggalDitindaklanjuti : tanggalLaporan;
+    const minTanggal =
+      tanggalDitindaklanjuti >= tanggalLaporan
+        ? tanggalDitindaklanjuti
+        : tanggalLaporan;
     const tanggalInput = new Date(tanggal);
     tanggalInput.setHours(0, 0, 0, 0);
     if (tanggalInput < minTanggal) {
       return res.status(400).json({
         success: false,
-        message: "Tanggal pelaksanaan tidak boleh lebih awal dari tanggal Ka P4M menindaklanjuti laporan.",
+        message:
+          "Tanggal pelaksanaan tidak boleh lebih awal dari tanggal Ka P4M menindaklanjuti laporan.",
       });
     }
 
     const [existingPelaksanaan] = await pool.query(
       `SELECT id_pelaksanaan FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
-      [id_boxing]
+      [id_boxing],
     );
 
     if (existingPelaksanaan.length > 0) {
@@ -295,13 +304,13 @@ async function submitPelaksanaan(req, res) {
         `UPDATE pelaksanaan_tindakan
          SET deskripsi = ?, tanggal = ?, lampiran = ?, updated_at = NOW()
          WHERE id_boxing = ?`,
-        [deskripsi, tanggal, lampiran, id_boxing]
+        [deskripsi, tanggal, lampiran, id_boxing],
       );
     } else {
       await pool.query(
         `INSERT INTO pelaksanaan_tindakan (id_boxing, id_kepala, deskripsi, lampiran, tanggal)
          VALUES (?, ?, ?, ?, ?)`,
-        [id_boxing, kepala.id_kepala, deskripsi, lampiran, tanggal]
+        [id_boxing, kepala.id_kepala, deskripsi, lampiran, tanggal],
       );
     }
 
@@ -310,21 +319,29 @@ async function submitPelaksanaan(req, res) {
     // supaya Staf P4M tahu ini hasil BARU yang perlu di-review lagi.
     await pool.query(
       `UPDATE boxing_ketidaksesuaian SET status = 'di_staff', approval_staf = 'menunggu' WHERE id_boxing = ?`,
-      [id_boxing]
+      [id_boxing],
     );
     await pool.query(
       `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
-      [id_laporan]
+      [id_laporan],
     );
 
     return res.status(200).json({
       success: true,
-      message: "Hasil tindak lanjut dikirim ke Staf P4M untuk penilaian selesai atau belum.",
+      message:
+        "Hasil tindak lanjut dikirim ke Staf P4M untuk penilaian selesai atau belum.",
     });
   } catch (error) {
     console.error("Error submitPelaksanaan:", error);
-    return res.status(500).json({ success: false, message: "Gagal menyimpan pelaksanaan." });
+    return res
+      .status(500)
+      .json({ success: false, message: "Gagal menyimpan pelaksanaan." });
   }
 }
 
-module.exports = { getLaporanMasuk, submitRancangan, getLaporanHasil, submitPelaksanaan };
+module.exports = {
+  getLaporanMasuk,
+  submitRancangan,
+  getLaporanHasil,
+  submitPelaksanaan,
+};
