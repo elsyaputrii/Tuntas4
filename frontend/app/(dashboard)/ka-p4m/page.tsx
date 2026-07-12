@@ -27,6 +27,11 @@ import {
 } from "recharts";
 import { kaP4MApi } from "@/lib/api";
 
+// Daftar nama bulan tetap — dipakai buat generate ulang chartData tanpa
+// perlu baca state chartData (biar gak kena warning exhaustive-deps &
+// gak infinite loop kalau chartData dimasukin ke dependency array)
+const BULAN_LIST = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
 export default function DashboardKaP4MPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dataLaporan, setDataLaporan] = useState<any[]>([]);
@@ -89,11 +94,11 @@ export default function DashboardKaP4MPage() {
           }
         });
 
-        const newChartData = chartData.map(item => ({
-          ...item,
-          total: bulanMap[item.bulan]?.total || 0,
-          disetujui: bulanMap[item.bulan]?.disetujui || 0,
-          ditolak: bulanMap[item.bulan]?.ditolak || 0,
+        const newChartData = BULAN_LIST.map(bulan => ({
+          bulan,
+          total: bulanMap[bulan]?.total || 0,
+          disetujui: bulanMap[bulan]?.disetujui || 0,
+          ditolak: bulanMap[bulan]?.ditolak || 0,
         }));
         setChartData(newChartData);
 
@@ -129,7 +134,7 @@ export default function DashboardKaP4MPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[500px]">
+      <div className="flex items-center justify-center h-125">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-500">Memuat data usulan...</p>
@@ -142,7 +147,7 @@ export default function DashboardKaP4MPage() {
     <>
       {/* ========== CARD STATISTIK ========== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+        <div className="bg-linear-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-blue-100 text-sm">Total Usulan</p>
@@ -152,7 +157,7 @@ export default function DashboardKaP4MPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+        <div className="bg-linear-to-br from-green-500 to-green-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-green-100 text-sm">Disetujui</p>
@@ -162,7 +167,7 @@ export default function DashboardKaP4MPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+        <div className="bg-linear-to-br from-red-500 to-red-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-red-100 text-sm">Ditolak / Revisi</p>
@@ -172,7 +177,7 @@ export default function DashboardKaP4MPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+        <div className="bg-linear-to-br from-amber-500 to-amber-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-amber-100 text-sm">Menunggu Review</p>
@@ -247,7 +252,7 @@ export default function DashboardKaP4MPage() {
 
       {/* ========== PESAN KOSONG ========== */}
       <div className="mt-6">
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-700">
+        <div className="bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-700">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
             <FileText size={32} className="text-blue-500" />
           </div>

@@ -33,18 +33,27 @@
 
 const { pool } = require("../config/db");
 
-async function getKepalaInfo(id_pengguna) {
+// ✅ FITUR BARU: akun Ka P4M digabung dengan Kepala Unit P4M.
+// Kalau yang login role-nya ka_p4m, langsung anggap dia Kepala Unit
+// unit 'P4M' (tanpa perlu akun kepala_unit terpisah). Kalau role-nya
+// kepala_unit biasa, cari datanya sendiri seperti biasa lewat id_pengguna.
+async function getKepalaInfo(req) {
+  if (req.user.role === "ka_p4m") {
+    const [rows] = await pool.query(
+      `SELECT id_kepala, unit FROM kepala_unit WHERE unit = 'P4M' LIMIT 1`
+    );
+    return rows[0] || null;
+  }
   const [rows] = await pool.query(
     `SELECT id_kepala, unit FROM kepala_unit WHERE id_pengguna = ?`,
-    [id_pengguna]
+    [req.user.id]
   );
   return rows[0] || null;
 }
 
 async function getLaporanMasuk(req, res) {
-  const id_pengguna = req.user.id;
   try {
-    const kepala = await getKepalaInfo(id_pengguna);
+    const kepala = await getKepalaInfo(req);
     if (!kepala) {
       return res.status(403).json({
         success: false,
@@ -90,7 +99,6 @@ async function getLaporanMasuk(req, res) {
 
 async function submitRancangan(req, res) {
   const { id_boxing, penyebab, rencana_tindakan } = req.body;
-  const id_pengguna = req.user.id;
 
   if (!id_boxing || !penyebab || !rencana_tindakan) {
     return res.status(400).json({
@@ -100,7 +108,7 @@ async function submitRancangan(req, res) {
   }
 
   try {
-    const kepala = await getKepalaInfo(id_pengguna);
+    const kepala = await getKepalaInfo(req);
     if (!kepala) {
       return res.status(403).json({
         success: false,
@@ -165,9 +173,8 @@ async function submitRancangan(req, res) {
 // penjelasan di komentar atas file. Ditambahkan juga b.approval_staf ke
 // SELECT supaya frontend bisa kasih konteks "ditolak, perlu revisi".
 async function getLaporanHasil(req, res) {
-  const id_pengguna = req.user.id;
   try {
-    const kepala = await getKepalaInfo(id_pengguna);
+    const kepala = await getKepalaInfo(req);
     if (!kepala) {
       return res.status(403).json({
         success: false,
@@ -211,7 +218,6 @@ async function getLaporanHasil(req, res) {
 
 async function submitPelaksanaan(req, res) {
   const { id_boxing, deskripsi, tanggal } = req.body;
-  const id_pengguna = req.user.id;
   const lampiran = req.file ? req.file.filename : null;
 
   if (!id_boxing || !deskripsi || !tanggal) {
@@ -229,7 +235,7 @@ async function submitPelaksanaan(req, res) {
   }
 
   try {
-    const kepala = await getKepalaInfo(id_pengguna);
+    const kepala = await getKepalaInfo(req);
     if (!kepala) {
       return res.status(403).json({
         success: false,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import KepalaUnitLaporanHasilTable from '@/components/ka-p4m/KepalaUnitLaporanHasilTable';
+import ResultReportTable from '@/components/kepala-unit/ResultReportTable';
 
 export default function KaP4MKepalaUnitLaporanHasilPage() {
   const router = useRouter();
@@ -49,13 +49,13 @@ export default function KaP4MKepalaUnitLaporanHasilPage() {
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">
-        ✅ Laporan Hasil — Kepala Unit
+        ✅ Laporan Hasil — Kepala Unit P4M
       </h2>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Pantauan seluruh hasil pelaksanaan tindak lanjut oleh Kepala Unit dari semua unit (khusus lihat, tidak bisa diubah dari sini).
+        Isi bukti pelaksanaan tindak lanjut untuk laporan unit P4M yang sudah disetujui Ka P4M.
       </p>
 
-      <KepalaUnitLaporanHasilTable />
+      <ResultReportTable />
     </div>
   );
 }

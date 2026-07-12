@@ -11,9 +11,11 @@ const {
   submitPelaksanaan,
 } = require("../controllers/kepalaUnitController");
 
-// Semua route di bawah wajib: token valid + role = kepala_unit
+// Semua route di bawah wajib: token valid + role = kepala_unit ATAU ka_p4m
+// (ka_p4m yang login otomatis dianggap Kepala Unit P4M, lihat getKepalaInfo
+// di kepalaUnitController.js)
 router.use(authMiddleware);
-router.use(roleMiddleware("kepala_unit"));
+router.use(roleMiddleware("kepala_unit", "ka_p4m"));
 
 // Tab Ketidaksesuaian Masuk
 router.get("/laporan",    getLaporanMasuk);   // GET  /api/kepala-unit/laporan
