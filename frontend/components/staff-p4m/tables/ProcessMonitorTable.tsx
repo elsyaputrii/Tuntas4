@@ -74,23 +74,8 @@ export default function ProcessMonitorTable() {
   const [data, setData] = useState<ProsesItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [msg, setMsg] = useState("");
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [pendingApproval, setPendingApproval] = useState<Record<number, "diterima"|"ditolak">>({});
-
-  // ✅ STATE UNTUK MODAL KOMENTAR
-  const [modalApproval, setModalApproval] = useState<{
-    open: boolean;
-    id_boxing: number | null;
-    keputusan: "diterima" | "ditolak" | null;
-    catatan: string;
-  }>({
-    open: false,
-    id_boxing: null,
-    keputusan: null,
-    catatan: "",
-  });
 
   useEffect(() => { fetchData(); }, []);
 
@@ -103,39 +88,6 @@ export default function ProcessMonitorTable() {
       setError("Gagal memuat data proses.");
     } finally {
       setLoading(false);
-    }
-  }
-
- 
-  function openApprovalModal(id_boxing: number, keputusan: "diterima" | "ditolak") {
-    setModalApproval({
-      open: true,
-      id_boxing,
-      keputusan,
-      catatan: "",
-    });
-  }
-
-  async function handleApprovalSubmit() {
-    const { id_boxing, keputusan, catatan } = modalApproval;
-    if (!id_boxing || !keputusan) return;
-    if (!catatan.trim()) {
-      alert("Catatan / alasan wajib diisi!");
-      return;
-    }
-
-    setPendingApproval(prev => ({ ...prev, [id_boxing]: keputusan }));
-    setError("");
-    try {
-      const res = await stafApi.setApprovalBoxing(id_boxing, keputusan, catatan.trim());
-      setMsg(res.message);
-      setTimeout(() => setMsg(""), 4000);
-      setModalApproval({ open: false, id_boxing: null, keputusan: null, catatan: "" });
-      fetchData();
-    } catch (err: unknown) {
-      setPendingApproval(prev => { const n = {...prev}; delete n[id_boxing]; return n; });
-      setError(err instanceof Error ? err.message : "Gagal menyimpan approval.");
-      setTimeout(() => setError(""), 4000);
     }
   }
 
@@ -167,6 +119,9 @@ export default function ProcessMonitorTable() {
     setTimeout(() => setExportingId(null), 1200);
   }
 
+  // ℹ️ READ-ONLY: Staf P4M cuma memantau status di sini. Keputusan
+  // diterima/ditolak atas hasil tindak lanjut unit sekarang wewenang
+  // Ka P4M (lihat KaP4MHasilTable.tsx / PATCH /ka-p4m/approval-hasil).
   function renderKeputusanStaf(item: ProsesItem) {
     if (item.status_boxing !== "di_staff") {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
@@ -175,9 +130,7 @@ export default function ProcessMonitorTable() {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu hasil unit</span>;
     }
 
-    const pendingAppr = pendingApproval[item.id_boxing];
-    const existingAppr = item.approval_staf;
-    const apprVal = pendingAppr ?? (existingAppr && existingAppr !== "menunggu" ? existingAppr : null);
+    const apprVal = item.approval_staf && item.approval_staf !== "menunggu" ? item.approval_staf : null;
 
     if (apprVal) {
       return (
@@ -190,18 +143,9 @@ export default function ProcessMonitorTable() {
     }
 
     return (
-      <div className="flex gap-3">
-        <button type="button" onClick={() => openApprovalModal(item.id_boxing, "diterima")}
-          title="Terima hasil — laporan otomatis Selesai"
-          className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white text-xl font-bold flex items-center justify-center shadow">
-          ✓
-        </button>
-        <button type="button" onClick={() => openApprovalModal(item.id_boxing, "ditolak")}
-          title="Tolak — kembalikan ke unit untuk revisi hasil"
-          className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold flex items-center justify-center shadow">
-          ✗
-        </button>
-      </div>
+      <span className="text-[9px] text-blue-600 italic text-center font-semibold">
+        ⏳ Menunggu keputusan Ka P4M
+      </span>
     );
   }
 
@@ -311,56 +255,10 @@ export default function ProcessMonitorTable() {
       {/* ── IMAGE MODAL ── */}
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
 
-      {/* ── MODAL KOMENTAR KEPUTUSAN STAF ── */}
-      {modalApproval.open && modalApproval.id_boxing && modalApproval.keputusan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white border-2 border-black w-full max-w-md p-6 shadow-2xl">
-            <h3 className="font-bold text-sm uppercase border-b-2 border-black pb-2 mb-3">
-              {modalApproval.keputusan === "diterima" ? "✅ Terima Hasil" : "✗ Tolak Hasil"} — Konfirmasi
-            </h3>
-            <p className="text-[11px] text-gray-500 mb-3">
-              ID Boxing: <strong>{modalApproval.id_boxing}</strong>
-            </p>
-            <div className="mb-4">
-              <label className="text-[11px] font-bold uppercase block mb-1">
-                Catatan / Alasan <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                className="w-full border border-black p-2 text-xs h-24 outline-none resize-none"
-                placeholder={modalApproval.keputusan === "diterima" 
-                  ? "Tuliskan alasan menerima hasil ini..." 
-                  : "Tuliskan alasan menolak hasil ini (wajib untuk revisi)..."
-                }
-                value={modalApproval.catatan}
-                onChange={(e) => setModalApproval(prev => ({ ...prev, catatan: e.target.value }))}
-              />
-              <p className="text-[9px] text-gray-400 mt-1">* Wajib diisi</p>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setModalApproval({ open: false, id_boxing: null, keputusan: null, catatan: "" })}
-                className="px-4 py-2 border border-black text-[11px]"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleApprovalSubmit}
-                className="px-6 py-2 bg-[#5da0dd] text-white text-[11px] font-bold disabled:opacity-50"
-              >
-                Kirim Keputusan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Staf P4M: ✓ terima (otomatis Selesai) · ✗ tolak (revisi hasil unit). Untuk membuka laporan dari awal, gunakan tab Rekapitulasi. Klik 📄 untuk export PDF.
+          Staf P4M: mode pantau. Keputusan diterima/ditolak atas hasil tindak lanjut unit sekarang wewenang Ka P4M. Klik 📄 untuk export PDF.
         </p>
-        {msg   && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msg}</p>}
         {error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
 
         {/* ── DESKTOP ── */}

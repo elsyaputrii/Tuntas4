@@ -92,14 +92,11 @@ export const stafApi = {
       body: JSON.stringify({ id_boxing, keputusan }),
     }),
 
-  setApprovalBoxing: (
-    id_boxing: number,
-    approval: "diterima" | "ditolak"
-  ) =>
-    apiFetch("/staf/approval-boxing", {
-      method: "PATCH",
-      body: JSON.stringify({ id_boxing, approval }),
-    }),
+  // ❌ DIHAPUS: setApprovalBoxing. Keputusan "diterima/ditolak" atas hasil
+  // tindak lanjut unit sekarang HANYA wewenang Ka P4M — lihat
+  // kaP4MApi.setApprovalHasil di bawah. Staf P4M cuma pantau lewat
+  // getProsesMonitor/getRekapitulasi, tidak lagi punya endpoint untuk
+  // memutuskan ulang-atau-tidak.
 
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
@@ -128,6 +125,20 @@ export const kaP4MApi = {
   // ✅ FITUR BARU: Ka P4M memantau data Kepala Unit (read-only, semua unit)
   getKepalaUnitLaporanMasuk: () => apiFetch("/ka-p4m/kepala-unit/laporan-masuk"),
   getKepalaUnitLaporanHasil: () => apiFetch("/ka-p4m/kepala-unit/laporan-hasil"),
+
+  // ✅ FITUR PINDAH: dulu stafApi.setApprovalBoxing. Sekarang keputusan
+  // "diterima" (→ laporan otomatis Selesai) atau "ditolak" (→ balik ke
+  // Kepala Unit untuk revisi hasil) atas hasil tindak lanjut unit adalah
+  // wewenang Ka P4M, bukan Staf P4M lagi.
+  setApprovalHasil: (
+    id_boxing: number,
+    approval: "diterima" | "ditolak",
+    catatan: string
+  ) =>
+    apiFetch("/ka-p4m/approval-hasil", {
+      method: "PATCH",
+      body: JSON.stringify({ id_boxing, approval, catatan }),
+    }),
 };
 
 // ─────────────────────────────────────────────

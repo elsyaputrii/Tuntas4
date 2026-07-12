@@ -87,7 +87,6 @@ export default function RecapitulationTable() {
   const [filterMode,   setFilterMode]   = useState<FilterMode>("semua");
   const [exportingExcelLoading, setExportingExcelLoading] = useState(false);
   const [exportingPDF, setExportingPDF] = useState<PdfKategori|null>(null);
-  const [pendingApproval, setPendingApproval] = useState<Record<number, "diterima"|"ditolak">>({});
   const [pendingReopen, setPendingReopen] = useState<Set<number>>(new Set());
   const [showCalendar, setShowCalendar] = useState(false);
 
@@ -173,20 +172,6 @@ export default function RecapitulationTable() {
     }catch(err:unknown){
       setPendingReopen(prev => { const n = new Set(prev); n.delete(id_boxing); return n; });
       setError(err instanceof Error?err.message:"Gagal."); setTimeout(()=>setError(""),4000);
-    }
-  }
-
-  async function approvalStaf(id_boxing: number, approval: "diterima" | "ditolak") {
-    setPendingApproval(prev => ({ ...prev, [id_boxing]: approval }));
-    setError("");
-    try {
-      const res = await stafApi.setApprovalBoxing(id_boxing, approval);
-      setMsg(res.message); setTimeout(() => setMsg(""), 4000);
-      fetchData();
-    } catch (err: unknown) {
-      setPendingApproval(prev => { const n = { ...prev }; delete n[id_boxing]; return n; });
-      setError(err instanceof Error ? err.message : "Gagal menyimpan approval.");
-      setTimeout(() => setError(""), 4000);
     }
   }
 
@@ -324,7 +309,6 @@ export default function RecapitulationTable() {
               : item.isSelesai
                 ? { label: "✓ Selesai", cls: "bg-green-100 text-green-700", butuhAksiStaf: false }
                 : labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
-            const pendingAppr = pendingApproval[item.id_boxing];
             return (
               <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-175 border-t-2 border-black text-[11px]">
                 <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
@@ -353,18 +337,7 @@ export default function RecapitulationTable() {
                   {isReopenPending ? (
                     <span className="text-[9px] text-orange-600 font-bold text-center italic">⏳ Sedang ditindak ulang</span>
                   ) : statusInfo.butuhAksiStaf ? (
-                    pendingAppr ? (
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${pendingAppr==="diterima"?"text-green-700 bg-green-50 border-green-300":"text-red-700 bg-red-50 border-red-300"}`}>
-                        {pendingAppr==="diterima"?"✓ Disetujui":"✗ Ditolak"}
-                      </span>
-                    ) : (
-                      <div className="flex gap-1.5 justify-center">
-                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"diterima")}
-                          className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow">✓</button>
-                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"ditolak")}
-                          className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow">✗</button>
-                      </div>
-                    )
+                    <span className="text-[9px] text-blue-600 italic text-center font-semibold">⏳ Menunggu keputusan Ka P4M</span>
                   ) : reopenAction ? (
                     <button onClick={()=>bukaLagi(item.id_boxing,reopenAction)}
                       className={`w-full border-2 text-[9px] font-bold py-1.5 leading-tight transition-all ${reopenAction==="ditindak_lanjut"?"border-orange-500 bg-orange-50 text-orange-800 hover:bg-orange-100":"border-gray-400 text-gray-600 hover:bg-gray-50"}`}>
@@ -396,7 +369,6 @@ export default function RecapitulationTable() {
               : item.isSelesai
                 ? { label: "✓ Selesai", cls: "bg-green-100 text-green-700", butuhAksiStaf: false }
                 : labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
-            const pendingAppr = pendingApproval[item.id_boxing];
             return (
               <div key={`m-${item.id_boxing}-${index}`} className="border-t-2 border-black p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -430,18 +402,7 @@ export default function RecapitulationTable() {
                   {isReopenPending ? (
                     <span className="text-[10px] text-orange-600 font-bold italic">⏳ Sedang ditindak ulang</span>
                   ) : statusInfo.butuhAksiStaf ? (
-                    pendingAppr ? (
-                      <span className={`text-[10px] font-bold px-3 py-1.5 rounded border ${pendingAppr==="diterima"?"text-green-700 bg-green-50 border-green-300":"text-red-700 bg-red-50 border-red-300"}`}>
-                        {pendingAppr==="diterima"?"✓ Disetujui":"✗ Ditolak"}
-                      </span>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"diterima")}
-                          className="flex-1 py-2 rounded bg-green-500 hover:bg-green-600 text-white text-xs font-bold shadow">✓ Terima</button>
-                        <button type="button" onClick={()=>approvalStaf(item.id_boxing,"ditolak")}
-                          className="flex-1 py-2 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-bold shadow">✗ Tolak</button>
-                      </div>
-                    )
+                    <span className="text-[10px] text-blue-600 italic font-semibold">⏳ Menunggu keputusan Ka P4M</span>
                   ) : reopenAction ? (
                     <button onClick={()=>bukaLagi(item.id_boxing,reopenAction)}
                       className={`w-full border-2 text-xs font-bold py-2 rounded transition-all ${reopenAction==="ditindak_lanjut"?"border-orange-500 bg-orange-50 text-orange-800":"border-gray-400 text-gray-600"}`}>

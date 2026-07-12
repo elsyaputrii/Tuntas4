@@ -10,7 +10,13 @@
 //   5. setKeputusanBoxing   → Staf P4M putuskan selesai/belum/lanjut
 //   6. inputHasilPemantauan → Staf P4M input hasil pemantauan lapangan
 //   7. getRekapitulasi      → ringkasan semua laporan dari awal sampai selesai
-//   8. setApprovalStaf      → Staf P4M setujui/tolak hasil tindak lanjut unit
+//   8. setApprovalStaf      → setujui/tolak hasil tindak lanjut unit.
+//                              ✅ Sekarang di-mount di /api/ka-p4m/approval-hasil
+//                              (kaP4MRoutes.js), BUKAN lagi di route staf.
+//                              Nama fungsi dibiarkan "setApprovalStaf" supaya
+//                              histori/diff minimal, tapi pemilik keputusannya
+//                              sekarang Ka P4M. Staf P4M hanya read-only lewat
+//                              getProsesMonitor.
 //
 // ════════════════════════════════════════════════════════════════════════
 // CATATAN PERBAIKAN (sesi ini) — alur "approve → selesai" & "reopen penuh"

@@ -3,6 +3,15 @@ const express = require("express");
 const router = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const { pool } = require("../config/db");
+// ✅ FITUR PINDAH KEWENANGAN: keputusan "diterima/ditolak" atas hasil
+// tindak lanjut Kepala Unit sekarang jadi wewenang Ka P4M, BUKAN Staf
+// P4M lagi. Staf P4M cuma boleh lihat & pantau (lewat /staf/proses),
+// tidak boleh memutuskan ulang-atau-tidak. Fungsi setApprovalStaf tetap
+// hidup di stafController.js (logic-nya tidak berubah), tapi sekarang
+// di-mount di endpoint /ka-p4m/approval-hasil, jadi otomatis kena
+// roleMiddleware("ka_p4m") dari router.use di bawah — bukan lagi
+// roleMiddleware("staf_p4m") seperti sebelumnya di stafRoutes.js.
+const { setApprovalStaf } = require("../controllers/stafController");
 
 router.use(authMiddleware);
 router.use(roleMiddleware("ka_p4m"));
@@ -20,6 +29,8 @@ router.get("/proses", async (req, res) => {
         b.id_boxing,
         b.unit_tujuan AS nama_unit,
         b.status AS status_boxing,
+        b.approval_staf,
+        b.catatan_approval,
         r.id_rancangan,
         r.penyebab,
         r.deskripsi AS rencana_tindakan,
@@ -214,5 +225,16 @@ router.get("/kepala-unit/laporan-hasil", async (req, res) => {
     return res.status(500).json({ success: false, message: "Gagal mengambil data laporan hasil kepala unit." });
   }
 });
+
+// ─────────────────────────────────────────────────────────────
+// FITUR PINDAH: Ka P4M memutuskan hasil tindak lanjut Kepala Unit
+// (diterima → laporan otomatis Selesai | ditolak → balik ke Kepala
+// Unit untuk revisi hasil). Ini KEPUTUSAN "ulang atau tidak" yang
+// sebelumnya dipegang Staf P4M (PATCH /staf/approval-boxing) — sekarang
+// hanya Ka P4M yang boleh. Staf P4M tetap bisa LIHAT hasilnya lewat
+// GET /staf/proses, tapi tombol keputusannya sudah dicabut dari sisi
+// Staf (lihat stafRoutes.js & ProcessMonitorTable.tsx / RecapitulationTable.tsx).
+// Logic setApprovalStaf sendiri TIDAK diubah — cuma dipindah "pemiliknya".
+router.patch("/approval-hasil", setApprovalStaf);
 
 module.exports = router;

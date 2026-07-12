@@ -82,6 +82,12 @@ export default function KaP4MLayout({
       path: '/ka-p4m/proses-pengaduan'
     },
     {
+      id: 'hasil-tindak-lanjut',
+      label: 'Hasil Tindak Lanjut',
+      icon: <CheckCircle2 size={18} />,
+      path: '/ka-p4m/hasil-tindak-lanjut'
+    },
+    {
       id: 'kepala-unit',
       label: 'Kepala Unit',
       icon: <Building2 size={18} />,
