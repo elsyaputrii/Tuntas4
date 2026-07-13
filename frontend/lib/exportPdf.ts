@@ -4,6 +4,7 @@
 //   - RecapitulationTable.tsx  → exportPDFRekap (per harian/mingguan/bulanan/tahunan)
 //   - ProcessMonitorTable.tsx  → exportPDFProses (per laporan individual)
 
+import QRCode from "qrcode";
 import type { RekapItem, ProsesItem } from "./exportTypes";
 import {
   fmtTgl,
@@ -14,6 +15,23 @@ import {
   sameWeekOfMonth,
   sameDay,
 } from "./exportHelpers";
+
+// ─── QR Code TTD ─────────────────────────────────────────────
+// Menggantikan gambar tanda tangan dengan QR code yang bisa discan.
+// QR berisi teks info penandatangan (offline, tidak butuh endpoint
+// verifikasi di backend) — cukup dipindai pakai kamera/QR scanner
+// apa pun untuk menampilkan info TTD-nya.
+async function generateQrDataUrl(text: string): Promise<string | null> {
+  try {
+    return await QRCode.toDataURL(text, {
+      width: 130,
+      margin: 1,
+      color: { dark: "#111111", light: "#ffffff" },
+    });
+  } catch {
+    return null; // nonfatal — PDF tetap bisa dicetak tanpa QR
+  }
+}
 
 export type PdfKategori = "harian" | "mingguan" | "bulanan" | "tahunan";
 
@@ -60,6 +78,8 @@ const BASE_CSS = `
   .hasil-img-cap { display:block; font-size:7.5pt; color:#94a3b8; font-style:italic; margin-top:1px; }
   .ttd .signature-img { display:block; max-height:58px; max-width:170px; margin:8px auto 2px; object-fit:contain; }
   .ttd .signature-placeholder { height:64px; }
+  .ttd .qr-img { display:block; width:88px; height:88px; margin:8px auto 2px; }
+  .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
   .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px;
     padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold;
     cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
@@ -99,7 +119,7 @@ const CLOSE_BUTTON = `<button class="close-btn" onclick="window.close()" title="
 // ═══════════════════════════════════════════════════════════════
 // 1. PDF REKAPITULASI — per kategori waktu
 // ═══════════════════════════════════════════════════════════════
-export function exportPDFRekap(
+export async function exportPDFRekap(
   rekapData: RekapItem[],
   prosesData: ProsesItem[],
   kategori: PdfKategori,
@@ -164,8 +184,10 @@ export function exportPDFRekap(
 
   const allRows = [...selesaiRows, ...dipantauRows];
 
-  const signatureUrl = getUploadUrl(penandatangan?.tandaTangan ?? null);
   const namaPenandatangan = penandatangan?.nama?.trim() || "_________________";
+  const tglCetakRekap = fmtTglWaktu(new Date().toISOString());
+  const qrTextRekap = `LAPORAN REKAPITULASI TUNTAS - Polibatam\nPeriode: ${labelKat[kategori]}\nPenandatangan: Kepala P4M - ${namaPenandatangan}\nDicetak: ${tglCetakRekap}`;
+  const qrDataUrlRekap = await generateQrDataUrl(qrTextRekap);
 
   function badgeReview(sr: string) {
     if (sr === "ditindaklanjuti")       return `<span class="badge badge-green">✓ Ditindaklanjuti</span>`;
@@ -239,8 +261,8 @@ ${CLOSE_BUTTON}
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
     <p style="margin-top:4px;">Kepala P4M,</p>
     ${
-      signatureUrl
-        ? `<img src="${signatureUrl}" class="signature-img" alt="Tanda tangan" onerror="this.style.display='none';this.nextElementSibling.style.marginTop='64px'"/>`
+      qrDataUrlRekap
+        ? `<img src="${qrDataUrlRekap}" class="qr-img" alt="QR TTD Kepala P4M"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
         : `<div class="signature-placeholder"></div>`
     }
     <div class="name" style="margin-top:4px;">( ${namaPenandatangan} )</div>
@@ -272,13 +294,15 @@ export interface ProsesDetailItem {
   created_at?: string | null;
 }
 
-export function exportPDFProses(
+export async function exportPDFProses(
   item: ProsesDetailItem,
   penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null
 ) {
   const gambarHasilUrl = getUploadUrl(item.lampiran_hasil);
-  const signatureUrl = getUploadUrl(penandatangan?.tandaTangan ?? null);
   const namaPenandatangan = penandatangan?.nama?.trim() || "_________________";
+  const tglCetakProses = fmtTglWaktu(new Date().toISOString());
+  const qrTextProses = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nPenandatangan: Staff P4M - ${namaPenandatangan}\nDicetak: ${tglCetakProses}`;
+  const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
@@ -354,8 +378,8 @@ ${item.aksi_masukan ? `
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
     <p style="margin-top:4px;">Staff P4M,</p>
     ${
-      signatureUrl
-        ? `<img src="${signatureUrl}" class="signature-img" alt="Tanda tangan" onerror="this.style.display='none';this.nextElementSibling.style.marginTop='64px'"/>`
+      qrDataUrlProses
+        ? `<img src="${qrDataUrlProses}" class="qr-img" alt="QR TTD Staff P4M"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
         : `<div class="signature-placeholder"></div>`
     }
     <div class="name" style="margin-top:4px;">( ${namaPenandatangan} )</div>

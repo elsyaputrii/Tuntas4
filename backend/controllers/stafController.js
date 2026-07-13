@@ -279,6 +279,8 @@ async function getProsesMonitor(req, res) {
         b.unit_tujuan         AS nama_unit,
         b.status              AS status_boxing,
         b.approval_staf,
+        b.catatan_approval,
+        b.updated_at          AS tanggal_keputusan_ka,
 
         r.id_rancangan,
         r.penyebab,
@@ -574,6 +576,9 @@ async function getRekapitulasi(req, res) {
         b.id_boxing,
         b.unit_tujuan         AS nama_unit,
         b.status              AS status_boxing,
+        b.approval_staf,
+        b.catatan_approval,
+        b.updated_at          AS tanggal_keputusan_ka,
 
         r.penyebab,
         r.deskripsi           AS rencana_tindakan,

@@ -544,7 +544,7 @@ export default function RecapitulationTable() {
         <span className="text-[9px] text-gray-400">PDF:</span>
         {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
           <button key={kat}
-            onClick={()=>{ setExportingPDF(kat); exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M); setExportingPDF(null); }}
+            onClick={async ()=>{ setExportingPDF(kat); await exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M); setExportingPDF(null); }}
             disabled={exportingPDF===kat}
             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
             📄 {kat.charAt(0).toUpperCase()+kat.slice(1)}

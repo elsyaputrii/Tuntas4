@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Image from 'next/image'; // ✅ Import Image dari next/image
+import Image from 'next/image';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -28,7 +28,6 @@ export default function KaP4MLayout({
   const pathname = usePathname();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  // ✅ Inisialisasi langsung dari localStorage
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true';
@@ -56,7 +55,6 @@ export default function KaP4MLayout({
     }
   }, [router]);
 
-  // ✅ Effect hanya untuk sinkronisasi DOM, bukan setState
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
@@ -67,7 +65,6 @@ export default function KaP4MLayout({
     localStorage.setItem('darkMode', String(newMode));
   };
 
-  // ========== MENU KA-P4M ==========
   const menuItems = [
     {
       id: 'dashboard',
@@ -95,7 +92,6 @@ export default function KaP4MLayout({
     },
   ];
 
-  // ========== MENU KEPALA UNIT P4M (persis kayak Kepala Unit asli) ==========
   const kepalaUnitMenuItems = [
     {
       id: 'ku-dashboard',
@@ -119,26 +115,20 @@ export default function KaP4MLayout({
 
   const isActive = (path: string) => pathname === path;
 
-  // Login page = no sidebar
   if (pathname?.includes('/login')) {
     return <>{children}</>;
   }
 
-  // ✅ FITUR BARU: begitu masuk /ka-p4m/kepala-unit/*, tampilan sidebar
-  // GANTI TOTAL jadi persis kayak dashboard Kepala Unit asli (Dashboard,
-  // Ketidaksesuaian Masuk, Laporan Hasil) — bukan lagi dropdown kecil.
   const isKepalaUnitSection = pathname?.startsWith('/ka-p4m/kepala-unit');
 
   if (isKepalaUnitSection) {
     return (
-      <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
-        {/* ========== SIDEBAR KEPALA UNIT P4M ========== */}
+      <div className="h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
         <aside
           className={`bg-linear-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
           text-white transition-all duration-300 flex flex-col shadow-2xl h-screen sticky top-0
           ${sidebarOpen ? 'w-65' : 'w-21.25'}`}
         >
-          {/* Logo */}
           <div className={`px-5 py-5 border-b border-white/10 flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col justify-center gap-3'}`}>
             <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'flex-col'}`}>
               <div className={`shrink-0 ${sidebarOpen ? 'w-11 h-11' : 'w-10 h-10'} rounded-full overflow-hidden bg-white flex items-center justify-center`}>
@@ -168,7 +158,6 @@ export default function KaP4MLayout({
             </button>
           </div>
 
-          {/* ✅ Tombol kembali ke Dashboard Ka P4M */}
           <button
             onClick={() => router.push('/ka-p4m')}
             className="flex items-center gap-3 px-5 py-3 mt-3 text-slate-400 hover:text-white hover:bg-white/5 transition text-xs"
@@ -177,7 +166,6 @@ export default function KaP4MLayout({
             {sidebarOpen && <span>Kembali ke Ka P4M</span>}
           </button>
 
-          {/* Menu */}
           <nav className="flex-1 overflow-y-auto mt-2 px-3 flex flex-col gap-1">
             {kepalaUnitMenuItems.map((item) => (
               <button
@@ -195,7 +183,6 @@ export default function KaP4MLayout({
             ))}
           </nav>
 
-          {/* Logout */}
           <div className="p-4 border-t border-white/10 shrink-0">
             <button
               onClick={() => {
@@ -210,9 +197,7 @@ export default function KaP4MLayout({
           </div>
         </aside>
 
-        {/* ========== AREA KANAN ========== */}
-        <div className="flex-1 flex flex-col">
-          {/* NAVBAR */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
           <div className="bg-linear-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
             <div className="flex justify-between items-center">
               <div>
@@ -232,17 +217,18 @@ export default function KaP4MLayout({
                 </button>
 
                 <div className="relative">
-                  <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
+                  <button onClick={() => setShowNotif(!showNotif)} className="p-2 rounded-full hover:bg-white/10 transition">
                     <Bell size={18} />
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                   </button>
                   {showNotif && (
                     <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                       <div className="p-3 border-b flex justify-between">
-                        <span className="font-semibold">Notifikasi</span>
-                        <button onClick={() => setShowNotif(false)}><X size={16} /></button>
+                        <span className="font-semibold text-slate-700 dark:text-white">Notifikasi</span>
+                        <button onClick={() => setShowNotif(false)}><X size={16} className="text-slate-700 dark:text-white" /></button>
                       </div>
-                      <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
+                      <div className="p-8 text-center text-slate-400 text-sm">
+                        Belum ada notifikasi
+                      </div>
                     </div>
                   )}
                 </div>
@@ -257,7 +243,7 @@ export default function KaP4MLayout({
                   {showProfile && (
                     <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                       <div className="p-3 border-b">
-                        <p className="text-sm font-semibold">KA-P4M</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">KA-P4M</p>
                         <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
                       </div>
                       <div className="p-2">
@@ -266,7 +252,7 @@ export default function KaP4MLayout({
                             setShowProfile(false);
                             router.push('/ka-p4m/profil');
                           }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                          className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                         >
                           Profil Saya
                         </button>
@@ -275,7 +261,7 @@ export default function KaP4MLayout({
                             setShowProfile(false);
                             router.push('/ka-p4m/pengaturan');
                           }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                          className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                         >
                           Pengaturan
                         </button>
@@ -287,8 +273,7 @@ export default function KaP4MLayout({
             </div>
           </div>
 
-          {/* KONTEN */}
-          <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
+          <div className="flex-1 min-h-0 overflow-y-auto mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
             <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-125 p-6">
               {children}
             </div>
@@ -299,25 +284,22 @@ export default function KaP4MLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
-
-      {/* ========== SIDEBAR ========== */}
+    <div className="h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
       <aside
         className={`bg-linear-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
         text-white transition-all duration-300 flex flex-col shadow-2xl h-screen sticky top-0
         ${sidebarOpen ? 'w-65' : 'w-21.25'}`}
       >
-        {/* Logo - Dengan Image dari Next.js */}
         <div className={`px-5 py-5 border-b border-white/10 flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col justify-center gap-3'}`}>
           <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'flex-col'}`}>
             <div className={`shrink-0 ${sidebarOpen ? 'w-11 h-11' : 'w-10 h-10'} rounded-full overflow-hidden bg-white flex items-center justify-center`}>
               <Image
                 src="/LogoTuntas.png"
                 alt="Logo"
-                width={44}  // w-11 = 44px
-                height={44} // h-11 = 44px
+                width={44}
+                height={44}
                 className="w-full h-full object-cover scale-125"
-                priority // Untuk LCP optimization
+                priority
               />
             </div>
             {sidebarOpen && (
@@ -337,7 +319,6 @@ export default function KaP4MLayout({
           </button>
         </div>
 
-        {/* Menu */}
         <nav className="flex-1 overflow-y-auto mt-6 px-3 flex flex-col gap-1">
           {menuItems.map((item) => (
             <button
@@ -355,7 +336,6 @@ export default function KaP4MLayout({
           ))}
         </nav>
 
-        {/* Logout */}
         <div className="p-4 border-t border-white/10 shrink-0">
           <button
             onClick={() => {
@@ -370,10 +350,7 @@ export default function KaP4MLayout({
         </div>
       </aside>
 
-      {/* ========== AREA KANAN ========== */}
-      <div className="flex-1 flex flex-col">
-
-        {/* NAVBAR */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="bg-linear-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
           <div className="flex justify-between items-center">
             <div>
@@ -393,17 +370,18 @@ export default function KaP4MLayout({
               </button>
 
               <div className="relative">
-                <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
+                <button onClick={() => setShowNotif(!showNotif)} className="p-2 rounded-full hover:bg-white/10 transition">
                   <Bell size={18} />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                 </button>
                 {showNotif && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b flex justify-between">
-                      <span className="font-semibold">Notifikasi</span>
-                      <button onClick={() => setShowNotif(false)}><X size={16} /></button>
+                      <span className="font-semibold text-slate-700 dark:text-white">Notifikasi</span>
+                      <button onClick={() => setShowNotif(false)}><X size={16} className="text-slate-700 dark:text-white" /></button>
                     </div>
-                    <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
+                    <div className="p-8 text-center text-slate-400 text-sm">
+                      Belum ada notifikasi
+                    </div>
                   </div>
                 )}
               </div>
@@ -418,7 +396,7 @@ export default function KaP4MLayout({
                 {showProfile && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b">
-                      <p className="text-sm font-semibold">KA-P4M</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">KA-P4M</p>
                       <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
@@ -427,7 +405,7 @@ export default function KaP4MLayout({
                           setShowProfile(false);
                           router.push('/ka-p4m/profil');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
                         Profil Saya
                       </button>
@@ -436,7 +414,7 @@ export default function KaP4MLayout({
                           setShowProfile(false);
                           router.push('/ka-p4m/pengaturan');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
                         Pengaturan
                       </button>
@@ -448,8 +426,7 @@ export default function KaP4MLayout({
           </div>
         </div>
 
-        {/* KONTEN */}
-        <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
+        <div className="flex-1 min-h-0 overflow-y-auto mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
           <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-125 p-6">
             {children}
           </div>

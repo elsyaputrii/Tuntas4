@@ -118,9 +118,9 @@ export default function ProcessMonitorTable() {
     return `${BASE_URL}/uploads/${lampiran}`;
   }
 
-  function handleExportPDF(item: ProsesItem) {
+  async function handleExportPDF(item: ProsesItem) {
     setExportingId(item.id_boxing);
-    exportPDFProses({
+    await exportPDFProses({
       kode_laporan: item.kode_laporan,
       jenis_laporan: item.jenis_laporan,
       isi_laporan: item.isi_laporan,
@@ -136,7 +136,7 @@ export default function ProcessMonitorTable() {
       tanggal_pelaksanaan: item.tanggal_pelaksanaan,
       created_at: item.created_at,
     }, meSignature);
-    setTimeout(() => setExportingId(null), 1200);
+    setExportingId(null);
   }
 
   // ℹ️ READ-ONLY: Staf P4M cuma memantau status di sini. Keputusan

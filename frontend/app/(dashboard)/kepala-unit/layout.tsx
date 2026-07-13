@@ -26,7 +26,6 @@ export default function KepalaUnitLayout({
   const pathname = usePathname();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  // ✅ Initialize langsung dari localStorage
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true';
@@ -54,7 +53,6 @@ export default function KepalaUnitLayout({
     }
   }, [router]);
 
-  // ✅ Effect hanya untuk sinkronisasi DOM
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
@@ -65,7 +63,6 @@ export default function KepalaUnitLayout({
     localStorage.setItem('darkMode', String(newMode));
   };
 
-  // ========== MENU KEPALA UNIT ==========
   const menuItems = [
     {
       id: 'dashboard',
@@ -89,20 +86,17 @@ export default function KepalaUnitLayout({
 
   const isActive = (path: string) => pathname === path;
 
-  // Login page = no sidebar
   if (pathname?.includes('/login')) {
     return <>{children}</>;
   }
 
   return (
     <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
-      {/* ========== SIDEBAR ========== */}
       <aside
         className={`bg-linear-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
         text-white transition-all duration-300 flex flex-col shadow-2xl
         ${sidebarOpen ? 'w-65' : 'w-21.25'}`}
       >
-        {/* Logo - Gaya KA-P4M dengan Image */}
         <div className={`px-5 py-5 border-b border-white/10 flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col justify-center gap-3'}`}>
           <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'flex-col'}`}>
             <div className={`shrink-0 ${sidebarOpen ? 'w-11 h-11' : 'w-10 h-10'} rounded-full overflow-hidden bg-white flex items-center justify-center`}>
@@ -132,7 +126,6 @@ export default function KepalaUnitLayout({
           </button>
         </div>
 
-        {/* Menu */}
         <nav className="flex-1 mt-6 px-3 flex flex-col gap-1">
           {menuItems.map((item) => (
             <button
@@ -150,7 +143,6 @@ export default function KepalaUnitLayout({
           ))}
         </nav>
 
-        {/* Logout */}
         <div className="p-4 border-t border-white/10 mt-auto">
           <button
             onClick={() => {
@@ -165,9 +157,7 @@ export default function KepalaUnitLayout({
         </div>
       </aside>
 
-      {/* ========== AREA KANAN ========== */}
       <div className="flex-1 flex flex-col">
-        {/* NAVBAR */}
         <div className="bg-linear-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
           <div className="flex justify-between items-center">
             <div>
@@ -187,9 +177,8 @@ export default function KepalaUnitLayout({
               </button>
 
               <div className="relative">
-                <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-full hover:bg-white/10 transition">
+                <button onClick={() => setShowNotif(!showNotif)} className="p-2 rounded-full hover:bg-white/10 transition">
                   <Bell size={18} />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
                 </button>
                 {showNotif && (
                   <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
@@ -197,7 +186,9 @@ export default function KepalaUnitLayout({
                       <span className="font-semibold">Notifikasi</span>
                       <button onClick={() => setShowNotif(false)}><X size={16} /></button>
                     </div>
-                    <div className="p-4 text-center text-slate-400">Tidak ada notifikasi</div>
+                    <div className="p-8 text-center text-slate-400 text-sm">
+                      Belum ada notifikasi
+                    </div>
                   </div>
                 )}
               </div>
@@ -212,7 +203,7 @@ export default function KepalaUnitLayout({
                 {showProfile && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b">
-                      <p className="text-sm font-semibold">Kepala Unit</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Kepala Unit</p>
                       <p className="text-xs text-slate-400">kepala@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">
@@ -221,7 +212,7 @@ export default function KepalaUnitLayout({
                           setShowProfile(false);
                           router.push('/kepala-unit/profil');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
                         Profil Saya
                       </button>
@@ -230,7 +221,7 @@ export default function KepalaUnitLayout({
                           setShowProfile(false);
                           router.push('/kepala-unit/pengaturan');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
                         Pengaturan
                       </button>
@@ -242,7 +233,6 @@ export default function KepalaUnitLayout({
           </div>
         </div>
 
-        {/* KONTEN */}
         <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
           <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-125 p-6">
             {children}

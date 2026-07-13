@@ -14,7 +14,7 @@ import {
   Lock,
 } from 'lucide-react';
 
-export default function PengaturanStaffPage() {
+export default function PengaturanKaP4MPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -28,9 +28,19 @@ export default function PengaturanStaffPage() {
   // Auth check
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    if (!token || role !== 'staf_p4m') {
-      router.replace('/staff-p4m/login');
+    const userRaw = localStorage.getItem('user');
+    if (!token || !userRaw) {
+      router.replace('/ka-p4m/login');
+      return;
+    }
+    try {
+      const user = JSON.parse(userRaw);
+      if (user.role !== 'ka_p4m') {
+        router.replace('/ka-p4m/login');
+        return;
+      }
+    } catch {
+      router.replace('/ka-p4m/login');
       return;
     }
     setIsChecking(false);

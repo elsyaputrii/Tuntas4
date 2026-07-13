@@ -23,7 +23,7 @@ interface UserProfile {
   created_at: string;
 }
 
-export default function ProfilStaffPage() {
+export default function ProfilKaP4MPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -43,9 +43,19 @@ export default function ProfilStaffPage() {
   // Auth check
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    if (!token || role !== 'staf_p4m') {
-      router.replace('/staff-p4m/login');
+    const userRaw = localStorage.getItem('user');
+    if (!token || !userRaw) {
+      router.replace('/ka-p4m/login');
+      return;
+    }
+    try {
+      const user = JSON.parse(userRaw);
+      if (user.role !== 'ka_p4m') {
+        router.replace('/ka-p4m/login');
+        return;
+      }
+    } catch {
+      router.replace('/ka-p4m/login');
       return;
     }
     setIsChecking(false);
@@ -72,11 +82,11 @@ export default function ProfilStaffPage() {
         // Data dummy (kalau API belum siap)
         const dummy = {
           id: 1,
-          nama_lengkap: 'Admin Staff',
-          email: 'staff@polibatam.ac.id',
-          role: 'staf_p4m',
+          nama_lengkap: 'Kepala P4M',
+          email: 'ka.p4m@polibatam.ac.id',
+          role: 'ka_p4m',
           unit: 'P4M',
-          username: 'staff_p4m',
+          username: 'ka_p4m',
           created_at: '2024-01-01',
         };
         setProfile(dummy);

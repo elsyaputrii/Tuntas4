@@ -33,6 +33,7 @@ interface HasilItem {
   tanggal_pelaksanaan: string | null;
   approval_staf: string | null;
   catatan_approval: string | null;
+  tanggal_keputusan_ka?: string | null;
   created_at?: string | null;
 }
 
@@ -241,15 +242,21 @@ export default function KaP4MHasilTable() {
 
               <div className="w-[16%] p-3 flex items-center justify-center">
                 {item.approval_staf && item.approval_staf !== "menunggu" ? (
-                  <span
-                    className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
-                      item.approval_staf === "diterima"
-                        ? "text-green-700 bg-green-50 border-green-300"
-                        : "text-red-700 bg-red-50 border-red-300"
-                    }`}
-                  >
-                    {item.approval_staf === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
-                  </span>
+                  <div className="flex flex-col items-center gap-1">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
+                        item.approval_staf === "diterima"
+                          ? "text-green-700 bg-green-50 border-green-300"
+                          : "text-red-700 bg-red-50 border-red-300"
+                      }`}
+                    >
+                      {item.approval_staf === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
+                    </span>
+                    {/* ✅ Bukti tanggal keputusan Ka P4M (dari boxing.updated_at) */}
+                    <p className="text-[9px] text-gray-400 text-center leading-tight">
+                      🕒 {formatTanggal(item.tanggal_keputusan_ka)}
+                    </p>
+                  </div>
                 ) : (
                   <div className="flex gap-3">
                     <button

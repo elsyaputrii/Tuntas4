@@ -31,6 +31,7 @@ router.get("/proses", async (req, res) => {
         b.status AS status_boxing,
         b.approval_staf,
         b.catatan_approval,
+        b.updated_at AS tanggal_keputusan_ka,
         r.id_rancangan,
         r.penyebab,
         r.deskripsi AS rencana_tindakan,
