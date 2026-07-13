@@ -4,7 +4,7 @@
 // Worksheet 2: Laporan Masih Dipantau
 // Worksheet 3: Laporan Selesai
 
-import type { RekapItem, ProsesItem } from "./exportTypes";
+import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
 import { fmtTgl, labelStatusReview, labelStatusBoxing } from "./exportHelpers";
 
 // ─── Tipe kolom tabel ──────────────────────────────────────
@@ -14,19 +14,24 @@ interface KolomTabel {
   width: number;
 }
 
+// ✅ RAPI: lebar kolom dipangkas supaya sheet tidak lagi memanjang ke
+// samping (sebelumnya total lebar ±245, sekarang ±178). Isi/urutan/nama
+// kolom TIDAK berubah sama sekali — cuma lebarnya lebih pas dengan
+// panjang teks yang biasanya muncul, dan teks panjang tetap aman karena
+// tiap sel sudah wrapText + tinggi baris otomatis 40px.
 const KOLOM: KolomTabel[] = [
   { header: "No",                    key: "no",          width: 5  },
-  { header: "Kode Laporan",          key: "kode",        width: 14 },
-  { header: "Jenis Laporan",         key: "jenis",       width: 12 },
-  { header: "Tgl Masuk",             key: "tglMasuk",    width: 14 },
-  { header: "Uraian Ketidaksesuaian",key: "uraian",      width: 40 },
-  { header: "Unit",                  key: "unit",        width: 16 },
-  { header: "Penyebab",              key: "penyebab",    width: 30 },
-  { header: "Rencana Tindakan",      key: "rencana",     width: 30 },
-  { header: "Hasil Tindak Lanjut",   key: "hasil",       width: 30 },
-  { header: "Tgl Pelaksanaan",       key: "tglPelaks",   width: 16 },
-  { header: "Status Review",         key: "statusReview",width: 20 },
-  { header: "Status Proses",         key: "statusBoxing",width: 18 },
+  { header: "Kode Laporan",          key: "kode",        width: 12 },
+  { header: "Jenis Laporan",         key: "jenis",       width: 11 },
+  { header: "Tgl Masuk",             key: "tglMasuk",    width: 11 },
+  { header: "Uraian Ketidaksesuaian",key: "uraian",      width: 28 },
+  { header: "Unit",                  key: "unit",        width: 13 },
+  { header: "Penyebab",              key: "penyebab",    width: 20 },
+  { header: "Rencana Tindakan",      key: "rencana",     width: 20 },
+  { header: "Hasil Tindak Lanjut",   key: "hasil",       width: 20 },
+  { header: "Tgl Pelaksanaan",       key: "tglPelaks",   width: 12 },
+  { header: "Status Review",         key: "statusReview",width: 15 },
+  { header: "Status Proses",         key: "statusBoxing",width: 14 },
 ];
 
 // ─── Baris data laporan ────────────────────────────────────
@@ -81,10 +86,35 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
   }
 }
 
+// ✅ BARU: baris arsip (hasil upload Excel data tahun lalu) dipetakan ke
+// bentuk BarisLaporan yang sama supaya bisa dirender pakai fungsi
+// buatWorksheetLaporan yang sudah ada, tanpa mengubah tampilan tabel.
+function buatBarisArsip(item: ArsipItem, no: number): BarisLaporan {
+  return {
+    no,
+    kode:         item.kode_laporan ?? "—",
+    jenis:        item.jenis_laporan ?? "—",
+    uraian:       item.uraian_ketidaksesuaian ?? "—",
+    unit:         item.unit ?? "—",
+    penyebab:     item.penyebab ?? "—",
+    rencana:      item.rencana_tindakan ?? "—",
+    hasil:        item.hasil_tindakan ?? "—",
+    tglPelaks:    item.tgl_pelaksanaan ?? "—",
+    statusReview: item.status_review ? labelStatusReview(item.status_review) : (item.status_review ?? "—"),
+    statusBoxing: item.status_boxing ?? "—",
+    tglMasuk:     item.tgl_masuk ?? "—",
+  };
+}
+
 // ─── Fungsi utama export ────────────────────────────────────
+// arsipData: opsional — data tahun-tahun lalu hasil "Upload Data Lama"
+// (lihat tombol Upload di sebelah tombol Excel pada RecapitulationTable).
+// Setiap tahun yang ada di data ini akan dibuatkan 1 worksheet sendiri,
+// diurutkan dari tahun terbaru ke terlama, supaya rapi dan mudah dicari.
 export async function exportExcel(
   rekapData: RekapItem[],
-  prosesData: ProsesItem[]
+  prosesData: ProsesItem[],
+  arsipData: ArsipItem[] = []
 ): Promise<void> {
   // Import ExcelJS secara dinamis (browser bundle via CDN atau npm)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,9 +185,13 @@ export async function exportExcel(
   judulCell.font      = { bold: true, size: 13, name: "Arial", color: { argb: ABU_TUA } };
   judulCell.alignment = { horizontal: "center" };
 
+  const daftarTahunArsip = [...new Set(arsipData.map((a) => a.tahun))].sort((a, b) => b - a);
+
   wsRingkasan.mergeCells("A2:C2");
   const tglCell = wsRingkasan.getCell("A2");
-  tglCell.value     = `Tanggal Export: ${tglExport}`;
+  tglCell.value = daftarTahunArsip.length
+    ? `Tanggal Export: ${tglExport}  |  Termasuk arsip tahun: ${daftarTahunArsip.join(", ")}`
+    : `Tanggal Export: ${tglExport}`;
   tglCell.font      = { size: 10, name: "Arial", italic: true };
   tglCell.alignment = { horizontal: "center" };
 
@@ -287,6 +321,21 @@ export async function exportExcel(
     buatBaris(d, i + 1, true)
   );
   buatWorksheetLaporan("Laporan Selesai", barisSelesai, HIJAU_BG);
+
+  // ══════════════════════════════════════════════════════════
+  // WORKSHEET ARSIP — 1 sheet per tahun hasil "Upload Data Lama"
+  // (data 1–10 tahun ke belakang), diurutkan tahun terbaru dulu
+  // supaya tersusun rapi dan gampang dicari.
+  // ══════════════════════════════════════════════════════════
+  const UNGU_BG = "FFE9D5FF";
+  const tahunTersedia = [...new Set(arsipData.map((a) => a.tahun))].sort((a, b) => b - a);
+
+  tahunTersedia.forEach((tahun) => {
+    const barisTahunIni = arsipData
+      .filter((a) => a.tahun === tahun)
+      .map((a, i) => buatBarisArsip(a, i + 1));
+    buatWorksheetLaporan(`Arsip ${tahun}`, barisTahunIni, UNGU_BG);
+  });
 
   // ── Download ────────────────────────────────────────────
   const buffer   = await workbook.xlsx.writeBuffer();

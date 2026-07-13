@@ -57,10 +57,14 @@ export default function KaP4MHasilTable() {
     setError("");
     try {
       const res = await kaP4MApi.getProsesMonitor();
-      // Hanya tampilkan yang sudah ada hasil pelaksanaan dari unit dan
-      // sedang di tahap Staf P4M (di_staff) — inilah yang butuh keputusan.
+      // ✅ PERUBAHAN: sebelumnya di-filter hanya yang status_boxing==='di_staff'
+      // && ada hasil_tindakan. Sekarang SEMUA laporan ditampilkan supaya Ka P4M
+      // bisa memutuskan "siap/tidak" dari tahap manapun, tidak perlu menunggu
+      // Kepala Unit mengisi hasil pelaksanaan dulu. Yang sudah 'selesai' tetap
+      // disembunyikan karena sudah final (dan backend akan menolak approval
+      // ulang untuk status ini).
       const filtered = (res.data as HasilItem[]).filter(
-        (item) => item.status_boxing === "di_staff" && item.hasil_tindakan
+        (item) => item.status_boxing !== "selesai"
       );
       setData(filtered);
     } catch (err: unknown) {
@@ -118,7 +122,7 @@ export default function KaP4MHasilTable() {
   if (loading) {
     return (
       <div className="w-full border-2 border-black bg-white p-12 text-center">
-        <div className="w-6 h-6 border-4 border-[#5da0dd] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <div className="w-6 h-6 border-4 border-blue-polibatam border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-gray-400 text-xs">Memuat data hasil tindak lanjut...</p>
       </div>
     );
@@ -138,6 +142,23 @@ export default function KaP4MHasilTable() {
             <p className="text-[11px] text-gray-500 mb-3">
               ID Boxing: <strong>{modal.id_boxing}</strong>
             </p>
+
+            {/* ⚠️ Banner peringatan supaya gak salah pencet — beda teks
+                untuk "diterima" vs "ditolak" karena efeknya beda jauh */}
+            <div
+              className={`mb-4 p-3 border-2 text-[11px] font-bold leading-relaxed ${
+                modal.keputusan === "diterima"
+                  ? "border-green-500 bg-green-50 text-green-800"
+                  : "border-red-500 bg-red-50 text-red-800"
+              }`}
+            >
+              {modal.keputusan === "diterima" ? (
+                <>⚠️ Yakin mau TERIMA? Laporan ini akan langsung ditandai <u>SELESAI</u> dan masuk Rekapitulasi. Tindakan ini tidak bisa dibatalkan setelah dikirim.</>
+              ) : (
+                <>⚠️ Yakin mau TOLAK? Laporan ini akan dikembalikan ke Kepala Unit untuk direvisi (hasil pelaksanaan lama akan dihapus).</>
+              )}
+            </div>
+
             <div className="mb-4">
               <label className="text-[11px] font-bold uppercase block mb-1">
                 Catatan / Alasan <span className="text-red-500">*</span>
@@ -167,9 +188,15 @@ export default function KaP4MHasilTable() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submittingId === modal.id_boxing}
-                className="px-6 py-2 bg-[#5da0dd] text-white text-[11px] font-bold disabled:opacity-50"
+                className={`px-6 py-2 text-white text-[11px] font-bold disabled:opacity-50 ${
+                  modal.keputusan === "diterima" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                }`}
               >
-                {submittingId === modal.id_boxing ? "Menyimpan..." : "Kirim Keputusan"}
+                {submittingId === modal.id_boxing
+                  ? "Menyimpan..."
+                  : modal.keputusan === "diterima"
+                  ? "Ya, Terima & Selesaikan"
+                  : "Ya, Tolak & Kirim ke Unit"}
               </button>
             </div>
           </div>
@@ -178,7 +205,7 @@ export default function KaP4MHasilTable() {
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil).
+          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Bisa diputuskan dari tahap manapun, tidak perlu menunggu Kepala Unit mengisi hasil pelaksanaan dulu.
         </p>
         {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
         {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
@@ -192,8 +219,8 @@ export default function KaP4MHasilTable() {
 
         {data.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-gray-400 italic text-sm">Belum ada hasil tindak lanjut yang perlu diputuskan.</p>
-            <p className="text-gray-300 text-xs mt-1">(Tampil setelah Kepala Unit mengisi laporan hasil pelaksanaan)</p>
+            <p className="text-gray-400 italic text-sm">Belum ada laporan yang perlu diputuskan.</p>
+            <p className="text-gray-300 text-xs mt-1">(Semua laporan aktif sudah tampil di sini, apa pun tahapnya)</p>
           </div>
         ) : (
           data.map((item) => (
@@ -224,7 +251,9 @@ export default function KaP4MHasilTable() {
 
               <div className="w-[24%] border-r-2 border-black p-3">
                 <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
-                  {item.hasil_tindakan}
+                  {item.hasil_tindakan || (
+                    <span className="text-gray-400 italic">Belum diisi Kepala Unit</span>
+                  )}
                 </div>
                 {item.tanggal_pelaksanaan && (
                   <p className="text-[9px] text-gray-400 mt-1">📅 {formatTanggal(item.tanggal_pelaksanaan)}</p>

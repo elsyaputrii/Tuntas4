@@ -51,3 +51,22 @@ export interface ProsesItem {
   /** ✅ BARU: "menunggu" | "diterima" | "ditolak" — dikirim backend tapi sebelumnya tidak ada di tipe ini */
   approval_staf?: string | null;
 }
+
+/** ✅ BARU: data arsip tahun lalu hasil upload Excel (fitur "Upload Data Lama"
+ *  di halaman Rekapitulasi). Datang dari tabel arsip_rekapitulasi lewat
+ *  GET /api/staf/rekap/arsip — kolom tanggal disimpan sbg teks karena
+ *  formatnya bisa bermacam-macam dari file lama. */
+export interface ArsipItem {
+  tahun: number;
+  kode_laporan: string | null;
+  jenis_laporan: string | null;
+  tgl_masuk: string | null;
+  uraian_ketidaksesuaian: string | null;
+  unit: string | null;
+  penyebab: string | null;
+  rencana_tindakan: string | null;
+  hasil_tindakan: string | null;
+  tgl_pelaksanaan: string | null;
+  status_review: string | null;
+  status_boxing: string | null;
+}

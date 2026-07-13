@@ -2,6 +2,7 @@
 const express = require("express");
 const router  = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
+const uploadExcel = require("../middleware/excelUploadMiddleware");
 const {
    getLaporanMasuk,
   getKepalaUnit,
@@ -10,6 +11,8 @@ const {
   inputHasilPemantauan,
   setKeputusanBoxing,
   getRekapitulasi,
+  uploadArsipRekap,
+  getArsipRekap,
 } = require("../controllers/stafController");
 // ✅ FITUR PINDAH KEWENANGAN: setApprovalStaf ("diterima"/"ditolak" atas
 // hasil tindak lanjut Kepala Unit — keputusan "ulang atau tidak") TIDAK
@@ -27,6 +30,10 @@ router.get("/laporan",     roleMiddleware("staf_p4m"), getLaporanMasuk);
 router.get("/kepala-unit", roleMiddleware("staf_p4m"), getKepalaUnit);
 router.post("/boxing",     roleMiddleware("staf_p4m"), distribusiLaporan);
 router.get("/rekap",       roleMiddleware("staf_p4m"), getRekapitulasi);
+
+// ── Arsip data tahun lalu (upload Excel s/d 10 tahun ke belakang) ─
+router.post("/rekap/arsip/upload", roleMiddleware("staf_p4m"), uploadExcel.single("file"), uploadArsipRekap);
+router.get("/rekap/arsip",         roleMiddleware("staf_p4m"), getArsipRekap);
 
 // ── Tab Proses & Pantau (khusus Staf P4M — pantau & input pemantauan) ─
 // Review rancangan & keputusan hasil tindak lanjut (diterima/ditolak)

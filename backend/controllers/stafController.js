@@ -66,6 +66,18 @@
 //   salah, atau kirim ulang apa adanya kalau penyebab/rencananya sudah
 //   benar. pelaksanaan_tindakan (hasil unit) tetap dihapus, karena itu
 //   memang bagian yang mau direvisi.
+//
+// BUG #4 — [setApprovalStaf] Ka P4M tidak bisa memutuskan "siap/tidak"
+//   kecuali status_boxing sudah 'di_staff' (artinya Kepala Unit HARUS
+//   sudah isi hasil pelaksanaan dulu). Ini menyebabkan laporan lama yang
+//   belum sampai tahap itu (misal masih 'menunggu_pelaksanaan' atau bahkan
+//   'terdistribusi') tidak pernah muncul untuk diputuskan Ka P4M.
+//   FIX: validasi status_boxing !== 'di_staff' DIHAPUS. Sekarang Ka P4M
+//   bisa memutuskan dari TAHAP MANAPUN — satu-satunya yang tetap diblokir
+//   adalah laporan yang statusnya sudah 'selesai' (supaya tidak diputuskan
+//   dua kali). Lihat KaP4MHasilTable.tsx untuk perubahan filter di sisi
+//   frontend yang sejalan dengan ini (sekarang menampilkan SEMUA laporan
+//   yang belum 'selesai', bukan cuma yang 'di_staff').
 
 const { pool } = require("../config/db");
 const { UNITS_UMUM } = require("../constants/unitsUmum");
@@ -617,6 +629,214 @@ async function getRekapitulasi(req, res) {
 }
 
 // ============================================================
+// 7b. UPLOAD ARSIP REKAP — POST /api/staf/rekap/arsip/upload
+//     Staf mengupload file Excel data tahun lalu (s/d 10 tahun
+//     ke belakang). Isi file dibaca lalu disimpan ke tabel
+//     arsip_rekapitulasi supaya bisa ikut ditampilkan rapi per
+//     tahun saat export Excel dibuat.
+// ============================================================
+const KOLOM_ALIAS = {
+  kode:         ["kode laporan", "kode"],
+  jenis:        ["jenis laporan", "jenis"],
+  tglMasuk:     ["tgl masuk", "tanggal masuk"],
+  uraian:       ["uraian ketidaksesuaian", "uraian"],
+  unit:         ["unit"],
+  penyebab:     ["penyebab"],
+  rencana:      ["rencana tindakan", "rencana"],
+  hasil:        ["hasil tindak lanjut", "hasil"],
+  tglPelaks:    ["tgl pelaksanaan", "tanggal pelaksanaan"],
+  statusReview: ["status review"],
+  statusBoxing: ["status proses", "status boxing"],
+};
+
+function cariBarisHeader(sheet) {
+  const batasBaris = Math.min(sheet.rowCount, 10);
+  for (let r = 1; r <= batasBaris; r++) {
+    const row = sheet.getRow(r);
+    const petaKolom = {};
+    let jumlahCocok = 0;
+
+    row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      const nilai = cell.value;
+      if (nilai == null) return;
+      const teks = String(typeof nilai === "object" ? (nilai.text ?? nilai.result ?? "") : nilai)
+        .trim()
+        .toLowerCase();
+      if (!teks) return;
+      for (const [key, alias] of Object.entries(KOLOM_ALIAS)) {
+        if (alias.includes(teks) && petaKolom[key] === undefined) {
+          petaKolom[key] = colNumber;
+          jumlahCocok++;
+        }
+      }
+    });
+
+    // Minimal 4 kolom penting terbaca supaya baris ini dianggap header valid
+    if (jumlahCocok >= 4) {
+      return { headerRowNum: r, petaKolom };
+    }
+  }
+  return null;
+}
+
+function ambilNilaiSel(row, colNumber) {
+  if (!colNumber) return null;
+  const cell = row.getCell(colNumber);
+  const nilai = cell?.value;
+  if (nilai == null) return null;
+  if (typeof nilai === "object") {
+    if (nilai.text) return String(nilai.text).trim() || null;
+    if (nilai.result != null) return String(nilai.result).trim() || null;
+    if (nilai instanceof Date) return nilai.toISOString().slice(0, 10);
+    return null;
+  }
+  const teks = String(nilai).trim();
+  return teks === "" ? null : teks;
+}
+
+async function uploadArsipRekap(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "File Excel wajib diunggah.",
+      });
+    }
+
+    const tahun = parseInt(req.body.tahun, 10);
+    const tahunSekarang = new Date().getFullYear();
+    if (!tahun || tahun < tahunSekarang - 10 || tahun > tahunSekarang) {
+      return res.status(400).json({
+        success: false,
+        message: `Tahun tidak valid. Pilih tahun antara ${tahunSekarang - 10} sampai ${tahunSekarang}.`,
+      });
+    }
+
+    const ExcelJS  = require("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+
+    // Ambil worksheet pertama yang bukan sheet "Ringkasan" (kalau file
+    // ini hasil export TUNTAS sebelumnya, sheet Ringkasan tidak berisi
+    // data baris laporan sehingga dilewati).
+    const sheet =
+      workbook.worksheets.find((ws) => ws.name.toLowerCase() !== "ringkasan") ||
+      workbook.worksheets[0];
+
+    if (!sheet) {
+      return res.status(400).json({
+        success: false,
+        message: "File Excel tidak berisi sheet data apa pun.",
+      });
+    }
+
+    const hasilHeader = cariBarisHeader(sheet);
+    if (!hasilHeader) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Format file tidak dikenali. Pastikan file memiliki kolom seperti hasil export TUNTAS (Kode Laporan, Uraian Ketidaksesuaian, Penyebab, dst).",
+      });
+    }
+    const { headerRowNum, petaKolom } = hasilHeader;
+
+    const barisSiapInsert = [];
+    for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
+      const row     = sheet.getRow(r);
+      const kode    = ambilNilaiSel(row, petaKolom.kode);
+      const uraian  = ambilNilaiSel(row, petaKolom.uraian);
+      if (!kode && !uraian) continue; // lewati baris kosong / baris "Tidak ada data"
+
+      barisSiapInsert.push([
+        tahun,
+        kode,
+        ambilNilaiSel(row, petaKolom.jenis),
+        ambilNilaiSel(row, petaKolom.tglMasuk),
+        uraian,
+        ambilNilaiSel(row, petaKolom.unit),
+        ambilNilaiSel(row, petaKolom.penyebab),
+        ambilNilaiSel(row, petaKolom.rencana),
+        ambilNilaiSel(row, petaKolom.hasil),
+        ambilNilaiSel(row, petaKolom.tglPelaks),
+        ambilNilaiSel(row, petaKolom.statusReview),
+        ambilNilaiSel(row, petaKolom.statusBoxing),
+        req.file.originalname,
+        req.user?.id ?? null,
+      ]);
+    }
+
+    if (barisSiapInsert.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Tidak ditemukan baris data yang bisa dibaca dari file ini.",
+      });
+    }
+
+    // Upload ulang utk tahun yang sama akan MENGGANTI (bukan menumpuk)
+    // arsip tahun tsb, supaya tidak terjadi data dobel kalau staf
+    // mengupload file yang sama / versi revisi.
+    await pool.query(`DELETE FROM arsip_rekapitulasi WHERE tahun = ?`, [tahun]);
+
+    const placeholder = barisSiapInsert.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").join(",");
+    await pool.query(
+      `INSERT INTO arsip_rekapitulasi
+        (tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian, unit,
+         penyebab, rencana_tindakan, hasil_tindakan, tgl_pelaksanaan, status_review,
+         status_boxing, nama_file_asal, diupload_oleh)
+       VALUES ${placeholder}`,
+      barisSiapInsert.flat()
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Berhasil mengimpor ${barisSiapInsert.length} baris data arsip tahun ${tahun}.`,
+      jumlah: barisSiapInsert.length,
+      tahun,
+    });
+  } catch (error) {
+    console.error("Error uploadArsipRekap:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal memproses file Excel. Pastikan file tidak rusak dan formatnya sesuai.",
+    });
+  }
+}
+
+// ============================================================
+// 7c. GET ARSIP REKAP — GET /api/staf/rekap/arsip
+//     Ambil data arsip (opsional filter ?tahun=2024), dipakai
+//     saat export Excel supaya data lama ikut disertakan rapi
+//     per tahun.
+// ============================================================
+async function getArsipRekap(req, res) {
+  try {
+    const { tahun } = req.query;
+    let query = `
+      SELECT tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian,
+             unit, penyebab, rencana_tindakan, hasil_tindakan, tgl_pelaksanaan,
+             status_review, status_boxing
+      FROM arsip_rekapitulasi`;
+    const params = [];
+    if (tahun) {
+      query += ` WHERE tahun = ?`;
+      params.push(tahun);
+    }
+    query += ` ORDER BY tahun DESC, tgl_masuk DESC, id_arsip ASC`;
+
+    const [rows] = await pool.query(query, params);
+    const tahunTersedia = [...new Set(rows.map((r) => r.tahun))].sort((a, b) => b - a);
+
+    return res.status(200).json({ success: true, data: rows, tahunTersedia });
+  } catch (error) {
+    console.error("Error getArsipRekap:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal mengambil data arsip rekapitulasi.",
+    });
+  }
+}
+
+// ============================================================
 // 8. APPROVAL STAF — PATCH /api/staf/approval-boxing
 //    Staf P4M menentukan: diterima atau ditolak setelah lihat hasil unit
 //    Body: { id_boxing, approval }  → approval: "diterima" | "ditolak"
@@ -636,6 +856,14 @@ async function getRekapitulasi(req, res) {
 //    Unit tinggal koreksi kalau memang ada yang salah. Yang dihapus
 //    hanya pelaksanaan_tindakan (hasil unit), karena itu memang
 //    bagian yang direvisi.
+//
+//    ✅ FIX BUG #4 (sesi ini): dulu ada validasi
+//    `if (row.status_boxing !== "di_staff") return 400 ...` yang
+//    memaksa Kepala Unit HARUS isi hasil pelaksanaan dulu sebelum
+//    Ka P4M bisa memutuskan apa pun. Sekarang Ka P4M bisa memutuskan
+//    "siap/tidak" dari TAHAP MANAPUN (terdistribusi / diproses /
+//    menunggu_pelaksanaan / di_staff) — cuma laporan yang SUDAH
+//    'selesai' yang diblokir, supaya tidak diputuskan dua kali.
 // ============================================================
 async function setApprovalStaf(req, res) {
   const { id_boxing, approval, catatan } = req.body;
@@ -666,15 +894,18 @@ async function setApprovalStaf(req, res) {
       });
     }
     const row = rows[0];
-    if (row.status_boxing !== "di_staff") {
+
+    // ✅ FIX BUG #4: validasi lama `!== "di_staff"` DIHAPUS.
+    // Sekarang cuma blokir laporan yang sudah 'selesai'.
+    if (row.status_boxing === "selesai") {
       return res.status(400).json({
         success: false,
-        message: "Approval hanya bisa dilakukan jika laporan sudah ada di Staf P4M (di_staff).",
+        message: "Laporan ini sudah berstatus Selesai, tidak bisa diputuskan ulang.",
       });
     }
 
     if (approval === "diterima") {
-      // ✅ FIX: langsung selesai, sekali jalan.
+      // ✅ FIX: langsung selesai, sekali jalan — dari tahap manapun.
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?, status = 'selesai'
@@ -688,7 +919,9 @@ async function setApprovalStaf(req, res) {
       // SUDAH ADA dibiarkan (TIDAK di-NULL-kan) — Kepala Unit tinggal
       // edit kalau memang ada yang salah, atau kirim ulang apa adanya
       // kalau sudah benar. Hanya status_review yang direset supaya
-      // kotaknya jadi editable lagi.
+      // kotaknya jadi editable lagi. Kalau laporan ini belum sampai
+      // tahap rancangan/pelaksanaan sama sekali, dua query di bawah
+      // otomatis jadi no-op (0 rows affected) — aman, tidak error.
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?
@@ -734,5 +967,7 @@ module.exports = {
   inputHasilPemantauan,
   setKeputusanBoxing,
   getRekapitulasi,
+  uploadArsipRekap,
+  getArsipRekap,
   setApprovalStaf,
 };

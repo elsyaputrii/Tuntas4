@@ -100,6 +100,12 @@ export const stafApi = {
 
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
+
+  // ── Arsip data tahun lalu (Upload Excel s/d 10 tahun ke belakang) ──
+  uploadArsipRekap: (formData: FormData) =>
+    apiFetch("/staf/rekap/arsip/upload", { method: "POST", body: formData }),
+  getArsipRekap: (tahun?: number) =>
+    apiFetch(`/staf/rekap/arsip${tahun ? `?tahun=${tahun}` : ""}`),
 };
 
 // ─────────────────────────────────────────────
