@@ -2,14 +2,16 @@
 // FILE: frontend/components/staff-p4m/tables/RecapitulationTable.tsx
 
 import { useState, useEffect, useCallback } from "react";
-import { stafApi } from "@/lib/api";
+import { stafApi, userApi } from "@/lib/api";
 import { exportExcel } from "@/lib/exportExcel";
 import { exportPDFRekap, type PdfKategori } from "@/lib/exportPdf";
 import {
   fmtTgl,
-  getWeekNumber,
   sameDay,
   toLocalDate,
+  getMonthWeeks,
+  getWeekOfMonth,
+  sameWeekOfMonth,
   getReopenAction,
   labelStatusLengkap,
 } from "@/lib/exportHelpers";
@@ -26,6 +28,9 @@ interface CalendarProps {
   highlightedDates: Set<string>;
 }
 
+/** Kalender kotak-kotak (grid) — dipakai berdampingan dengan dropdown picker.
+ *  Tanggal setelah hari ini otomatis abu-abu/tidak bisa diklik. Klik satu
+ *  tanggal akan langsung pindah ke mode "Harian" dengan tanggal itu. */
 function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: CalendarProps) {
   const [viewDate, setViewDate] = useState(new Date(selectedDate));
   const year  = viewDate.getFullYear();
@@ -34,6 +39,8 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
   const startOffset = rawFirstDay === 0 ? 6 : rawFirstDay - 1;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const today = new Date(); today.setHours(0,0,0,0);
+  const isCurrentViewMonth = year === today.getFullYear() && month === today.getMonth();
+  const isFutureViewMonth  = year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth());
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
@@ -42,7 +49,9 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
           className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 text-sm font-bold">‹</button>
         <span className="text-xs font-semibold text-gray-700">{BULAN_PANJANG[month]} {year}</span>
         <button onClick={()=>setViewDate(new Date(year,month+1,1))}
-          className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 text-sm font-bold">›</button>
+          disabled={isCurrentViewMonth}
+          title={isCurrentViewMonth ? "Tidak bisa melihat bulan setelah hari ini" : undefined}
+          className="w-7 h-7 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed flex items-center justify-center text-gray-600 text-sm font-bold">›</button>
       </div>
       <div className="grid grid-cols-7 mb-1">
         {["Sen","Sel","Rab","Kam","Jum","Sab","Min"].map(d=>(
@@ -58,23 +67,258 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
           const isSelected=sameDay(thisDate,selectedDate);
           const isToday=sameDay(thisDate,today);
           const hasData=highlightedDates.has(key);
+          const isFuture=thisDate.getTime()>today.getTime();
           return (
-            <button key={day} onClick={()=>onSelectDate(new Date(year,month,day))}
+            <button key={day} onClick={()=>{ if(!isFuture) onSelectDate(new Date(year,month,day)); }}
+              disabled={isFuture}
+              title={isFuture ? "Tidak bisa memilih tanggal setelah hari ini" : undefined}
               className={`w-7 h-7 text-[10px] rounded-full flex items-center justify-center mx-auto relative transition-all
-                ${isSelected?"bg-dark-header text-white font-bold":isToday?"bg-blue-100 text-blue-700 font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
+                ${isFuture?"text-gray-300 cursor-not-allowed":isSelected?"bg-dark-header text-white font-bold":isToday?"bg-blue-100 text-blue-700 font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
               {day}
-              {hasData&&<span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${isSelected?"bg-white/70":"bg-blue-polibatam"}`}/>}
+              {hasData&&!isFuture&&<span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${isSelected?"bg-white/70":"bg-blue-polibatam"}`}/>}
             </button>
           );
         })}
       </div>
+      {isFutureViewMonth && (
+        <p className="text-[9px] text-amber-600 text-center mt-1 italic">Menampilkan bulan mendatang — belum ada data</p>
+      )}
       <button onClick={()=>{setViewDate(new Date());onSelectDate(new Date());}}
         className="w-full mt-2 text-[10px] text-dark-header font-semibold hover:underline">Hari Ini</button>
     </div>
   );
 }
 
+interface DailyPickerProps {
+  selectedDate: Date;
+  onChange: (d: Date) => void;
+}
+
+/** Picker Tanggal (harian) — 3 dropdown Tanggal/Bulan/Tahun, tidak bisa melewati hari ini */
+function DailyPicker({ selectedDate, onChange }: DailyPickerProps) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const currentYear = today.getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
+
+  const selYear  = selectedDate.getFullYear();
+  const selMonth = selectedDate.getMonth();
+  const selDay   = selectedDate.getDate();
+
+  const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+  const isCurrentMonth = selYear === today.getFullYear() && selMonth === today.getMonth();
+  const maxDay = isCurrentMonth ? today.getDate() : daysInMonth;
+  const maxMonth = selYear === currentYear ? today.getMonth() : 11;
+
+  function set(day: number, month: number, year: number) {
+    // clamp supaya gak pernah lewat hari ini
+    let d = new Date(year, month, day);
+    if (d.getTime() > today.getTime()) d = new Date(today);
+    onChange(d);
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">📅 Pilih Tanggal</p>
+      <div className="grid grid-cols-3 gap-2">
+        <select
+          value={selDay}
+          onChange={(e)=>set(Number(e.target.value), selMonth, selYear)}
+          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+        >
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d} disabled={d > maxDay}>{d}</option>
+          ))}
+        </select>
+        <select
+          value={selMonth}
+          onChange={(e)=>set(Math.min(selDay, new Date(selYear, Number(e.target.value)+1, 0).getDate()), Number(e.target.value), selYear)}
+          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+        >
+          {BULAN_PANJANG.map((b, i) => (
+            <option key={b} value={i} disabled={selYear === currentYear && i > maxMonth}>{b}</option>
+          ))}
+        </select>
+        <select
+          value={selYear}
+          onChange={(e)=>{
+            const y = Number(e.target.value);
+            const m = y === currentYear ? Math.min(selMonth, today.getMonth()) : selMonth;
+            const dim = new Date(y, m + 1, 0).getDate();
+            const d = y === currentYear && m === today.getMonth() ? Math.min(selDay, today.getDate()) : Math.min(selDay, dim);
+            set(d, m, y);
+          }}
+          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+        >
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+      <button onClick={()=>onChange(new Date())}
+        className="w-full mt-2 text-[10px] text-dark-header font-semibold hover:underline">Hari Ini</button>
+    </div>
+  );
+}
+
+interface WeeklyPickerProps {
+  selectedDate: Date;
+  onChange: (d: Date) => void;
+}
+
+function fmtRange(d: Date) {
+  return `${d.getDate()} ${BULAN_PANJANG[d.getMonth()].slice(0,3)}`;
+}
+
+/** Picker Minggu (mingguan) — pilih Bulan+Tahun dulu, lalu pilih Minggu KE BERAPA
+ *  di dalam bulan itu (Minggu 1, Minggu 2, dst — reset tiap bulan, bukan minggu
+ *  ke-sekian dalam setahun). Tidak bisa melewati bulan/minggu yang belum sampai. */
+function WeeklyPicker({ selectedDate, onChange }: WeeklyPickerProps) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const currentYear = today.getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
+
+  const selYear  = selectedDate.getFullYear();
+  const selMonth = selectedDate.getMonth();
+  const maxMonth = selYear === currentYear ? today.getMonth() : 11;
+
+  const allWeeks = getMonthWeeks(selYear, selMonth);
+  const isCurrentMonth = selYear === today.getFullYear() && selMonth === today.getMonth();
+  const weeks = isCurrentMonth
+    ? allWeeks.filter((w) => w.start.getTime() <= today.getTime())
+    : allWeeks;
+  const activeWeekNum = getWeekOfMonth(selectedDate).weekNum;
+  const activeWeek = weeks.find((w) => w.weekNum === activeWeekNum) ?? weeks[weeks.length - 1];
+
+  function goToMonth(year: number, month: number) {
+    const ws = getMonthWeeks(year, month).filter(
+      (w) => !(year === today.getFullYear() && month === today.getMonth()) || w.start.getTime() <= today.getTime()
+    );
+    const last = ws[ws.length - 1];
+    if (last) onChange(new Date(last.start));
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">🗓️ Pilih Minggu</p>
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={selMonth}
+            onChange={(e)=>goToMonth(selYear, Number(e.target.value))}
+            className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+          >
+            {BULAN_PANJANG.map((b, i) => (
+              <option key={b} value={i} disabled={selYear === currentYear && i > maxMonth}>{b}</option>
+            ))}
+          </select>
+          <select
+            value={selYear}
+            onChange={(e)=>{
+              const y = Number(e.target.value);
+              const m = y === currentYear ? Math.min(selMonth, today.getMonth()) : selMonth;
+              goToMonth(y, m);
+            }}
+            className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+          >
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <select
+          value={activeWeek?.weekNum ?? 1}
+          onChange={(e)=>{
+            const w = weeks.find((w)=>w.weekNum === Number(e.target.value));
+            if (w) onChange(new Date(w.start));
+          }}
+          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+        >
+          {weeks.map((w) => (
+            <option key={w.weekNum} value={w.weekNum}>
+              Minggu {w.weekNum} · {fmtRange(w.start)} – {fmtRange(w.end)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button onClick={()=>onChange(new Date())}
+        className="w-full mt-2 text-[10px] text-dark-header font-semibold hover:underline">Minggu Ini</button>
+    </div>
+  );
+}
+
 type FilterMode = "semua"|"harian"|"mingguan"|"bulanan"|"tahunan";
+
+interface MonthYearPickerProps {
+  selectedDate: Date;
+  onChange: (d: Date) => void;
+}
+
+/** Picker Bulan + Tahun untuk mode "bulanan" — tidak bisa melewati bulan berjalan */
+function MonthYearPicker({ selectedDate, onChange }: MonthYearPickerProps) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) => currentYear - i); // 5 tahun terakhir + tahun ini
+  const selYear  = selectedDate.getFullYear();
+  const selMonth = selectedDate.getMonth();
+  const maxMonth = selYear === currentYear ? today.getMonth() : 11;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">📆 Pilih Bulan</p>
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={selMonth}
+          onChange={(e)=>{
+            const m = Number(e.target.value);
+            onChange(new Date(selYear, m, 1));
+          }}
+          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+        >
+          {BULAN_PANJANG.map((b, i) => (
+            <option key={b} value={i} disabled={selYear === currentYear && i > maxMonth}>{b}</option>
+          ))}
+        </select>
+        <select
+          value={selYear}
+          onChange={(e)=>{
+            const y = Number(e.target.value);
+            const m = y === currentYear ? Math.min(selMonth, today.getMonth()) : selMonth;
+            onChange(new Date(y, m, 1));
+          }}
+          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+        >
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+      <button onClick={()=>onChange(new Date(currentYear, today.getMonth(), 1))}
+        className="w-full mt-2 text-[10px] text-dark-header font-semibold hover:underline">Bulan Ini</button>
+    </div>
+  );
+}
+
+interface YearPickerProps {
+  selectedDate: Date;
+  onChange: (d: Date) => void;
+}
+
+/** Picker Tahun untuk mode "tahunan" — tidak bisa melewati tahun berjalan */
+function YearPicker({ selectedDate, onChange }: YearPickerProps) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const years = Array.from({ length: 8 }, (_, i) => currentYear - i); // 7 tahun terakhir + tahun ini
+  const selYear = selectedDate.getFullYear();
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">🗃️ Pilih Tahun</p>
+      <select
+        value={selYear}
+        onChange={(e)=>onChange(new Date(Number(e.target.value), selectedDate.getMonth(), selectedDate.getDate()))}
+        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+      >
+        {years.map((y) => <option key={y} value={y}>{y}</option>)}
+      </select>
+      <button onClick={()=>onChange(new Date())}
+        className="w-full mt-2 text-[10px] text-dark-header font-semibold hover:underline">Tahun Ini</button>
+    </div>
+  );
+}
 
 export default function RecapitulationTable() {
   const [rekapData,  setRekapData]  = useState<RekapItem[]>([]);
@@ -88,7 +332,20 @@ export default function RecapitulationTable() {
   const [exportingExcelLoading, setExportingExcelLoading] = useState(false);
   const [exportingPDF, setExportingPDF] = useState<PdfKategori|null>(null);
   const [pendingReopen, setPendingReopen] = useState<Set<number>>(new Set());
-  const [showCalendar, setShowCalendar] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [kaP4M, setKaP4M] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
+
+  useEffect(() => {
+    // Ambil data penandatangan (Kepala P4M) untuk ditempel di PDF Rekapitulasi
+    userApi.getUsers()
+      .then((list: Array<{ role: string; name: string; tandaTangan?: string | null }>) => {
+        const kepalaP4M = list.find((u) => u.role === "ka_p4m");
+        if (kepalaP4M) {
+          setKaP4M({ nama: kepalaP4M.name, tandaTangan: kepalaP4M.tandaTangan ?? null });
+        }
+      })
+      .catch(() => { /* nonfatal — PDF tetap bisa dicetak tanpa TTD */ });
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -142,7 +399,7 @@ export default function RecapitulationTable() {
     if(!tglMasuk) return false;
     const d = toLocalDate(tglMasuk);
     if(filterMode==="harian")   return sameDay(d,selectedDate);
-    if(filterMode==="mingguan") return d.getFullYear()===selectedDate.getFullYear()&&getWeekNumber(d)===getWeekNumber(selectedDate);
+    if(filterMode==="mingguan") return sameWeekOfMonth(d,selectedDate);
     if(filterMode==="bulanan")  return d.getFullYear()===selectedDate.getFullYear()&&d.getMonth()===selectedDate.getMonth();
     return d.getFullYear()===selectedDate.getFullYear();
   }
@@ -154,9 +411,10 @@ export default function RecapitulationTable() {
   const tidakDitindak   = filteredItems.filter(d=>d.statusReview==="tidak_ditindaklanjuti").length;
   const menungguCount   = filteredItems.filter(d=>!["ditindaklanjuti","tidak_ditindaklanjuti"].includes(d.statusReview)).length;
 
+  const mingguSelected = getWeekOfMonth(selectedDate);
   const labelFilter:Record<FilterMode,string>={
     semua:"Semua Waktu", harian:fmtTgl(selectedDate.toISOString()),
-    mingguan:`Minggu ke-${getWeekNumber(selectedDate)} / ${selectedDate.getFullYear()}`,
+    mingguan:`Minggu ${mingguSelected.weekNum} · ${mingguSelected.start.getDate()}–${mingguSelected.end.getDate()} ${BULAN_PANJANG[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
     bulanan:`${BULAN_PANJANG[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
     tahunan:`Tahun ${selectedDate.getFullYear()}`,
   };
@@ -189,10 +447,7 @@ export default function RecapitulationTable() {
       {/* Filter pill — scroll horizontal di HP */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
         {(["harian","mingguan","bulanan","tahunan","semua"] as FilterMode[]).map(mode=>(
-          <button key={mode} onClick={()=>{
-              setFilterMode(mode);
-              if (mode !== "harian") setCalendarResetKey(k => k + 1);
-            }}
+          <button key={mode} onClick={()=>{ setFilterMode(mode); setCalendarResetKey(k=>k+1); }}
             className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
               ${filterMode===mode?"bg-dark-header text-white border-dark-header shadow":"bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
             {mode==="semua"?"📋 Semua":mode==="harian"?"📅 Harian":mode==="mingguan"?"🗓️ Mingguan":mode==="bulanan"?"📆 Bulanan":"🗃️ Tahunan"}
@@ -200,22 +455,37 @@ export default function RecapitulationTable() {
         ))}
       </div>
 
-      {/* Toggle kalender — mobile only */}
+      {/* Toggle picker periode — mobile only */}
       <button
-        onClick={()=>setShowCalendar(v=>!v)}
+        onClick={()=>setShowPicker(v=>!v)}
         className="sm:hidden w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 shadow-sm"
       >
-        <span>📅 {showCalendar ? "Sembunyikan Kalender" : "Tampilkan Kalender"}</span>
-        <span>{showCalendar ? "▲" : "▼"}</span>
+        <span>📅 {showPicker ? "Sembunyikan Kalender & Filter" : "Kalender & Filter Periode"}</span>
+        <span>{showPicker ? "▲" : "▼"}</span>
       </button>
 
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Sidebar kalender */}
-        <div className={`${showCalendar ? "block" : "hidden"} sm:block sm:w-56 md:w-60 shrink-0 space-y-3`}>
+        {/* Sidebar: kalender kotak-kotak SELALU tampil, ditambah dropdown
+            picker sesuai mode filter yang aktif di bawahnya. Semua opsi
+            dibatasi supaya gak bisa pilih hari/minggu/bulan/tahun yang
+            belum sampai (masih di masa depan). */}
+        <div className={`${showPicker ? "block" : "hidden"} sm:block sm:w-56 md:w-60 shrink-0 space-y-3`}>
+          {filterMode === "harian" && (
+            <DailyPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
+          )}
+          {filterMode === "mingguan" && (
+            <WeeklyPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
+          )}
+          {filterMode === "bulanan" && (
+            <MonthYearPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
+          )}
+          {filterMode === "tahunan" && (
+            <YearPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
+          )}
           <MiniCalendar
             key={calendarResetKey}
             selectedDate={selectedDate}
-            onSelectDate={(d)=>{setSelectedDate(d);setFilterMode("harian");setShowCalendar(false);}}
+            onSelectDate={(d)=>{setSelectedDate(d);setFilterMode("harian");}}
             highlightedDates={highlightedDates}
           />
         </div>
@@ -274,7 +544,7 @@ export default function RecapitulationTable() {
         <span className="text-[9px] text-gray-400">PDF:</span>
         {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
           <button key={kat}
-            onClick={()=>{ setExportingPDF(kat); exportPDFRekap(rekapData,prosesData,kat,selectedDate); setExportingPDF(null); }}
+            onClick={()=>{ setExportingPDF(kat); exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M); setExportingPDF(null); }}
             disabled={exportingPDF===kat}
             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
             📄 {kat.charAt(0).toUpperCase()+kat.slice(1)}

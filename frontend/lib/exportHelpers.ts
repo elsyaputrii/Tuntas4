@@ -35,7 +35,9 @@ export function fmtTglWaktu(iso: string | null): string {
   return `${fmtTgl(iso)}, ${jam}:${mnt}`;
 }
 
-/** Nomor minggu ISO */
+/** Nomor minggu ISO (dalam setahun) — dipertahankan untuk kompatibilitas, tapi
+ *  UI filter sekarang pakai getMonthWeeks/getWeekOfMonth (minggu dalam BULAN,
+ *  lebih gampang dipahami: "Minggu 1", "Minggu 2" dst per bulan berjalan). */
 export function getWeekNumber(d: Date): number {
   const date = new Date(d);
   date.setHours(0, 0, 0, 0);
@@ -50,6 +52,48 @@ export function getWeekNumber(d: Date): number {
         7
     )
   );
+}
+
+export interface WeekOfMonth {
+  weekNum: number;
+  start: Date;
+  end: Date;
+}
+
+/** Pecah satu bulan jadi blok Senin–Minggu (dipotong di awal/akhir bulan),
+ *  diberi nomor 1,2,3,... mulai dari awal bulan itu sendiri.
+ *  Contoh Juli 2026 (1 Jul = Rabu): Minggu 1 = 1–5 Jul, Minggu 2 = 6–12 Jul, dst. */
+export function getMonthWeeks(year: number, month: number): WeekOfMonth[] {
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const weeks: WeekOfMonth[] = [];
+  let cursor = 1;
+  let weekNum = 1;
+  while (cursor <= lastDate) {
+    const start = new Date(year, month, cursor);
+    const dayOfWeek = (start.getDay() + 6) % 7; // 0 = Senin
+    const daysUntilSunday = 6 - dayOfWeek;
+    let endDay = cursor + daysUntilSunday;
+    if (endDay > lastDate) endDay = lastDate;
+    const end = new Date(year, month, endDay);
+    weeks.push({ weekNum, start, end });
+    cursor = endDay + 1;
+    weekNum += 1;
+  }
+  return weeks;
+}
+
+/** Cari blok minggu (dalam bulan yang sama dengan tanggal itu) yang memuat tanggal ini */
+export function getWeekOfMonth(d: Date): WeekOfMonth {
+  const weeks = getMonthWeeks(d.getFullYear(), d.getMonth());
+  const day = d.getDate();
+  return weeks.find((w) => day >= w.start.getDate() && day <= w.end.getDate()) ?? weeks[weeks.length - 1];
+}
+
+/** Dua tanggal dianggap "satu minggu yang sama" kalau tahun+bulan sama DAN
+ *  masuk ke blok minggu (dalam bulan) yang sama. */
+export function sameWeekOfMonth(a: Date, b: Date): boolean {
+  if (a.getFullYear() !== b.getFullYear() || a.getMonth() !== b.getMonth()) return false;
+  return getWeekOfMonth(a).weekNum === getWeekOfMonth(b).weekNum;
 }
 
 /**

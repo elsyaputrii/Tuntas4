@@ -12,7 +12,11 @@
 // pengguna.id_pengguna.
 
 const bcrypt = require("bcryptjs");
+const fs = require("fs");
+const path = require("path");
 const { pool } = require("../config/db");
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
 
 const ROLE_FE_TO_DB = { staff_p4m: "staf_p4m", kepala_unit: "kepala_unit", ka_p4m: "ka_p4m" };
 const ROLE_DB_TO_FE = { staf_p4m: "staff_p4m", kepala_unit: "kepala_unit", ka_p4m: "ka_p4m" };
@@ -32,6 +36,7 @@ async function getUsers(req, res) {
         p.email       AS email,
         p.role        AS role,
         p.status      AS status,
+        p.tanda_tangan AS tandaTangan,
         p.created_at  AS createdAt,
         COALESCE(s.nip, k.nip, kp.nip)         AS nip,
         COALESCE(s.no_telp, '')                AS phone,
@@ -208,4 +213,80 @@ async function deleteUser(req, res) {
   }
 }
 
-module.exports = { getUsers, createUser, updateUser, deleteUser };
+// ── POST /api/users/:id/tanda-tangan — upload gambar TTD akun ────────
+// Dipakai halaman Data Akun agar Staf P4M / Ka P4M / Kepala Unit punya
+// tanda tangan digital yang otomatis ditempel di dokumen PDF (mis.
+// PDF Rekapitulasi), mirip tanda tangan digital di dokumen bank.
+async function uploadTandaTangan(req, res) {
+  const { id } = req.params;
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "Tidak ada file tanda tangan yang diunggah." });
+  }
+
+  try {
+    const [existing] = await pool.query(
+      "SELECT id_pengguna, tanda_tangan FROM pengguna WHERE id_pengguna = ?",
+      [id]
+    );
+    if (existing.length === 0) {
+      // hapus file yang sudah kepalang di-upload multer karena akun tidak ada
+      fs.unlink(path.join(UPLOAD_DIR, req.file.filename), () => {});
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    // hapus file TTD lama (kalau ada) supaya folder uploads tidak menumpuk
+    const fileLama = existing[0].tanda_tangan;
+    if (fileLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fileLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET tanda_tangan = ? WHERE id_pengguna = ?", [
+      req.file.filename,
+      id,
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Tanda tangan berhasil diunggah.",
+      tandaTangan: req.file.filename,
+    });
+  } catch (error) {
+    console.error("Error uploadTandaTangan:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengunggah tanda tangan." });
+  }
+}
+
+// ── DELETE /api/users/:id/tanda-tangan — hapus gambar TTD akun ───────
+async function deleteTandaTangan(req, res) {
+  const { id } = req.params;
+  try {
+    const [existing] = await pool.query(
+      "SELECT tanda_tangan FROM pengguna WHERE id_pengguna = ?",
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    const fileLama = existing[0].tanda_tangan;
+    if (fileLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fileLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET tanda_tangan = NULL WHERE id_pengguna = ?", [id]);
+    return res.status(200).json({ success: true, message: "Tanda tangan berhasil dihapus." });
+  } catch (error) {
+    console.error("Error deleteTandaTangan:", error);
+    return res.status(500).json({ success: false, message: "Gagal menghapus tanda tangan." });
+  }
+}
+
+module.exports = {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  uploadTandaTangan,
+  deleteTandaTangan,
+};

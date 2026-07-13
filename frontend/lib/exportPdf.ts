@@ -10,11 +10,23 @@ import {
   fmtTglWaktu,
   labelStatusReview,
   labelStatusBoxing,
-  getWeekNumber,
+  getWeekOfMonth,
+  sameWeekOfMonth,
   sameDay,
 } from "./exportHelpers";
 
 export type PdfKategori = "harian" | "mingguan" | "bulanan" | "tahunan";
+
+// Base URL backend (tanpa /api) — dipakai untuk membangun URL gambar lampiran
+// hasil tindak lanjut (foto perbaikan dari Kepala Unit) dan gambar tanda tangan.
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
+
+function getUploadUrl(file: string | null | undefined): string | null {
+  if (!file) return null;
+  if (file.startsWith("http://") || file.startsWith("https://")) return file;
+  if (file.startsWith("uploads/")) return `${BASE_URL}/${file}`;
+  return `${BASE_URL}/uploads/${file}`;
+}
 
 const BULAN_PANJANG = [
   "Januari","Februari","Maret","April","Mei","Juni",
@@ -44,12 +56,25 @@ const BASE_CSS = `
   .badge-yellow { background:#fef3c7; color:#92400e; }
   .badge-blue   { background:#dbeafe; color:#1e40af; }
   .badge-gray   { background:#f3f4f6; color:#374151; }
-  @media print { body { padding:8px; } @page { size:A4 landscape; margin:12mm; } }
+  .hasil-img { display:block; margin-top:5px; max-width:90px; max-height:70px; object-fit:cover; border:1px solid #cbd5e1; border-radius:3px; }
+  .hasil-img-cap { display:block; font-size:7.5pt; color:#94a3b8; font-style:italic; margin-top:1px; }
+  .ttd .signature-img { display:block; max-height:58px; max-width:170px; margin:8px auto 2px; object-fit:contain; }
+  .ttd .signature-placeholder { height:64px; }
+  .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px;
+    padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold;
+    cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
+  .close-btn:hover { background:#3a4d5e; }
+  @media print { body { padding:8px; } @page { size:A4 landscape; margin:12mm; } tr { page-break-inside:avoid; } .close-btn { display:none !important; } }
 `;
 
-// ─── FIX: printWindow sekarang auto-close popup setelah print ───
-// Sebelumnya popup tidak pernah ditutup → menyebabkan Next.js
-// router bingung dan halaman parent loading terus / hilang.
+// ─── FIX: window PDF TIDAK auto-close lagi ──────────────────────
+// Sebelumnya dipasang auto-close via event 'afterprint', tapi ini
+// menyebabkan bug: begitu user pilih "Save as PDF" (bukan Cancel),
+// proses simpan file di OS/browser masih berjalan di belakang layar
+// saat 'afterprint' ditembak duluan → window dipaksa close() padahal
+// dialog simpan file belum selesai → nge-freeze/error.
+// Sekarang window dibiarkan terbuka apa pun aksinya (print/save/cancel),
+// dan user tutup sendiri lewat tombol "✕ Tutup" di pojok halaman.
 function printWindow(html: string) {
   const win = window.open("", "_blank", "width=1100,height=750");
   if (!win) {
@@ -58,27 +83,18 @@ function printWindow(html: string) {
   }
   win.document.write(html);
   win.document.close();
-
-  // Tutup popup otomatis setelah user selesai dengan dialog print
-  // (baik print maupun cancel)
-  win.addEventListener("afterprint", () => {
-    win.close();
-  });
 }
 
-// ─── Script tag yang dipakai di setiap HTML template ────────
-// afterprint sudah handle close, tapi tambah fallback kecil
-// via focus kembali ke parent supaya Next.js tidak kehilangan context
+// ─── Script + tombol tutup manual — dipakai di setiap HTML template ──
 const PRINT_SCRIPT = `
 <script>
   window.onload = function() {
     window.print();
   };
-  window.addEventListener('afterprint', function() {
-    window.close();
-  });
 </script>
 `;
+
+const CLOSE_BUTTON = `<button class="close-btn" onclick="window.close()" title="Tutup halaman ini">✕ Tutup</button>`;
 
 // ═══════════════════════════════════════════════════════════════
 // 1. PDF REKAPITULASI — per kategori waktu
@@ -87,16 +103,14 @@ export function exportPDFRekap(
   rekapData: RekapItem[],
   prosesData: ProsesItem[],
   kategori: PdfKategori,
-  selectedDate: Date
+  selectedDate: Date,
+  penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null
 ) {
   function isInRange(iso: string | null): boolean {
     if (!iso) return false;
     const d = new Date(iso);
     if (kategori === "harian")   return sameDay(d, selectedDate);
-    if (kategori === "mingguan") return (
-      d.getFullYear() === selectedDate.getFullYear() &&
-      getWeekNumber(d) === getWeekNumber(selectedDate)
-    );
+    if (kategori === "mingguan") return sameWeekOfMonth(d, selectedDate);
     if (kategori === "bulanan")  return (
       d.getFullYear() === selectedDate.getFullYear() &&
       d.getMonth()    === selectedDate.getMonth()
@@ -110,9 +124,10 @@ export function exportPDFRekap(
   const filteredSelesai  = rekapData.filter((d) => isInRange(d.created_at ?? null));
   const filteredDipantau = dipantauData.filter((p) => isInRange(p.created_at ?? null));
 
+  const mingguIni = getWeekOfMonth(selectedDate);
   const labelKat: Record<PdfKategori, string> = {
     harian:   `Tanggal ${fmtTgl(selectedDate.toISOString())}`,
-    mingguan: `Minggu ke-${getWeekNumber(selectedDate)} / ${selectedDate.getFullYear()}`,
+    mingguan: `Minggu ${mingguIni.weekNum} ${BULAN_PANJANG[selectedDate.getMonth()]} ${selectedDate.getFullYear()} (${mingguIni.start.getDate()}–${mingguIni.end.getDate()} ${BULAN_PANJANG[selectedDate.getMonth()]})`,
     bulanan:  `${BULAN_PANJANG[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
     tahunan:  `Tahun ${selectedDate.getFullYear()}`,
   };
@@ -126,6 +141,7 @@ export function exportPDFRekap(
     penyebab: d.penyebab ?? "—",
     rencana: d.rencana_tindakan ?? "—",
     hasil: d.hasil_tindakan ?? "—",
+    lampiranHasil: d.lampiran_hasil ?? null,
     tgl: fmtTgl(d.tanggal_pelaksanaan),
     statusReview: d.status_review ?? "",
     isSelesai: true,
@@ -140,12 +156,16 @@ export function exportPDFRekap(
     penyebab: p.penyebab ?? "—",
     rencana: p.rencana_tindakan ?? "—",
     hasil: p.hasil_tindakan ?? "—",
+    lampiranHasil: p.lampiran_hasil ?? null,
     tgl: fmtTgl(p.tanggal_pelaksanaan),
     statusReview: p.status_review ?? "",
     isSelesai: false,
   }));
 
   const allRows = [...selesaiRows, ...dipantauRows];
+
+  const signatureUrl = getUploadUrl(penandatangan?.tandaTangan ?? null);
+  const namaPenandatangan = penandatangan?.nama?.trim() || "_________________";
 
   function badgeReview(sr: string) {
     if (sr === "ditindaklanjuti")       return `<span class="badge badge-green">✓ Ditindaklanjuti</span>`;
@@ -154,7 +174,9 @@ export function exportPDFRekap(
     return `<span class="badge badge-gray">—</span>`;
   }
 
-  const tableRows = allRows.map((r) => `
+  const tableRows = allRows.map((r) => {
+    const gambarUrl = getUploadUrl(r.lampiranHasil);
+    return `
     <tr>
       <td class="center">${r.no}</td>
       <td class="center" style="font-weight:bold;font-size:8pt">${r.kode}</td>
@@ -163,7 +185,13 @@ export function exportPDFRekap(
       <td class="center">${r.unit}</td>
       <td>${r.penyebab}</td>
       <td>${r.rencana}</td>
-      <td>${r.hasil}</td>
+      <td>
+        ${r.hasil}
+        ${gambarUrl ? `
+          <img src="${gambarUrl}" class="hasil-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
+          <span class="hasil-img-cap">Foto hasil perbaikan Kepala Unit</span>
+        ` : ""}
+      </td>
       <td class="center">${r.tgl}</td>
       <td class="center">${badgeReview(r.statusReview)}</td>
       <td class="center">
@@ -171,13 +199,15 @@ export function exportPDFRekap(
           ${r.isSelesai ? "Selesai" : "Dipantau"}
         </span>
       </td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
 <title>Rekap — ${labelKat[kategori]}</title>
 <style>${BASE_CSS}</style>
 </head><body>
+${CLOSE_BUTTON}
 <div class="header">
   <h1>TUNTAS — Politeknik Negeri Batam</h1>
   <h2>Laporan Rekapitulasi Ketidaksesuaian</h2>
@@ -207,8 +237,13 @@ export function exportPDFRekap(
   </div>
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
-    <div class="name">( _________________ )</div>
     <p style="margin-top:4px;">Kepala P4M,</p>
+    ${
+      signatureUrl
+        ? `<img src="${signatureUrl}" class="signature-img" alt="Tanda tangan" onerror="this.style.display='none';this.nextElementSibling.style.marginTop='64px'"/>`
+        : `<div class="signature-placeholder"></div>`
+    }
+    <div class="name" style="margin-top:4px;">( ${namaPenandatangan} )</div>
   </div>
 </div>
 ${PRINT_SCRIPT}
@@ -237,7 +272,14 @@ export interface ProsesDetailItem {
   created_at?: string | null;
 }
 
-export function exportPDFProses(item: ProsesDetailItem) {
+export function exportPDFProses(
+  item: ProsesDetailItem,
+  penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null
+) {
+  const gambarHasilUrl = getUploadUrl(item.lampiran_hasil);
+  const signatureUrl = getUploadUrl(penandatangan?.tandaTangan ?? null);
+  const namaPenandatangan = penandatangan?.nama?.trim() || "_________________";
+
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
 <title>Laporan ${item.kode_laporan}</title>
@@ -249,9 +291,12 @@ export function exportPDFProses(item: ProsesDetailItem) {
   .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
   .field .val { color:#111; flex:1; }
   .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
+  .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
+  .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
   @media print { @page { size:A4 portrait; margin:15mm; } }
 </style>
 </head><body>
+${CLOSE_BUTTON}
 <div class="header">
   <h1>TUNTAS — Politeknik Negeri Batam</h1>
   <h2>Laporan Ketidaksesuaian</h2>
@@ -294,15 +339,26 @@ ${item.aksi_masukan ? `
   ${item.tanggal_pelaksanaan
     ? `<div class="field"><span class="lbl">Tanggal Pelaksanaan</span><span class="val">${fmtTgl(item.tanggal_pelaksanaan)}</span></div>`
     : ""}
-  <div class="box">${item.hasil_tindakan ?? "<em style='color:#9ca3af'>Belum ada hasil</em>"}</div>
+  <div class="box">
+    ${item.hasil_tindakan ?? "<em style='color:#9ca3af'>Belum ada hasil</em>"}
+    ${gambarHasilUrl ? `
+      <img src="${gambarHasilUrl}" class="box-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
+      <span class="box-img-cap">Foto hasil perbaikan dari Kepala Unit</span>
+    ` : ""}
+  </div>
 </div>
 
 <div class="footer">
   <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p></div>
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
-    <div class="name">( _________________ )</div>
     <p style="margin-top:4px;">Staff P4M,</p>
+    ${
+      signatureUrl
+        ? `<img src="${signatureUrl}" class="signature-img" alt="Tanda tangan" onerror="this.style.display='none';this.nextElementSibling.style.marginTop='64px'"/>`
+        : `<div class="signature-placeholder"></div>`
+    }
+    <div class="name" style="margin-top:4px;">( ${namaPenandatangan} )</div>
   </div>
 </div>
 ${PRINT_SCRIPT}

@@ -2,7 +2,7 @@
 // FILE: frontend/components/staff-p4m/tables/ProcessMonitorTable.tsx
 
 import { useState, useEffect } from "react";
-import { stafApi } from "@/lib/api";
+import { stafApi, authApi, userApi } from "@/lib/api";
 import { exportPDFProses } from "@/lib/exportPdf";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -76,8 +76,28 @@ export default function ProcessMonitorTable() {
   const [error, setError] = useState("");
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [meSignature, setMeSignature] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    // Ambil TTD digital Staf P4M yang sedang login, buat ditempel di PDF
+    // "Proses & Pantau" (bukan TTD Kepala P4M — beda dari PDF Rekapitulasi).
+    (async () => {
+      try {
+        const me = await authApi.getMe();
+        const users = await userApi.getUsers();
+        const myAccount = users.find(
+          (u: { id: number; name: string; tandaTangan?: string | null }) => u.id === me.data?.id
+        );
+        if (myAccount) {
+          setMeSignature({ nama: myAccount.name, tandaTangan: myAccount.tandaTangan ?? null });
+        }
+      } catch {
+        /* nonfatal — PDF tetap bisa dicetak tanpa TTD */
+      }
+    })();
+  }, []);
 
   async function fetchData() {
     try {
@@ -115,7 +135,7 @@ export default function ProcessMonitorTable() {
       lampiran_hasil: item.lampiran_hasil,
       tanggal_pelaksanaan: item.tanggal_pelaksanaan,
       created_at: item.created_at,
-    });
+    }, meSignature);
     setTimeout(() => setExportingId(null), 1200);
   }
 

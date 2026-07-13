@@ -101,11 +101,24 @@ router.patch("/keputusan", async (req, res) => {
     }
 
     const row = rows[0];
-    if (row.status_review !== "menunggu_keputusan_ka") {
+    // ✅ FIX: sebelumnya endpoint ini menolak (400) kalau status_review
+    // sudah bukan "menunggu_keputusan_ka" lagi. Itu bikin fitur "Edit
+    // Keputusan" (tombol pensil kuning di tabel) tidak pernah bisa
+    // dipakai, karena tombol itu justru muncul untuk rancangan yang
+    // SUDAH diputuskan (ditindaklanjuti / tidak_ditindaklanjuti).
+    // Sekarang endpoint ini boleh dipanggil ulang untuk kedua status
+    // tersebut (mode edit), dan hanya menolak kalau rancangan belum
+    // pernah diputuskan sama sekali dalam kondisi yang tidak valid.
+    const editableStatus = [
+      "menunggu_keputusan_ka",
+      "ditindaklanjuti",
+      "tidak_ditindaklanjuti",
+    ];
+    if (!editableStatus.includes(row.status_review)) {
       conn.release();
       return res.status(400).json({
         success: false,
-        message: "Rancangan ini sudah diputuskan sebelumnya.",
+        message: "Rancangan ini tidak bisa diputuskan pada tahap ini.",
       });
     }
 

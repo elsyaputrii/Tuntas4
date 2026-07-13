@@ -166,4 +166,12 @@ export const userApi = {
     apiFetch(`/users/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteUser: (id: number) =>
     apiFetch(`/users/${id}`, { method: "DELETE" }),
+  // Tanda tangan (TTD) digital akun — ditempel otomatis di PDF
+  uploadTandaTangan: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append("tanda_tangan", file);
+    return apiFetch(`/users/${id}/tanda-tangan`, { method: "POST", body: formData });
+  },
+  deleteTandaTangan: (id: number) =>
+    apiFetch(`/users/${id}/tanda-tangan`, { method: "DELETE" }),
 };

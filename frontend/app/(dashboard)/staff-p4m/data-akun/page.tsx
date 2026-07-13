@@ -14,8 +14,13 @@ import {
   Briefcase,
   UserCog,
   X,
+  PenTool,
+  Upload,
+  Trash,
 } from "lucide-react";
 import { userApi } from "@/lib/api";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
 interface User {
   id: number;
@@ -29,6 +34,7 @@ interface User {
   lastLogin: string;
   createdAt: string;
   password?: string;
+  tandaTangan?: string | null;
 }
 
 export default function DataAkunPage() {
@@ -51,6 +57,9 @@ export default function DataAkunPage() {
     status: "active",
     password: "",
   });
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+  const [uploadingSignature, setUploadingSignature] = useState(false);
 
   // Fetch data dari backend
   useEffect(() => {
@@ -133,6 +142,8 @@ export default function DataAkunPage() {
   const openEditModal = (user: User) => {
     setSelectedUser(user);
     setFormData({ ...user, password: "" });
+    setSignatureFile(null);
+    setSignaturePreview(user.tandaTangan ? `${BASE_URL}/uploads/${user.tandaTangan}` : null);
     setIsModalOpen(true);
   };
 
@@ -148,12 +159,71 @@ export default function DataAkunPage() {
       status: "active",
       password: "",
     });
+    setSignatureFile(null);
+    setSignaturePreview(null);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedUser(null);
+    setSignatureFile(null);
+    setSignaturePreview(null);
+  };
+
+  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const tipeDiizinkan = ["image/jpeg", "image/png", "image/webp"];
+    if (!tipeDiizinkan.includes(file.type)) {
+      alert("Format tidak didukung. Gunakan PNG, JPG, atau WEBP.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Ukuran file maksimal 2MB.");
+      return;
+    }
+    setSignatureFile(file);
+    setSignaturePreview(URL.createObjectURL(file));
+  };
+
+  const handleUploadSignature = async () => {
+    if (!selectedUser || !signatureFile) return;
+    setUploadingSignature(true);
+    try {
+      const res = await userApi.uploadTandaTangan(selectedUser.id, signatureFile);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === selectedUser.id ? { ...u, tandaTangan: res.tandaTangan } : u))
+      );
+      setSelectedUser((prev) => (prev ? { ...prev, tandaTangan: res.tandaTangan } : prev));
+      setSignatureFile(null);
+      alert("Tanda tangan berhasil diunggah.");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error("Error uploadTandaTangan:", error);
+      alert(`Gagal mengunggah tanda tangan: ${error.message || "Silakan coba lagi"}`);
+    } finally {
+      setUploadingSignature(false);
+    }
+  };
+
+  const handleDeleteSignature = async () => {
+    if (!selectedUser) return;
+    const ok = confirm("Hapus tanda tangan akun ini?");
+    if (!ok) return;
+    try {
+      await userApi.deleteTandaTangan(selectedUser.id);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === selectedUser.id ? { ...u, tandaTangan: null } : u))
+      );
+      setSelectedUser((prev) => (prev ? { ...prev, tandaTangan: null } : prev));
+      setSignaturePreview(null);
+      setSignatureFile(null);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error("Error deleteTandaTangan:", error);
+      alert(`Gagal menghapus tanda tangan: ${error.message || "Silakan coba lagi"}`);
+    }
   };
 
   const stats = {
@@ -352,7 +422,14 @@ export default function DataAkunPage() {
                         {user.name.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-medium text-slate-700 dark:text-white">{user.name}</p>
+                        <p className="font-medium text-slate-700 dark:text-white flex items-center gap-1.5">
+                          {user.name}
+                          {user.tandaTangan && (
+                            <span title="Sudah punya tanda tangan digital" className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-50 text-blue-500">
+                              <PenTool size={10} />
+                            </span>
+                          )}
+                        </p>
                         <p className="text-sm text-slate-400 flex items-center gap-1">
                           <Mail size={12} className="text-slate-300" /> {user.email}
                         </p>
@@ -541,6 +618,62 @@ export default function DataAkunPage() {
                     className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
                   />
                 </div>
+              </div>
+
+              {/* Tanda Tangan (TTD) Digital — hanya untuk akun yang sudah tersimpan */}
+              <div className="border-t border-slate-100 dark:border-slate-700 pt-5">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
+                  <PenTool size={16} className="text-slate-400" />
+                  Tanda Tangan (TTD) Digital
+                </label>
+
+                {!selectedUser ? (
+                  <p className="text-sm text-slate-400 italic bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-600 rounded-lg p-3">
+                    Simpan akun baru ini terlebih dahulu, lalu buka menu Edit untuk mengunggah tanda tangan.
+                  </p>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg p-3">
+                    <div className="w-32 h-20 shrink-0 border border-slate-200 dark:border-slate-600 rounded-lg bg-white flex items-center justify-center overflow-hidden">
+                      {signaturePreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={signaturePreview} alt="Pratinjau tanda tangan" className="max-w-full max-h-full object-contain" />
+                      ) : (
+                        <span className="text-[10px] text-slate-300 italic px-2 text-center">Belum ada tanda tangan</span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-xs text-slate-400">
+                        Gambar tanda tangan ini akan otomatis ditempel pada dokumen PDF yang dicetak sistem
+                        (mis. PDF Rekapitulasi), seperti tanda tangan digital pada dokumen bank. Format PNG/JPG/WEBP, maks. 2MB — gunakan gambar dengan latar transparan/putih untuk hasil terbaik.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                          <Upload size={14} />
+                          Pilih Gambar
+                          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleSignatureChange} />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleUploadSignature}
+                          disabled={!signatureFile || uploadingSignature}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-500 disabled:bg-blue-200 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        >
+                          {uploadingSignature ? "Mengunggah..." : "Unggah"}
+                        </button>
+                        {selectedUser.tandaTangan && (
+                          <button
+                            type="button"
+                            onClick={handleDeleteSignature}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-rose-50 text-rose-500 border border-rose-100 rounded-lg hover:bg-rose-100 transition-colors"
+                          >
+                            <Trash size={14} />
+                            Hapus
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
