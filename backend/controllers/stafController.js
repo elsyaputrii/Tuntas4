@@ -66,18 +66,6 @@
 //   salah, atau kirim ulang apa adanya kalau penyebab/rencananya sudah
 //   benar. pelaksanaan_tindakan (hasil unit) tetap dihapus, karena itu
 //   memang bagian yang mau direvisi.
-//
-// BUG #4 — [setApprovalStaf] Ka P4M tidak bisa memutuskan "siap/tidak"
-//   kecuali status_boxing sudah 'di_staff' (artinya Kepala Unit HARUS
-//   sudah isi hasil pelaksanaan dulu). Ini menyebabkan laporan lama yang
-//   belum sampai tahap itu (misal masih 'menunggu_pelaksanaan' atau bahkan
-//   'terdistribusi') tidak pernah muncul untuk diputuskan Ka P4M.
-//   FIX: validasi status_boxing !== 'di_staff' DIHAPUS. Sekarang Ka P4M
-//   bisa memutuskan dari TAHAP MANAPUN — satu-satunya yang tetap diblokir
-//   adalah laporan yang statusnya sudah 'selesai' (supaya tidak diputuskan
-//   dua kali). Lihat KaP4MHasilTable.tsx untuk perubahan filter di sisi
-//   frontend yang sejalan dengan ini (sekarang menampilkan SEMUA laporan
-//   yang belum 'selesai', bukan cuma yang 'di_staff').
 
 const { pool } = require("../config/db");
 const { UNITS_UMUM } = require("../constants/unitsUmum");
@@ -716,11 +704,24 @@ async function uploadArsipRekap(req, res) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
 
-    // Ambil worksheet pertama yang bukan sheet "Ringkasan" (kalau file
-    // ini hasil export TUNTAS sebelumnya, sheet Ringkasan tidak berisi
-    // data baris laporan sehingga dilewati).
+    // ✅ DIPERBAIKI: sebelumnya kode ini asal ambil "sheet pertama yang
+    // bukan Ringkasan", sehingga kalau file yang diupload adalah hasil
+    // export TUNTAS (yang punya banyak sheet: Ringkasan, Laporan Masih
+    // Dipantau, Laporan Selesai, Arsip ...), yang kebaca malah sheet
+    // "Laporan Masih Dipantau" (karena urutannya duluan), bukan sheet
+    // "Laporan Selesai" yang seharusnya diarsipkan.
+    //
+    // Sekarang urutan prioritasnya:
+    //   1. Sheet yang namanya mengandung "selesai"      → paling diutamakan
+    //   2. Sheet yang bukan "ringkasan"/"masih dipantau" → alternatif aman
+    //   3. Sheet pertama yang bukan "ringkasan"
+    //   4. Sheet pertama apa pun (fallback terakhir)
     const sheet =
-      workbook.worksheets.find((ws) => ws.name.toLowerCase() !== "ringkasan") ||
+      workbook.worksheets.find((ws) => /selesai/i.test(ws.name)) ||
+      workbook.worksheets.find(
+        (ws) => !/ringkasan/i.test(ws.name) && !/masih.?dipantau/i.test(ws.name)
+      ) ||
+      workbook.worksheets.find((ws) => !/ringkasan/i.test(ws.name)) ||
       workbook.worksheets[0];
 
     if (!sheet) {
@@ -856,14 +857,6 @@ async function getArsipRekap(req, res) {
 //    Unit tinggal koreksi kalau memang ada yang salah. Yang dihapus
 //    hanya pelaksanaan_tindakan (hasil unit), karena itu memang
 //    bagian yang direvisi.
-//
-//    ✅ FIX BUG #4 (sesi ini): dulu ada validasi
-//    `if (row.status_boxing !== "di_staff") return 400 ...` yang
-//    memaksa Kepala Unit HARUS isi hasil pelaksanaan dulu sebelum
-//    Ka P4M bisa memutuskan apa pun. Sekarang Ka P4M bisa memutuskan
-//    "siap/tidak" dari TAHAP MANAPUN (terdistribusi / diproses /
-//    menunggu_pelaksanaan / di_staff) — cuma laporan yang SUDAH
-//    'selesai' yang diblokir, supaya tidak diputuskan dua kali.
 // ============================================================
 async function setApprovalStaf(req, res) {
   const { id_boxing, approval, catatan } = req.body;
@@ -894,18 +887,15 @@ async function setApprovalStaf(req, res) {
       });
     }
     const row = rows[0];
-
-    // ✅ FIX BUG #4: validasi lama `!== "di_staff"` DIHAPUS.
-    // Sekarang cuma blokir laporan yang sudah 'selesai'.
-    if (row.status_boxing === "selesai") {
+    if (row.status_boxing !== "di_staff") {
       return res.status(400).json({
         success: false,
-        message: "Laporan ini sudah berstatus Selesai, tidak bisa diputuskan ulang.",
+        message: "Approval hanya bisa dilakukan jika laporan sudah ada di Staf P4M (di_staff).",
       });
     }
 
     if (approval === "diterima") {
-      // ✅ FIX: langsung selesai, sekali jalan — dari tahap manapun.
+      // ✅ FIX: langsung selesai, sekali jalan.
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?, status = 'selesai'
@@ -919,9 +909,7 @@ async function setApprovalStaf(req, res) {
       // SUDAH ADA dibiarkan (TIDAK di-NULL-kan) — Kepala Unit tinggal
       // edit kalau memang ada yang salah, atau kirim ulang apa adanya
       // kalau sudah benar. Hanya status_review yang direset supaya
-      // kotaknya jadi editable lagi. Kalau laporan ini belum sampai
-      // tahap rancangan/pelaksanaan sama sekali, dua query di bawah
-      // otomatis jadi no-op (0 rows affected) — aman, tidak error.
+      // kotaknya jadi editable lagi.
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?

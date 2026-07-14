@@ -335,12 +335,13 @@ export default function RecapitulationTable() {
   const [showPicker, setShowPicker] = useState(false);
   const [kaP4M, setKaP4M] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
 
-  // ✅ BARU: state utk fitur "Upload Data Lama" (arsip Excel s/d 10 tahun
+  // ✅ state utk fitur "Upload Data Lama" (arsip Excel s/d 10 tahun
   // ke belakang) yang tampil di sebelah tombol Excel pada bar Export.
   const tahunSekarang = new Date().getFullYear();
   const [showUploadArsip, setShowUploadArsip] = useState(false);
   const [uploadTahun, setUploadTahun] = useState<number>(tahunSekarang - 1);
   const [uploadingArsip, setUploadingArsip] = useState(false);
+  const [fileArsipTerpilih, setFileArsipTerpilih] = useState<File | null>(null);
   const fileArsipRef = useRef<HTMLInputElement>(null);
   const tahunPilihanArsip = Array.from({ length: 11 }, (_, i) => tahunSekarang - i); // tahun ini + 10 tahun lalu
 
@@ -359,6 +360,7 @@ export default function RecapitulationTable() {
       setTimeout(()=>setError(""),5000);
     } finally {
       setUploadingArsip(false);
+      setFileArsipTerpilih(null);
       if (fileArsipRef.current) fileArsipRef.current.value = "";
     }
   }
@@ -563,11 +565,16 @@ export default function RecapitulationTable() {
                 const ids=new Set(rekapData.map(d=>d.id_boxing));
                 return !ids.has(p.id_boxing)&&isInFilter(p.created_at??null);
               });
-              // Sertakan juga semua data arsip (tahun-tahun lalu) yang pernah
-              // diupload, supaya ikut muncul rapi per tahun di file Excel.
+              // ✅ FIX: Data arsip sekarang ikut mengikuti filter di layar —
+              // kalau lagi mode "Tahunan" dan pilih tahun tertentu, cuma
+              // arsip tahun itu yang disertakan (bukan semua tahun) supaya
+              // export Excel sesuai dengan tahun yang lagi dipilih di layar.
+              // Untuk mode lain (Semua/Harian/Mingguan/Bulanan), semua
+              // tahun arsip yang pernah diupload tetap disertakan.
               let arsipData: ArsipItem[] = [];
               try{
-                const arsipRes = await stafApi.getArsipRekap();
+                const tahunFilter = filterMode === "tahunan" ? selectedDate.getFullYear() : undefined;
+                const arsipRes = await stafApi.getArsipRekap(tahunFilter);
                 arsipData = arsipRes.data ?? [];
               }catch{ /* nonfatal — export tetap jalan tanpa data arsip */ }
               await exportExcel(filteredRekap, filteredDipantau, arsipData);
@@ -580,7 +587,7 @@ export default function RecapitulationTable() {
           {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel
         </button>
 
-        {/* ✅ BARU: Upload Data Lama — di samping tombol Excel. Staf pilih
+        {/* Upload Data Lama — di samping tombol Excel. Staf pilih
             tahun (s/d 10 tahun ke belakang) lalu unggah file Excel data
             tahun tsb; datanya akan ikut muncul rapi per tahun saat Excel
             di-export lagi lewat tombol di atas. */}
@@ -588,37 +595,67 @@ export default function RecapitulationTable() {
           <button
             onClick={()=>setShowUploadArsip(v=>!v)}
             disabled={uploadingArsip}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-700 hover:bg-purple-800 disabled:bg-purple-300 text-white text-[10px] font-bold rounded transition-all">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 text-white text-[10px] font-bold rounded transition-all">
             {uploadingArsip?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📁"} Upload Data Lama
           </button>
 
           {showUploadArsip && (
             <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase">🗃️ Upload Data Excel Tahun Lalu</p>
-              <p className="text-[9px] text-gray-400 leading-snug">
+              <p className="text-[10px] font-semibold text-black uppercase">🗃️ Upload Data Excel Tahun Lalu</p>
+              <p className="text-[9px] text-black leading-snug">
                 Pilih tahun datanya, lalu pilih file Excel (.xlsx/.xls) yang kolomnya
                 seperti hasil export ini (Kode Laporan, Uraian, Penyebab, dst).
-                Bisa untuk 1 sampai 10 tahun ke belakang.
+                Bisa untuk 1 sampai 10 tahun ke belakang. Selain file Excel tidak
+                akan bisa dipilih.
               </p>
               <select
                 value={uploadTahun}
                 onChange={(e)=>setUploadTahun(Number(e.target.value))}
-                className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+                className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-dark-header/30"
               >
                 {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
               </select>
+
+              {/* Input file asli disembunyikan; label di bawah ini yang jadi
+                  tombol pemicunya supaya teks bawaan browser "No file chosen"
+                  tidak ikut tampil. accept diperluas dengan MIME type resmi
+                  supaya dialog "buka file" lebih ketat menyaring file Excel. */}
               <input
                 ref={fileArsipRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 onChange={(e)=>{
                   const file = e.target.files?.[0];
-                  if(file) handlePilihFileArsip(file);
+                  if(!file){ setFileArsipTerpilih(null); return; }
+                  // Jaga-jaga: validasi ekstensi lagi di sisi klien, kalau2
+                  // dialog OS/browser tertentu tetap mengizinkan pilih file lain.
+                  if(!/\.(xlsx|xls)$/i.test(file.name)){
+                    setError("Hanya file Excel (.xlsx / .xls) yang diperbolehkan.");
+                    setTimeout(()=>setError(""),5000);
+                    setFileArsipTerpilih(null);
+                    if (fileArsipRef.current) fileArsipRef.current.value = "";
+                    return;
+                  }
+                  setFileArsipTerpilih(file);
                 }}
-                className="w-full text-[10px] text-gray-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                className="hidden"
               />
-              <button onClick={()=>setShowUploadArsip(false)}
-                className="w-full text-[10px] text-gray-400 hover:text-gray-600 text-center">Tutup</button>
+              <label
+                onClick={()=>fileArsipRef.current?.click()}
+                className="w-full block cursor-pointer text-center text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded py-1.5 px-2"
+              >
+                📁 {fileArsipTerpilih ? fileArsipTerpilih.name : "Pilih File Excel"}
+              </label>
+
+              <button
+                onClick={()=>{ if(fileArsipTerpilih) handlePilihFileArsip(fileArsipTerpilih); }}
+                disabled={!fileArsipTerpilih || uploadingArsip}
+                className="w-full text-[10px] font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 rounded py-1.5 text-center transition-all">
+                {uploadingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"⬆️ Upload"}
+              </button>
+
+              <button onClick={()=>{setShowUploadArsip(false); setFileArsipTerpilih(null);}}
+                className="w-full text-[10px] text-black hover:text-gray-600 text-center">Tutup</button>
             </div>
           )}
         </div>

@@ -173,6 +173,20 @@ export async function exportExcel(
     }
   }
 
+  // ✅ BARU: supaya tabel tidak polos 1 warna rata dari atas ke bawah,
+  // baris genap dibuat lebih pudar (dicampur putih) dari warna dasarnya —
+  // jadi kelihatan selang-seling (zebra stripe) tapi tetap 1 tema warna
+  // per tab (kuning=dipantau, hijau=selesai, ungu=arsip).
+  function cerahkanWarna(argbWarna: string, faktor: number): string {
+    const hex = argbWarna.slice(2); // buang 2 karakter alpha "FF" di depan
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const campur = (c: number) => Math.round(c + (255 - c) * faktor);
+    const keHex = (c: number) => c.toString(16).padStart(2, "0").toUpperCase();
+    return `FF${keHex(campur(r))}${keHex(campur(g))}${keHex(campur(b))}`;
+  }
+
   // ══════════════════════════════════════════════════════════
   // WORKSHEET 1 — RINGKASAN
   // ══════════════════════════════════════════════════════════
@@ -272,15 +286,19 @@ export async function exportExcel(
     });
 
     // Baris data
-    baris.forEach((b) => {
+    baris.forEach((b, idx) => {
       const row = ws.addRow([
         b.no, b.kode, b.jenis, b.tglMasuk, b.uraian, b.unit,
         b.penyebab, b.rencana, b.hasil,
         b.tglPelaks, b.statusReview, b.statusBoxing,
       ]);
       row.height = 40;
+      // Baris genap (idx 1, 3, 5, ...) dibuat lebih pudar supaya selang-seling,
+      // baris ganjil (idx 0, 2, 4, ...) tetap pakai warna dasar tab ini.
+      const warnaBarisIni =
+        warnaBaris && idx % 2 === 1 ? cerahkanWarna(warnaBaris, 0.55) : warnaBaris;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      row.eachCell((cell: any) => styleData(cell, warnaBaris));
+      row.eachCell((cell: any) => styleData(cell, warnaBarisIni));
 
       // Kolom No rata tengah
       row.getCell(1).alignment = { horizontal: "center", vertical: "top" };
