@@ -42,3 +42,6 @@ frontend/next-env.d.ts
 
 backend/node_modules
 backend/.env
+
+backend/database/schema.sql
+backend/database/tuntas4.sql
