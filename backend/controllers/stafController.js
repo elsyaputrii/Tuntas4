@@ -838,6 +838,51 @@ async function getArsipRekap(req, res) {
 }
 
 // ============================================================
+// 7d. DELETE ARSIP REKAP — DELETE /api/staf/rekap/arsip?tahun=2024
+//     Hapus data arsip Excel tahun tertentu yang sudah pernah
+//     diupload lewat "Upload Data Lama". Wajib sertakan ?tahun=
+//     supaya staf tidak salah hapus semua arsip sekaligus.
+// ============================================================
+async function deleteArsipRekap(req, res) {
+  try {
+    const { tahun } = req.query;
+    if (!tahun) {
+      return res.status(400).json({
+        success: false,
+        message: "Tahun wajib diisi untuk menghapus data arsip.",
+      });
+    }
+
+    const tahunInt = parseInt(tahun, 10);
+    const [existing] = await pool.query(
+      `SELECT COUNT(*) as jumlah FROM arsip_rekapitulasi WHERE tahun = ?`,
+      [tahunInt]
+    );
+    const jumlah = existing[0]?.jumlah ?? 0;
+    if (jumlah === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Tidak ada data arsip untuk tahun ${tahunInt}.`,
+      });
+    }
+
+    await pool.query(`DELETE FROM arsip_rekapitulasi WHERE tahun = ?`, [tahunInt]);
+
+    return res.status(200).json({
+      success: true,
+      message: `Berhasil menghapus ${jumlah} baris data arsip tahun ${tahunInt}.`,
+      tahun: tahunInt,
+    });
+  } catch (error) {
+    console.error("Error deleteArsipRekap:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal menghapus data arsip.",
+    });
+  }
+}
+
+// ============================================================
 // 8. APPROVAL STAF — PATCH /api/staf/approval-boxing
 //    Staf P4M menentukan: diterima atau ditolak setelah lihat hasil unit
 //    Body: { id_boxing, approval }  → approval: "diterima" | "ditolak"
@@ -957,5 +1002,6 @@ module.exports = {
   getRekapitulasi,
   uploadArsipRekap,
   getArsipRekap,
+  deleteArsipRekap,
   setApprovalStaf,
 };

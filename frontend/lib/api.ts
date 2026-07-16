@@ -167,6 +167,8 @@ export const stafApi = {
     apiFetch("/staf/rekap/arsip/upload", { method: "POST", body: formData }),
   getArsipRekap: (tahun?: number) =>
     apiFetch(`/staf/rekap/arsip${tahun ? `?tahun=${tahun}` : ""}`),
+  deleteArsipRekap: (tahun: number) =>
+    apiFetch(`/staf/rekap/arsip?tahun=${tahun}`, { method: "DELETE" }),
 };
 
 // ─────────────────────────────────────────────

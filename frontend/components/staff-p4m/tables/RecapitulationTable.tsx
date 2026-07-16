@@ -357,6 +357,27 @@ export default function RecapitulationTable() {
   const fileArsipRef = useRef<HTMLInputElement>(null);
   const tahunPilihanArsip = Array.from({ length: 11 }, (_, i) => tahunSekarang - i); // tahun ini + 10 tahun lalu
 
+  // ✅ state utk fitur "Hapus Data Arsip" — staf pilih tahun mana yang
+  // mau dihapus datanya (dari yang sudah pernah diupload via Upload Data Lama).
+  const [hapusTahun, setHapusTahun] = useState<number>(tahunSekarang - 1);
+  const [deletingArsip, setDeletingArsip] = useState(false);
+  const [confirmHapusArsip, setConfirmHapusArsip] = useState(false);
+
+  async function handleHapusArsip() {
+    setDeletingArsip(true); setError(""); setMsg("");
+    try {
+      const res = await stafApi.deleteArsipRekap(hapusTahun);
+      setMsg(res.message ?? `Berhasil menghapus data arsip tahun ${hapusTahun}.`);
+      setTimeout(()=>setMsg(""),6000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gagal menghapus data arsip.");
+      setTimeout(()=>setError(""),5000);
+    } finally {
+      setDeletingArsip(false);
+      setConfirmHapusArsip(false);
+    }
+  }
+
   async function handlePilihFileArsip(file: File) {
     setUploadingArsip(true); setError(""); setMsg("");
     try {
@@ -707,7 +728,54 @@ export default function RecapitulationTable() {
                 {uploadingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"⬆️ Upload"}
               </button>
 
-              <button onClick={()=>{setShowUploadArsip(false); setFileArsipTerpilih(null);}}
+              {/* Hapus Data Arsip — pilih tahun mana yang mau dihapus dari
+                  data yang sudah pernah diupload. Ada konfirmasi dulu
+                  sebelum benar-benar terhapus supaya tidak salah pencet. */}
+              <div className="border-t border-gray-200 pt-2 mt-2 space-y-2">
+                <p className="text-[10px] font-semibold text-red-700 uppercase">🗑️ Hapus Data Arsip</p>
+                <p className="text-[9px] text-black leading-snug">
+                  Pilih tahun datanya, lalu hapus data arsip tahun tsb yang
+                  sudah pernah diupload sebelumnya.
+                </p>
+                <select
+                  value={hapusTahun}
+                  onChange={(e)=>{ setHapusTahun(Number(e.target.value)); setConfirmHapusArsip(false); }}
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-red-400/30"
+                >
+                  {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
+                </select>
+
+                {confirmHapusArsip ? (
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] text-red-700 font-semibold text-center">
+                      Yakin hapus semua data arsip tahun {hapusTahun}?
+                    </p>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={handleHapusArsip}
+                        disabled={deletingArsip}
+                        className="flex-1 text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
+                        {deletingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"Ya, Hapus"}
+                      </button>
+                      <button
+                        onClick={()=>setConfirmHapusArsip(false)}
+                        disabled={deletingArsip}
+                        className="flex-1 text-[10px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded py-1.5 text-center transition-all">
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={()=>setConfirmHapusArsip(true)}
+                    disabled={deletingArsip}
+                    className="w-full text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
+                    🗑️ Hapus Data Tahun {hapusTahun}
+                  </button>
+                )}
+              </div>
+
+              <button onClick={()=>{setShowUploadArsip(false); setFileArsipTerpilih(null); setConfirmHapusArsip(false);}}
                 className="w-full text-[10px] text-black hover:text-gray-600 text-center">Tutup</button>
             </div>
           )}

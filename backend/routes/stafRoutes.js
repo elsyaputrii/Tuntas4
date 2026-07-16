@@ -13,6 +13,7 @@ const {
   getRekapitulasi,
   uploadArsipRekap,
   getArsipRekap,
+  deleteArsipRekap,
 } = require("../controllers/stafController");
 // ✅ FITUR PINDAH KEWENANGAN: setApprovalStaf ("diterima"/"ditolak" atas
 // hasil tindak lanjut Kepala Unit — keputusan "ulang atau tidak") TIDAK
@@ -34,6 +35,7 @@ router.get("/rekap",       roleMiddleware("staf_p4m"), getRekapitulasi);
 // ── Arsip data tahun lalu (upload Excel s/d 10 tahun ke belakang) ─
 router.post("/rekap/arsip/upload", roleMiddleware("staf_p4m"), uploadExcel.single("file"), uploadArsipRekap);
 router.get("/rekap/arsip",         roleMiddleware("staf_p4m"), getArsipRekap);
+router.delete("/rekap/arsip",      roleMiddleware("staf_p4m"), deleteArsipRekap);
 
 // ── Tab Proses & Pantau (khusus Staf P4M — pantau & input pemantauan) ─
 // Review rancangan & keputusan hasil tindak lanjut (diterima/ditolak)
