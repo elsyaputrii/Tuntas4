@@ -6,6 +6,50 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
+// ─────────────────────────────────────────────
+// AUTO-LOGOUT — dipanggil setiap kali server bilang token invalid/expired
+// ─────────────────────────────────────────────
+
+// Path login berbeda untuk tiap role
+function loginPathByRole(role: string | null): string {
+  switch (role) {
+    case "ka_p4m":
+      return "/ka-p4m/login";
+    case "kepala_unit":
+      return "/kepala-unit/login";
+    case "staf_p4m":
+      return "/staff-p4m/login";
+    default:
+      // fallback kalau role tidak diketahui/tidak tersimpan
+      return "/staff-p4m/login";
+  }
+}
+
+function forceLogout() {
+  if (typeof window === "undefined") return;
+
+  // Ambil role SEBELUM localStorage dibersihkan, biar tau harus diarahkan ke
+  // halaman login yang mana (staf / ka-p4m / kepala-unit)
+  let role: string | null = null;
+  try {
+    const userRaw = localStorage.getItem("user");
+    role = userRaw ? JSON.parse(userRaw).role : localStorage.getItem("role");
+  } catch {
+    role = localStorage.getItem("role");
+  }
+
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("role");
+
+  const target = loginPathByRole(role);
+
+  // Hindari redirect berulang kalau memang sudah di halaman login
+  if (!window.location.pathname.includes("/login")) {
+    window.location.href = target;
+  }
+}
+
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -24,6 +68,23 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const data     = await response.json();
 
   if (!response.ok) {
+    // Kalau request ini SUDAH bawa token, tapi server tetap balas 401 →
+    // artinya token expired/invalid (bukan sekadar gagal login biasa,
+    // karena request login tidak membawa token). Auto-logout + redirect,
+    // supaya user bisa langsung login ulang dari halaman login yang benar.
+    if (response.status === 401 && token) {
+      forceLogout();
+      throw new Error("Sesi Anda telah berakhir. Silakan login ulang.");
+    }
+
+    // 403 = user SUDAH login tapi tidak berhak atas resource ini
+    // (role salah, akun tidak terdaftar sebagai staf/ka-p4m/kepala unit, dll).
+    // Beda dengan 401 di atas: sesi TIDAK dihapus & TIDAK di-redirect,
+    // cukup tampilkan peringatan supaya user tahu kenapa gagal.
+    if (response.status === 403 && typeof window !== "undefined") {
+      window.alert(data.message || "Akses ditolak. Anda tidak memiliki izin untuk aksi ini.");
+    }
+
     throw new Error(data.message || "Terjadi kesalahan pada server");
   }
 

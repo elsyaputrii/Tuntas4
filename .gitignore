@@ -45,3 +45,5 @@ backend/.env
 
 backend/database/schema.sql
 backend/database/tuntas4.sql
+
+backend/database/migrate_alur_v2.sql

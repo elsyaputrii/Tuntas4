@@ -204,7 +204,7 @@ export default function ProcessMonitorTable() {
             {rev && <span className={`text-[9px] font-bold px-1.5 py-0.5 border rounded ${rev.cls}`}>{rev.label}</span>}
             <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
               className="flex items-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded">
-              {exportingId === item.id_boxing ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "📄 PDF"}
+              {exportingId === item.id_boxing ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "📄 Dokumen"}
             </button>
           </div>
         </div>
@@ -284,11 +284,11 @@ export default function ProcessMonitorTable() {
         {/* ── DESKTOP ── */}
         <div className="hidden lg:block">
           <div className="flex min-w-275 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
-            <div className="w-120 border-r-2 border-black p-3">Laporan</div>
-            <div className="w-40 border-r-2 border-black p-3">Keputusan Ka</div>
-            <div className="w-85 border-r-2 border-black p-3">Hasil Unit</div>
-            <div className="w-40 border-r-2 border-black p-3">Keputusan Staf</div>
-            <div style={{width:"60px",padding:"8px",textAlign:"center"}}>PDF</div>
+            <div className="w-120 shrink-0 border-r-2 border-black p-3">Laporan</div>
+            <div className="w-40 shrink-0 border-r-2 border-black p-3">Keputusan Ka</div>
+            <div className="w-85 shrink-0 border-r-2 border-black p-3">Hasil Unit</div>
+            <div className="w-40 shrink-0 border-r-2 border-black p-3">Keputusan Staf</div>
+            <div style={{width:"60px",minWidth:"60px",maxWidth:"60px",flexShrink:0,flexGrow:0,padding:"8px",textAlign:"center"}}>Dokumen</div>
           </div>
 
           {aktif.length === 0 && selesai.length === 0 ? (
@@ -300,7 +300,7 @@ export default function ProcessMonitorTable() {
                 return (
                   <div key={`${item.id_laporan}-${item.id_boxing}`} className="flex min-w-275 border-t-2 border-black">
                     {/* Kolom Laporan + Tanggal + Gambar */}
-                    <div className="w-120 border-r-2 border-black p-3">
+                    <div className="w-120 shrink-0 border-r-2 border-black p-3">
                       <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                         <span className="font-bold">{item.kode_laporan}</span><br />
                         {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}</span>
@@ -320,12 +320,12 @@ export default function ProcessMonitorTable() {
                       )}
                     </div>
 
-                    <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
+                    <div className="w-40 shrink-0 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
                       {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>{rev.label}</span>}
                       {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
                     </div>
 
-                    <div className="w-85 border-r-2 border-black p-3">
+                    <div className="w-85 shrink-0 border-r-2 border-black p-3">
                       <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
                         {item.hasil_tindakan || (item.status_review === "tidak_ditindaklanjuti" ? "— (tidak ditindaklanjuti)" : "Belum ada hasil")}
                       </div>
@@ -342,15 +342,15 @@ export default function ProcessMonitorTable() {
                       )}
                     </div>
 
-                    <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center items-center">
+                    <div className="w-40 shrink-0 border-r-2 border-black p-3 flex flex-col gap-1.5 justify-center items-center">
                       {renderKeputusanStaf(item)}
                     </div>
-                    <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{width:"60px",minWidth:"60px",maxWidth:"60px",flexShrink:0,flexGrow:0,padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
                       <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
                         className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded">
                         {exportingId === item.id_boxing
                           ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
+                          : <><span className="text-sm leading-none">📄</span><span>Dokumen</span></>}
                       </button>
                     </div>
                   </div>
@@ -366,7 +366,7 @@ export default function ProcessMonitorTable() {
                     const rev = item.status_review ? reviewBadge[item.status_review] : null;
                     return (
                       <div key={`${item.id_laporan}-${item.id_boxing}`} className="flex min-w-275 border-t-2 border-black">
-                        <div className="w-120 border-r-2 border-black p-3">
+                        <div className="w-120 shrink-0 border-r-2 border-black p-3">
                           <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                             <span className="font-bold">{item.kode_laporan}</span><br />
                             {item.nama_unit} · <span className="italic">Selesai</span>
@@ -386,12 +386,12 @@ export default function ProcessMonitorTable() {
                           )}
                         </div>
 
-                        <div className="w-40 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
+                        <div className="w-40 shrink-0 border-r-2 border-black p-3 flex flex-col gap-1 justify-center">
                           {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center ${rev.cls}`}>{rev.label}</span>}
                           {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
                         </div>
 
-                        <div className="w-85 border-r-2 border-black p-3">
+                        <div className="w-85 shrink-0 border-r-2 border-black p-3">
                           <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
                             {item.hasil_tindakan || "— (tidak ditindaklanjuti)"}
                           </div>
@@ -408,15 +408,15 @@ export default function ProcessMonitorTable() {
                           )}
                         </div>
 
-                        <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
+                        <div className="w-40 shrink-0 border-r-2 border-black p-3 flex items-center justify-center">
                           <span className="text-[10px] text-green-600 font-bold">✓ Selesai</span>
                         </div>
-                        <div style={{width:"60px",padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <div style={{width:"60px",minWidth:"60px",maxWidth:"60px",flexShrink:0,flexGrow:0,padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>
                           <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
                             className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded">
                             {exportingId === item.id_boxing
                               ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
+                              : <><span className="text-sm leading-none">📄</span><span>Dokumen</span></>}
                           </button>
                         </div>
                       </div>

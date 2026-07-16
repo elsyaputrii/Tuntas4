@@ -360,7 +360,7 @@ export default function KaP4MLayout({
                 Aplikasi Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👤 KA-P4M
+                👩‍💻KA-P4M
               </p>
             </div>
 

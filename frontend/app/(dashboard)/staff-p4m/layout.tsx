@@ -162,7 +162,7 @@ export default function StaffP4MLayout({
                 Aplikasi Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👤 Admin Staff P4M
+                👩‍💻Staff P4M
               </p>
             </div>
 
@@ -198,7 +198,7 @@ export default function StaffP4MLayout({
                 {showProfile && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
                     <div className="p-3 border-b dark:border-slate-700">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Admin Staff</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Staff</p>
                       <p className="text-xs text-slate-400">staff@polibatam.ac.id</p>
                     </div>
                     <div className="p-2">

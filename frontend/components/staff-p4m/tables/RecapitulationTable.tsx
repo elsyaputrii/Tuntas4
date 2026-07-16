@@ -22,6 +22,18 @@ const BULAN_PANJANG = [
   "Juli","Agustus","September","Oktober","November","Desember",
 ];
 
+/** Format tanggal yang sumbernya gak pasti ISO atau teks bebas (kasus data
+ *  arsip Excel tahun lalu, mis. tgl_pelaksanaan bisa aja udah berupa teks
+ *  "16 Juli 2026" dari hasil export sebelumnya, bukan ISO "2026-07-16").
+ *  Kalau berhasil diparse jadi Date valid → diformat ulang rapi via fmtTgl.
+ *  Kalau gagal (Invalid Date) → tampilkan teks aslinya apa adanya, supaya
+ *  gak muncul "NaN NaN NaN" di layar. */
+function formatTglAman(v: string | null): string {
+  if (!v) return "—";
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? v : fmtTgl(v);
+}
+
 interface CalendarProps {
   selectedDate: Date;
   onSelectDate: (d: Date) => void;
@@ -377,6 +389,12 @@ export default function RecapitulationTable() {
       .catch(() => { /* nonfatal — PDF tetap bisa dicetak tanpa TTD */ });
   }, []);
 
+  // ✅ data arsip (hasil Upload Data Lama) untuk tahun yang sedang
+  // dipilih di filter "Tahunan" — sebelumnya arsip ini cuma kepanggil
+  // pas Export Excel, gak pernah ikut tampil di tabel/statistik layar.
+  const [arsipData, setArsipData] = useState<ArsipItem[]>([]);
+  const [loadingArsip, setLoadingArsip] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -392,6 +410,19 @@ export default function RecapitulationTable() {
   }, []);
 
   useEffect(()=>{ fetchData(); },[fetchData]);
+
+  // ✅ Setiap kali mode "tahunan" aktif dan tahun yang dipilih berubah,
+  // ambil data arsip tahun itu supaya ikut muncul di tabel & statistik.
+  useEffect(() => {
+    if (filterMode !== "tahunan") { setArsipData([]); return; }
+    let batal = false;
+    setLoadingArsip(true);
+    stafApi.getArsipRekap(selectedDate.getFullYear())
+      .then((res) => { if (!batal) setArsipData(res.data ?? []); })
+      .catch(() => { if (!batal) setArsipData([]); })
+      .finally(() => { if (!batal) setLoadingArsip(false); });
+    return () => { batal = true; };
+  }, [filterMode, selectedDate]);
 
   const selesaiBoxingIds = new Set(rekapData.map(d=>d.id_boxing));
   const dipantauData     = prosesData.filter(p=>!selesaiBoxingIds.has(p.id_boxing));
@@ -414,6 +445,28 @@ export default function RecapitulationTable() {
       statusReview:p.status_review??"", statusBoxing:p.status_boxing??"",
       approvalStaf: p.approval_staf ?? null,
       tglMasuk:p.created_at??null, isSelesai:false,
+    })),
+    // ✅ data arsip Excel tahun lalu (hasil "Upload Data Lama") — dikasih
+    // id_boxing negatif berdasar index biar gak tabrakan sama id asli.
+    //
+    // ⚠️ FIX PENTING: tglMasuk TIDAK boleh diambil mentah dari a.tgl_masuk,
+    // karena isinya teks hasil export sebelumnya (mis. "16 Juli 2026"),
+    // BUKAN format ISO. new Date("16 Juli 2026") gagal diparse browser
+    // (nama bulan Indonesia) → jadi Invalid Date → getFullYear() jadi NaN
+    // → item ini SELALU ke-filter keluar dari tabel, walau datanya sendiri
+    // sudah benar tersimpan di server. Makanya kolom "tahun" (integer,
+    // sudah pasti benar) dipakai sebagai sumber kebenaran filter tahun,
+    // bukan hasil parse teks tanggalnya.
+    ...arsipData.map((a,i)=>({
+      id_boxing:-1000000-i, kode:a.kode_laporan??"—", jenis:a.jenis_laporan??"—",
+      uraian:a.uraian_ketidaksesuaian??"—", unit:a.unit??"—",
+      penyebab:a.penyebab??"—", rencana:a.rencana_tindakan??"—",
+      hasil:a.hasil_tindakan??"—",
+      tglPelaksanaan:formatTglAman(a.tgl_pelaksanaan),
+      statusReview:a.status_review??"", statusBoxing:a.status_boxing??"selesai",
+      approvalStaf: null as string | null,
+      tglMasuk:`${a.tahun}-06-15`, // tanggal sintetis, cuma dipakai buat filter tahun
+      isSelesai:a.status_boxing==="selesai",
     })),
   ];
 
@@ -571,13 +624,13 @@ export default function RecapitulationTable() {
               // export Excel sesuai dengan tahun yang lagi dipilih di layar.
               // Untuk mode lain (Semua/Harian/Mingguan/Bulanan), semua
               // tahun arsip yang pernah diupload tetap disertakan.
-              let arsipData: ArsipItem[] = [];
+              let arsipExport: ArsipItem[] = [];
+              const tahunFilter = filterMode === "tahunan" ? selectedDate.getFullYear() : undefined;
               try{
-                const tahunFilter = filterMode === "tahunan" ? selectedDate.getFullYear() : undefined;
                 const arsipRes = await stafApi.getArsipRekap(tahunFilter);
-                arsipData = arsipRes.data ?? [];
+                arsipExport = arsipRes.data ?? [];
               }catch{ /* nonfatal — export tetap jalan tanpa data arsip */ }
-              await exportExcel(filteredRekap, filteredDipantau, arsipData);
+              await exportExcel(filteredRekap, filteredDipantau, arsipExport, tahunFilter);
             } finally {
               setTimeout(()=>setExportingExcelLoading(false),1200);
             }

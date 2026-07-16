@@ -33,6 +33,12 @@ async function generateQrDataUrl(text: string): Promise<string | null> {
   }
 }
 
+// Menghapus gelar "Dr." di depan nama penandatangan (Ka P4M / Staff P4M)
+// supaya tidak muncul di teks nama PDF maupun di hasil scan QR code TTD.
+function stripGelarDr(nama: string): string {
+  return nama.replace(/^\s*dr\.?\s+/i, "").trim();
+}
+
 export type PdfKategori = "harian" | "mingguan" | "bulanan" | "tahunan";
 
 // Base URL backend (tanpa /api) — dipakai untuk membangun URL gambar lampiran
@@ -96,7 +102,13 @@ const BASE_CSS = `
 // Sekarang window dibiarkan terbuka apa pun aksinya (print/save/cancel),
 // dan user tutup sendiri lewat tombol "✕ Tutup" di pojok halaman.
 function printWindow(html: string) {
-  const win = window.open("", "_blank", "width=1100,height=750");
+  // Buka window seukuran layar penuh (bukan ukuran tetap 1100x750) supaya
+  // panel "Print Preview" browser menutupi seluruh konten halaman —
+  // sebelumnya window kecil menyebabkan sisa konten di bawah "nongol"
+  // dan terlihat seperti ada 2 lapisan/QR code dobel saat preview cetak.
+  const w = window.screen.availWidth;
+  const h = window.screen.availHeight;
+  const win = window.open("", "_blank", `width=${w},height=${h},left=0,top=0`);
   if (!win) {
     alert("Popup diblokir browser. Izinkan popup untuk mencetak PDF.");
     return;
@@ -184,9 +196,9 @@ export async function exportPDFRekap(
 
   const allRows = [...selesaiRows, ...dipantauRows];
 
-  const namaPenandatangan = penandatangan?.nama?.trim() || "_________________";
+  const jabatanPenandatanganRekap = stripGelarDr(penandatangan?.nama?.trim() || "Ka P4M");
   const tglCetakRekap = fmtTglWaktu(new Date().toISOString());
-  const qrTextRekap = `LAPORAN REKAPITULASI TUNTAS - Polibatam\nPeriode: ${labelKat[kategori]}\nPenandatangan: Kepala P4M - ${namaPenandatangan}\nDicetak: ${tglCetakRekap}`;
+  const qrTextRekap = `LAPORAN REKAPITULASI TUNTAS - Polibatam\nPeriode: ${labelKat[kategori]}\nPenandatangan: ${jabatanPenandatanganRekap}\nDicetak: ${tglCetakRekap}`;
   const qrDataUrlRekap = await generateQrDataUrl(qrTextRekap);
 
   function badgeReview(sr: string) {
@@ -265,7 +277,7 @@ ${CLOSE_BUTTON}
         ? `<img src="${qrDataUrlRekap}" class="qr-img" alt="QR TTD Kepala P4M"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
         : `<div class="signature-placeholder"></div>`
     }
-    <div class="name" style="margin-top:4px;">( ${namaPenandatangan} )</div>
+    <div class="name" style="margin-top:4px;">( ${jabatanPenandatanganRekap} )</div>
   </div>
 </div>
 ${PRINT_SCRIPT}
@@ -298,10 +310,20 @@ export async function exportPDFProses(
   item: ProsesDetailItem,
   penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null
 ) {
+  // Parameter 'penandatangan' sengaja tidak dipakai lagi di bawah — label
+  // penandatangan di bagian ini sudah di-hardcode "Staff P4M" (lihat
+  // jabatanPenandatanganProses). Parameter tetap dipertahankan di signature
+  // supaya pemanggil (ProcessMonitorTable.tsx) yang masih mengirim 2 argumen
+  // tidak perlu diubah.
+  void penandatangan;
+
   const gambarHasilUrl = getUploadUrl(item.lampiran_hasil);
-  const namaPenandatangan = penandatangan?.nama?.trim() || "_________________";
+  // Sengaja di-hardcode "Staff P4M" (bukan ikut nama akun individu, mis.
+  // "Admin Staf P4M") — baik untuk teks yang dicetak maupun yang di-encode
+  // ke QR, supaya tidak ada kata "Admin" muncul di bagian Proses & Pantau ini.
+  const jabatanPenandatanganProses = "Staff P4M";
   const tglCetakProses = fmtTglWaktu(new Date().toISOString());
-  const qrTextProses = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nPenandatangan: Staff P4M - ${namaPenandatangan}\nDicetak: ${tglCetakProses}`;
+  const qrTextProses = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nPenandatangan: ${jabatanPenandatanganProses}\nDicetak: ${tglCetakProses}`;
   const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
   const html = `<!DOCTYPE html>
@@ -382,7 +404,7 @@ ${item.aksi_masukan ? `
         ? `<img src="${qrDataUrlProses}" class="qr-img" alt="QR TTD Staff P4M"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
         : `<div class="signature-placeholder"></div>`
     }
-    <div class="name" style="margin-top:4px;">( ${namaPenandatangan} )</div>
+    <div class="name" style="margin-top:4px;">( ${jabatanPenandatanganProses} )</div>
   </div>
 </div>
 ${PRINT_SCRIPT}

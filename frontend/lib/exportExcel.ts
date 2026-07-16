@@ -111,10 +111,19 @@ function buatBarisArsip(item: ArsipItem, no: number): BarisLaporan {
 // (lihat tombol Upload di sebelah tombol Excel pada RecapitulationTable).
 // Setiap tahun yang ada di data ini akan dibuatkan 1 worksheet sendiri,
 // diurutkan dari tahun terbaru ke terlama, supaya rapi dan mudah dicari.
+//
+// tahunFilter: opsional — kalau diisi (mode filter "Tahunan" lagi aktif
+// dan user milih 1 tahun tertentu, misal 2024), maka rekapData/prosesData/
+// arsipData yang masuk ke sini DIANGGAP SUDAH di-filter tahun itu oleh
+// pemanggil, dan hasil export-nya akan digabung jadi SATU worksheet
+// "Laporan Tahun {tahun}" (bukan dipecah Selesai/Dipantau/Arsip terpisah),
+// serta nama file-nya otomatis dikasih tahun tsb supaya jelas ini
+// memang file khusus tahun itu.
 export async function exportExcel(
   rekapData: RekapItem[],
   prosesData: ProsesItem[],
-  arsipData: ArsipItem[] = []
+  arsipData: ArsipItem[] = [],
+  tahunFilter?: number
 ): Promise<void> {
   // Import ExcelJS secara dinamis (browser bundle via CDN atau npm)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -324,36 +333,55 @@ export async function exportExcel(
     return ws;
   }
 
-  // ══════════════════════════════════════════════════════════
-  // WORKSHEET 2 — LAPORAN MASIH DIPANTAU
-  // ══════════════════════════════════════════════════════════
-  const barisDipantau = dipantauData.map((p, i) =>
-    buatBaris(p, i + 1, false)
-  );
-  buatWorksheetLaporan("Laporan Masih Dipantau", barisDipantau, KUNING_BG);
+  if (tahunFilter) {
+    // ══════════════════════════════════════════════════════════
+    // MODE KHUSUS 1 TAHUN — semua data (laporan berjalan tahun ini +
+    // arsip tahun itu kalau ada) digabung jadi SATU worksheet, biar
+    // filenya bener-bener representasi "laporan tahun {tahunFilter}".
+    // ══════════════════════════════════════════════════════════
+    const barisGabungan: BarisLaporan[] = [
+      ...rekapData.map((d) => buatBaris(d, 0, true)),
+      ...dipantauData.map((p) => buatBaris(p, 0, false)),
+      ...arsipData.filter((a) => a.tahun === tahunFilter).map((a) => buatBarisArsip(a, 0)),
+    ]
+      // urutkan dari tanggal masuk terbaru ke terlama biar enak dibaca
+      .sort((a, b) => (a.tglMasuk < b.tglMasuk ? 1 : -1))
+      .map((b, i) => ({ ...b, no: i + 1 }));
 
-  // ══════════════════════════════════════════════════════════
-  // WORKSHEET 3 — LAPORAN SELESAI
-  // ══════════════════════════════════════════════════════════
-  const barisSelesai = rekapData.map((d, i) =>
-    buatBaris(d, i + 1, true)
-  );
-  buatWorksheetLaporan("Laporan Selesai", barisSelesai, HIJAU_BG);
+    const warnaTahun = "FFD1FAE5"; // hijau muda, senada tema "Selesai"
+    buatWorksheetLaporan(`Laporan Tahun ${tahunFilter}`, barisGabungan, warnaTahun);
+  } else {
+    // ══════════════════════════════════════════════════════════
+    // WORKSHEET 2 — LAPORAN MASIH DIPANTAU
+    // ══════════════════════════════════════════════════════════
+    const barisDipantau = dipantauData.map((p, i) =>
+      buatBaris(p, i + 1, false)
+    );
+    buatWorksheetLaporan("Laporan Masih Dipantau", barisDipantau, KUNING_BG);
 
-  // ══════════════════════════════════════════════════════════
-  // WORKSHEET ARSIP — 1 sheet per tahun hasil "Upload Data Lama"
-  // (data 1–10 tahun ke belakang), diurutkan tahun terbaru dulu
-  // supaya tersusun rapi dan gampang dicari.
-  // ══════════════════════════════════════════════════════════
-  const UNGU_BG = "FFE9D5FF";
-  const tahunTersedia = [...new Set(arsipData.map((a) => a.tahun))].sort((a, b) => b - a);
+    // ══════════════════════════════════════════════════════════
+    // WORKSHEET 3 — LAPORAN SELESAI
+    // ══════════════════════════════════════════════════════════
+    const barisSelesai = rekapData.map((d, i) =>
+      buatBaris(d, i + 1, true)
+    );
+    buatWorksheetLaporan("Laporan Selesai", barisSelesai, HIJAU_BG);
 
-  tahunTersedia.forEach((tahun) => {
-    const barisTahunIni = arsipData
-      .filter((a) => a.tahun === tahun)
-      .map((a, i) => buatBarisArsip(a, i + 1));
-    buatWorksheetLaporan(`Arsip ${tahun}`, barisTahunIni, UNGU_BG);
-  });
+    // ══════════════════════════════════════════════════════════
+    // WORKSHEET ARSIP — 1 sheet per tahun hasil "Upload Data Lama"
+    // (data 1–10 tahun ke belakang), diurutkan tahun terbaru dulu
+    // supaya tersusun rapi dan gampang dicari.
+    // ══════════════════════════════════════════════════════════
+    const UNGU_BG = "FFE9D5FF";
+    const tahunTersedia = [...new Set(arsipData.map((a) => a.tahun))].sort((a, b) => b - a);
+
+    tahunTersedia.forEach((tahun) => {
+      const barisTahunIni = arsipData
+        .filter((a) => a.tahun === tahun)
+        .map((a, i) => buatBarisArsip(a, i + 1));
+      buatWorksheetLaporan(`Arsip ${tahun}`, barisTahunIni, UNGU_BG);
+    });
+  }
 
   // ── Download ────────────────────────────────────────────
   const buffer   = await workbook.xlsx.writeBuffer();
@@ -363,7 +391,9 @@ export async function exportExcel(
   const url      = URL.createObjectURL(blob);
   const anchor   = document.createElement("a");
   anchor.href     = url;
-  anchor.download = `Rekapitulasi_TUNTAS_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  anchor.download = tahunFilter
+    ? `Rekapitulasi_TUNTAS_Tahun_${tahunFilter}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    : `Rekapitulasi_TUNTAS_${new Date().toISOString().slice(0, 10)}.xlsx`;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);

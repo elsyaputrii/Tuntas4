@@ -167,7 +167,7 @@ export default function KepalaUnitLayout({
                 Aplikasi Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👤 Kepala Unit
+                👩‍💻Kepala Unit
               </p>
             </div>
 

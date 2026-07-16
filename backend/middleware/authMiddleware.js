@@ -23,7 +23,9 @@ function authMiddleware(req, res, next) {
     req.user = decoded;
     next();
   } catch {
-    return res.status(403).json({
+    // 401 (bukan 403) → token invalid/expired berarti user BELUM terautentikasi,
+    // beda kasus dengan roleMiddleware (403 = sudah login tapi role-nya tidak sesuai)
+    return res.status(401).json({
       success: false,
       message: "Token tidak valid atau sudah kadaluarsa. Silakan login ulang.",
     });
