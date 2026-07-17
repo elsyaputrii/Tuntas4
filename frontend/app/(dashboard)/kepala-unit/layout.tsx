@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   CheckCircle2,
+  History,
   LogOut,
   Menu,
   X,
@@ -81,6 +82,12 @@ export default function KepalaUnitLayout({
       label: 'Laporan Hasil',
       icon: <CheckCircle2 size={18} />,
       path: '/kepala-unit/laporan-hasil'
+    },
+    {
+      id: 'riwayat',
+      label: 'Riwayat',
+      icon: <History size={18} />,
+      path: '/kepala-unit/riwayat'
     },
   ];
 

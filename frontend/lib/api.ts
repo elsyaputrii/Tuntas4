@@ -222,6 +222,8 @@ export const kepalaUnitApi = {
     apiFetch("/kepala-unit/laporan-hasil"),
   submitPelaksanaan: (formData: FormData) =>
     apiFetch("/kepala-unit/pelaksanaan", { method: "POST", body: formData }),
+  getRiwayat: () =>
+    apiFetch("/kepala-unit/riwayat"),
 };
 
 // ─────────────────────────────────────────────

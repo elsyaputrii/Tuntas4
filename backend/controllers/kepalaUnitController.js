@@ -220,6 +220,57 @@ async function getLaporanHasil(req, res) {
   }
 }
 
+// ✅ FITUR BARU: "Riwayat" — rekap semua laporan yang PERNAH diisi hasil
+// tindak lanjutnya oleh Kepala Unit ini (punya baris di pelaksanaan_tindakan),
+// beda dengan getLaporanHasil yang cuma nampilin yang MASIH nunggu diisi.
+//
+// Karena alur "ditolak Staf P4M" langsung MENGHAPUS baris pelaksanaan_tindakan
+// (lihat setApprovalStaf di stafController.js), JOIN di bawah otomatis hanya
+// menyisakan 2 kemungkinan status_boxing untuk tiap baris:
+//   - 'di_staff' (approval_staf='menunggu') → masih dipantau, menunggu keputusan Staf P4M
+//   - 'selesai'  (approval_staf='diterima') → sudah RAMPUNG, disetujui Staf P4M
+// (Laporan yang ditolak otomatis hilang dari riwayat ini karena hasilnya
+// dihapus — akan muncul lagi sebagai siklus baru begitu direvisi & dikirim ulang.)
+async function getRiwayat(req, res) {
+  try {
+    const kepala = await getKepalaInfo(req);
+    if (!kepala) {
+      return res.status(403).json({
+        success: false,
+        message: "Data kepala unit tidak ditemukan.",
+      });
+    }
+    const [rows] = await pool.query(
+      `SELECT
+        b.id_boxing, b.unit_tujuan AS nama_unit, b.status AS status_boxing,
+        b.approval_staf, b.catatan_approval,
+        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        l.created_at AS tanggal_laporan,
+        r.penyebab, r.deskripsi AS rencana_tindakan, r.status_review, r.aksi_masukan,
+        p.id_pelaksanaan, p.deskripsi AS hasil_tindakan, p.lampiran AS lampiran_hasil,
+        p.tanggal AS tanggal_pelaksanaan, p.created_at AS tanggal_kirim_hasil
+      FROM boxing_ketidaksesuaian b
+      JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
+      JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+      JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
+      WHERE b.id_kepala = ?
+      ORDER BY p.tanggal DESC, p.id_pelaksanaan DESC`,
+      [kepala.id_kepala],
+    );
+    const data = rows.map((row) => ({
+      ...row,
+      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
+    }));
+    return res.status(200).json({ success: true, data, unit: kepala.unit });
+  } catch (error) {
+    console.error("Error getRiwayat:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal mengambil data riwayat.",
+    });
+  }
+}
+
 async function submitPelaksanaan(req, res) {
   const { id_boxing, deskripsi, tanggal } = req.body;
   const lampiran = req.file ? req.file.filename : null;
@@ -343,5 +394,6 @@ module.exports = {
   getLaporanMasuk,
   submitRancangan,
   getLaporanHasil,
+  getRiwayat,
   submitPelaksanaan,
 };

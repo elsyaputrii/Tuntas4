@@ -412,3 +412,140 @@ ${PRINT_SCRIPT}
 
   printWindow(html);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 3. PDF RIWAYAT KEPALA UNIT — per laporan individual, TTD Kepala Unit
+//    (sama strukturnya dengan exportPDFProses milik Staf P4M, tapi
+//    penandatangannya "Kepala Unit — {unit}", dipakai oleh tab Riwayat
+//    di halaman Kepala Unit)
+// ═══════════════════════════════════════════════════════════════
+export interface RiwayatKepalaUnitItem {
+  kode_laporan: string;
+  jenis_laporan: string | null;
+  isi_laporan: string | null;
+  nama_unit: string | null;
+  status_boxing: string | null;
+  status_review: string | null;
+  approval_staf: string | null;
+  catatan_approval: string | null;
+  aksi_masukan: string | null;
+  penyebab: string | null;
+  rencana_tindakan: string | null;
+  hasil_tindakan: string | null;
+  lampiran_hasil: string | null;
+  tanggal_pelaksanaan: string | null;
+  tanggal_laporan?: string | null;
+}
+
+export async function exportPDFRiwayatKepalaUnit(
+  item: RiwayatKepalaUnitItem,
+  penandatangan?: { nama?: string | null } | null
+) {
+  const gambarHasilUrl = getUploadUrl(item.lampiran_hasil);
+  const namaUnit = item.nama_unit ?? "—";
+  // Sengaja pakai label jabatan generik "Kepala Unit — {unit}" (bukan nama
+  // akun pribadi) supaya konsisten dengan pola TTD "Staff P4M" di Proses &
+  // Pantau — baik di teks cetak maupun yang di-encode ke QR.
+  const jabatanPenandatangan = `Kepala Unit — ${namaUnit}`;
+  void penandatangan; // tersedia untuk pemakaian di masa depan (nama individu), tidak dipakai sekarang
+  const isSelesai = item.status_boxing === "selesai";
+  const statusLabel = isSelesai
+    ? "Selesai — Disetujui Staf P4M"
+    : "Menunggu Approval Staf P4M";
+  const tglCetak = fmtTglWaktu(new Date().toISOString());
+  const qrText = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nUnit: ${namaUnit}\nStatus: ${statusLabel}\nPenandatangan: ${jabatanPenandatangan}\nDicetak: ${tglCetak}`;
+  const qrDataUrl = await generateQrDataUrl(qrText);
+
+  const html = `<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"/>
+<title>Riwayat ${item.kode_laporan}</title>
+<style>
+  ${BASE_CSS}
+  .section { margin-bottom:14px; }
+  .section-title { font-size:10pt; font-weight:bold; color:#4d5e71; border-bottom:2px solid #4d5e71; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase; }
+  .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
+  .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
+  .field .val { color:#111; flex:1; }
+  .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
+  .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
+  .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
+  @media print { @page { size:A4 portrait; margin:15mm; } }
+</style>
+</head><body>
+${CLOSE_BUTTON}
+<div class="header">
+  <h1>TUNTAS — Politeknik Negeri Batam</h1>
+  <h2>Riwayat Laporan Ketidaksesuaian — Kepala Unit</h2>
+  <p>Kode: <strong>${item.kode_laporan}</strong> &nbsp;|&nbsp; Dicetak: ${tglCetak}</p>
+</div>
+
+<div class="section">
+  <div class="section-title">Identitas Laporan</div>
+  <div class="field"><span class="lbl">Kode Laporan</span><span class="val">${item.kode_laporan}</span></div>
+  <div class="field"><span class="lbl">Jenis</span><span class="val">${item.jenis_laporan ?? "—"}</span></div>
+  <div class="field"><span class="lbl">Unit</span><span class="val">${namaUnit}</span></div>
+  <div class="field"><span class="lbl">Tanggal Masuk</span><span class="val">${fmtTgl(item.tanggal_laporan ?? null)}</span></div>
+  <div class="field"><span class="lbl">Status</span><span class="val">
+    <span class="badge ${isSelesai ? "badge-green" : "badge-yellow"}">${isSelesai ? "✓ Selesai" : "⏳ Menunggu Approval Staf P4M"}</span>
+  </span></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Isi Laporan Civitas</div>
+  <div class="box">${item.isi_laporan ?? "—"}</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Analisis Penyebab</div>
+  <div class="box">${item.penyebab ?? "<em style='color:#9ca3af'>—</em>"}</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Rencana Tindakan</div>
+  <div class="box">${item.rencana_tindakan ?? "<em style='color:#9ca3af'>—</em>"}</div>
+</div>
+
+${item.aksi_masukan ? `
+<div class="section">
+  <div class="section-title">Masukan Ka P4M</div>
+  <div class="box" style="background:#eff6ff;border-color:#bfdbfe">${item.aksi_masukan}</div>
+</div>` : ""}
+
+<div class="section">
+  <div class="section-title">Hasil Pelaksanaan Tindakan</div>
+  ${item.tanggal_pelaksanaan
+    ? `<div class="field"><span class="lbl">Tanggal Pelaksanaan</span><span class="val">${fmtTgl(item.tanggal_pelaksanaan)}</span></div>`
+    : ""}
+  <div class="box">
+    ${item.hasil_tindakan ?? "<em style='color:#9ca3af'>Belum ada hasil</em>"}
+    ${gambarHasilUrl ? `
+      <img src="${gambarHasilUrl}" class="box-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
+      <span class="box-img-cap">Foto bukti pelaksanaan dari Kepala Unit</span>
+    ` : ""}
+  </div>
+</div>
+
+${isSelesai && item.catatan_approval ? `
+<div class="section">
+  <div class="section-title">Catatan Persetujuan Staf P4M</div>
+  <div class="box" style="background:#f0fdf4;border-color:#bbf7d0">${item.catatan_approval}</div>
+</div>` : ""}
+
+<div class="footer">
+  <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p></div>
+  <div class="ttd">
+    <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
+    <p style="margin-top:4px;">${jabatanPenandatangan},</p>
+    ${
+      qrDataUrl
+        ? `<img src="${qrDataUrl}" class="qr-img" alt="QR TTD Kepala Unit"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
+        : `<div class="signature-placeholder"></div>`
+    }
+    <div class="name" style="margin-top:4px;">( ${jabatanPenandatangan} )</div>
+  </div>
+</div>
+${PRINT_SCRIPT}
+</body></html>`;
+
+  printWindow(html);
+}

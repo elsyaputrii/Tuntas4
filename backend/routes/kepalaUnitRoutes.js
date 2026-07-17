@@ -8,6 +8,7 @@ const {
   getLaporanMasuk,
   submitRancangan,
   getLaporanHasil,
+  getRiwayat,
   submitPelaksanaan,
 } = require("../controllers/kepalaUnitController");
 
@@ -24,5 +25,9 @@ router.post("/rancangan", submitRancangan);   // POST /api/kepala-unit/rancangan
 // Tab Laporan Hasil
 router.get("/laporan-hasil", getLaporanHasil);                          // GET  /api/kepala-unit/laporan-hasil
 router.post("/pelaksanaan",  upload.single("lampiran"), submitPelaksanaan); // POST /api/kepala-unit/pelaksanaan
+
+// Tab Riwayat — rekap laporan yang sudah pernah diisi hasilnya (menunggu
+// approval Staf P4M ATAU sudah selesai), plus export PDF per laporan
+router.get("/riwayat", getRiwayat);                                     // GET  /api/kepala-unit/riwayat
 
 module.exports = router;

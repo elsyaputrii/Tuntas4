@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   CheckCircle2,
+  History,
   LogOut,
   Menu,
   X,
@@ -110,6 +111,12 @@ export default function KaP4MLayout({
       label: 'Laporan Hasil',
       icon: <CheckCircle2 size={18} />,
       path: '/ka-p4m/kepala-unit/laporan-hasil'
+    },
+    {
+      id: 'ku-riwayat',
+      label: 'Riwayat',
+      icon: <History size={18} />,
+      path: '/ka-p4m/kepala-unit/riwayat'
     },
   ];
 

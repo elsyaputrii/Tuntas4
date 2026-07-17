@@ -139,14 +139,18 @@ export async function exportExcel(
   const dipantauData        = prosesData.filter((p) => !selesaiBoxingIds.has(p.id_boxing));
 
   const totalSemua          = rekapData.length + dipantauData.length;
-  const jumlahSelesai       = rekapData.length;
-  const jumlahDipantau      = dipantauData.length;
   const jumlahDitindaklanjuti =
     rekapData.filter((d) => d.status_review === "ditindaklanjuti").length +
     dipantauData.filter((p) => p.status_review === "ditindaklanjuti").length;
   const jumlahTidakDitindak =
     rekapData.filter((d) => d.status_review === "tidak_ditindaklanjuti").length +
     dipantauData.filter((p) => p.status_review === "tidak_ditindaklanjuti").length;
+  // ✅ FIX: dulu kategori "Menunggu/Proses" ini nggak dihitung sama sekali
+  // di Ringkasan Excel — padahal di halaman web (Rekap Status Tindak
+  // Lanjut) ada. Sekarang dihitung sama persis: total dikurangi yang
+  // sudah py Ditindaklanjuti dan Tidak Ditindaklanjuti, supaya angka di
+  // Excel dan di layar web selalu sinkron.
+  const jumlahMenunggu = totalSemua - jumlahDitindaklanjuti - jumlahTidakDitindak;
 
   const tglExport = new Date().toLocaleDateString("id-ID", {
     day: "2-digit", month: "long", year: "numeric",
@@ -220,40 +224,46 @@ export async function exportExcel(
 
   wsRingkasan.addRow([]);
 
-  // Baris statistik ringkasan
-  const statistik = [
-    ["Laporan Selesai",        jumlahSelesai,            HIJAU_BG ],
-    ["Laporan Masih Dipantau", jumlahDipantau,           KUNING_BG],
-    ["Ditindaklanjuti",        jumlahDitindaklanjuti,    "FFD0E4FF"],
-    ["Tidak Ditindaklanjuti",  jumlahTidakDitindak,      "FFFEE2E2"],
-    ["Total Semua Laporan",    totalSemua,               ABU_MUDA ],
+  // Baris statistik ringkasan — sekarang PERSIS sama kategorinya dengan
+  // tabel "Rekap Status Tindak Lanjut" di halaman web (Ditindaklanjuti /
+  // Tidak Ditindaklanjuti / Menunggu-Proses / Total), termasuk kolom
+  // persentase-nya, supaya angka di Excel nggak lagi kelihatan beda
+  // sendiri dari yang ditampilkan di layar.
+  const pct = (n: number) => (totalSemua > 0 ? `${((n / totalSemua) * 100).toFixed(1)}%` : "—");
+  const statistik: [string, number, string, string][] = [
+    ["Ditindaklanjuti",       jumlahDitindaklanjuti, pct(jumlahDitindaklanjuti), "FFD1FAE5"],
+    ["Tidak Ditindaklanjuti", jumlahTidakDitindak,   pct(jumlahTidakDitindak),   "FFFEE2E2"],
+    ["Menunggu / Proses",     jumlahMenunggu,        pct(jumlahMenunggu),        KUNING_BG ],
+    ["Total Semua Laporan",   totalSemua,            pct(totalSemua),           ABU_MUDA  ],
   ];
 
   // Header tabel ringkasan
-  const headerRing = wsRingkasan.addRow(["Status", "Jumlah", "Keterangan"]);
+  const headerRing = wsRingkasan.addRow(["Status", "Jumlah", "Persentase"]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   headerRing.eachCell((cell: any) => styleHeader(cell));
   wsRingkasan.getRow(headerRing.number).height = 22;
 
-  statistik.forEach(([label, nilai, warna]) => {
-    const row = wsRingkasan.addRow([label, nilai, ""]);
+  statistik.forEach(([label, nilai, persen, warna]) => {
+    const row = wsRingkasan.addRow([label, nilai, persen]);
     row.getCell(1).font      = { name: "Arial", size: 10, bold: true };
     row.getCell(1).alignment = { vertical: "middle", wrapText: true };
     row.getCell(1).border    = semuaBorder();
-    row.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: warna as string } };
+    row.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: warna } };
 
     row.getCell(2).font      = { name: "Arial", size: 12, bold: true };
     row.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
     row.getCell(2).border    = semuaBorder();
-    row.getCell(2).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: warna as string } };
+    row.getCell(2).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: warna } };
 
+    row.getCell(3).font      = { name: "Arial", size: 10 };
+    row.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
     row.getCell(3).border    = semuaBorder();
     row.height = 22;
   });
 
   wsRingkasan.getColumn(1).width = 28;
   wsRingkasan.getColumn(2).width = 12;
-  wsRingkasan.getColumn(3).width = 30;
+  wsRingkasan.getColumn(3).width = 16;
 
   // ══════════════════════════════════════════════════════════
   // FUNGSI PEMBANTU — buat worksheet tabel laporan
@@ -286,8 +296,14 @@ export async function exportExcel(
     headerRow.eachCell((cell: any) => styleHeader(cell));
     headerRow.height = 28;
 
-    // Freeze header
-    ws.views = [{ state: "frozen", xSplit: 0, ySplit: 4, topLeftCell: "A5" }];
+    // Freeze header — ✅ FIX: sebelumnya topLeftCell di-set manual ke "A5",
+    // yang di beberapa aplikasi (terutama Google Sheets & Excel Online)
+    // bisa bikin baris header kelihatan "dobel" secara visual (baris
+    // beku render ulang tumpang tindih sama baris pertama area scroll).
+    // Data aslinya sebenarnya cuma ada SATU baris header — sudah dicek
+    // langsung dengan generate file-nya. topLeftCell dihapus, biarkan
+    // Excel/Google Sheets hitung otomatis biar rendering-nya konsisten.
+    ws.views = [{ state: "frozen", xSplit: 0, ySplit: 4 }];
 
     // Lebar kolom
     KOLOM.forEach((k, i) => {

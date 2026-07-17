@@ -6,14 +6,8 @@ import { stafApi, userApi } from "@/lib/api";
 import { exportExcel } from "@/lib/exportExcel";
 import { exportPDFRekap, type PdfKategori } from "@/lib/exportPdf";
 import {
-  fmtTgl,
-  sameDay,
-  toLocalDate,
-  getMonthWeeks,
-  getWeekOfMonth,
-  sameWeekOfMonth,
-  getReopenAction,
-  labelStatusLengkap,
+  fmtTgl, toLocalDate, sameDay, sameWeekOfMonth, getWeekOfMonth,
+  getMonthWeeks, getReopenAction, labelStatusLengkap,
 } from "@/lib/exportHelpers";
 import type { RekapItem, ProsesItem, ArsipItem } from "@/lib/exportTypes";
 
@@ -21,6 +15,8 @@ const BULAN_PANJANG = [
   "Januari","Februari","Maret","April","Mei","Juni",
   "Juli","Agustus","September","Oktober","November","Desember",
 ];
+
+type FilterMode = "semua"|"harian"|"mingguan"|"bulanan"|"tahunan";
 
 /** Format tanggal yang sumbernya gak pasti ISO atau teks bebas (kasus data
  *  arsip Excel tahun lalu, mis. tgl_pelaksanaan bisa aja udah berupa teks
@@ -33,6 +29,10 @@ function formatTglAman(v: string | null): string {
   const d = new Date(v);
   return isNaN(d.getTime()) ? v : fmtTgl(v);
 }
+
+// ══════════════════════════════════════════════════════════
+// KOMPONEN KALENDER & PICKER PERIODE
+// ══════════════════════════════════════════════════════════
 
 interface CalendarProps {
   selectedDate: Date;
@@ -254,8 +254,6 @@ function WeeklyPicker({ selectedDate, onChange }: WeeklyPickerProps) {
   );
 }
 
-type FilterMode = "semua"|"harian"|"mingguan"|"bulanan"|"tahunan";
-
 interface MonthYearPickerProps {
   selectedDate: Date;
   onChange: (d: Date) => void;
@@ -332,6 +330,227 @@ function YearPicker({ selectedDate, onChange }: YearPickerProps) {
   );
 }
 
+// ══════════════════════════════════════════════════════════
+// KOMPONEN UPLOAD & HAPUS DATA ARSIP
+// ══════════════════════════════════════════════════════════
+
+interface ArsipDataManagerProps {
+  /** Dipanggil setelah berhasil hapus arsip suatu tahun, supaya parent
+   *  bisa refresh tabel/statistik kalau tahun itu sedang ditampilkan. */
+  onDeleteSuccess?: (tahun: number) => void;
+}
+
+function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
+  const tahunSekarang = new Date().getFullYear();
+  const tahunPilihanArsip = Array.from({ length: 11 }, (_, i) => tahunSekarang - i); // tahun ini + 10 tahun lalu
+
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [showUploadArsip, setShowUploadArsip] = useState(false);
+
+  // ── Upload ──
+  const [uploadTahun, setUploadTahun] = useState<number>(tahunSekarang - 1);
+  const [uploadingArsip, setUploadingArsip] = useState(false);
+  const [fileArsipTerpilih, setFileArsipTerpilih] = useState<File | null>(null);
+  const fileArsipRef = useRef<HTMLInputElement>(null);
+
+  // ── Hapus ──
+  const [hapusTahun, setHapusTahun] = useState<number>(tahunSekarang - 1);
+  const [deletingArsip, setDeletingArsip] = useState(false);
+  const [confirmHapusArsip, setConfirmHapusArsip] = useState(false);
+
+  async function handlePilihFileArsip(file: File) {
+    setUploadingArsip(true); setError(""); setMsg("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("tahun", String(uploadTahun));
+      const res = await stafApi.uploadArsipRekap(formData);
+      setMsg(res.message ?? `Berhasil mengimpor data arsip tahun ${uploadTahun}.`);
+      setTimeout(()=>setMsg(""),6000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gagal mengunggah file arsip.");
+      setTimeout(()=>setError(""),5000);
+    } finally {
+      setUploadingArsip(false);
+      setFileArsipTerpilih(null);
+      if (fileArsipRef.current) fileArsipRef.current.value = "";
+    }
+  }
+
+  async function handleHapusArsip() {
+    setDeletingArsip(true); setError(""); setMsg("");
+    try {
+      const res = await stafApi.deleteArsipRekap(hapusTahun);
+      setMsg(res.message ?? `Berhasil menghapus data arsip tahun ${hapusTahun}.`);
+      setTimeout(()=>setMsg(""),6000);
+      onDeleteSuccess?.(hapusTahun);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gagal menghapus data arsip.");
+      setTimeout(()=>setError(""),5000);
+    } finally {
+      setDeletingArsip(false);
+      setConfirmHapusArsip(false);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={()=>setShowUploadArsip(v=>!v)}
+        disabled={uploadingArsip}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 text-white text-[10px] font-bold rounded transition-all">
+        {uploadingArsip?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📁"} Upload Data Lama
+      </button>
+
+      {showUploadArsip && (
+        <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2">
+          {/* Pesan sukses/error ditaruh di dalam dropdown ini (bukan cuma
+              di atas tabel), supaya pasti kelihatan tanpa perlu scroll. */}
+          {msg && (
+            <p className="text-green-700 text-[10px] font-bold px-2 py-1.5 bg-green-50 border border-green-200 rounded">
+              ✅ {msg}
+            </p>
+          )}
+          {error && (
+            <p className="text-red-600 text-[10px] font-bold px-2 py-1.5 bg-red-50 border border-red-200 rounded">
+              ❌ {error}
+            </p>
+          )}
+
+          <p className="text-[10px] font-semibold text-black uppercase">🗃️ Upload Data Excel Tahun Lalu</p>
+          <p className="text-[9px] text-black leading-snug">
+            Pilih tahun datanya, lalu pilih file Excel (.xlsx/.xls) yang kolomnya
+            seperti hasil export ini (Kode Laporan, Uraian, Penyebab, dst).
+            Bisa untuk 1 sampai 10 tahun ke belakang. Selain file Excel tidak
+            akan bisa dipilih.
+          </p>
+          <select
+            value={uploadTahun}
+            onChange={(e)=>setUploadTahun(Number(e.target.value))}
+            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-dark-header/30"
+          >
+            {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
+          </select>
+
+          {/* Input file asli disembunyikan; label di bawah ini yang jadi
+              tombol pemicunya supaya teks bawaan browser "No file chosen"
+              tidak ikut tampil. accept diperluas dengan MIME type resmi
+              supaya dialog "buka file" lebih ketat menyaring file Excel. */}
+          <input
+            ref={fileArsipRef}
+            type="file"
+            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={(e)=>{
+              const file = e.target.files?.[0];
+              if(!file){ setFileArsipTerpilih(null); return; }
+              // Jaga-jaga: validasi ekstensi lagi di sisi klien, kalau2
+              // dialog OS/browser tertentu tetap mengizinkan pilih file lain.
+              if(!/\.(xlsx|xls)$/i.test(file.name)){
+                setError("Hanya file Excel (.xlsx / .xls) yang diperbolehkan.");
+                setTimeout(()=>setError(""),5000);
+                setFileArsipTerpilih(null);
+                if (fileArsipRef.current) fileArsipRef.current.value = "";
+                return;
+              }
+              setFileArsipTerpilih(file);
+            }}
+            className="hidden"
+          />
+          <label
+            onClick={()=>fileArsipRef.current?.click()}
+            className="w-full block cursor-pointer text-center text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded py-1.5 px-2"
+          >
+            📁 {fileArsipTerpilih ? fileArsipTerpilih.name : "Pilih File Excel"}
+          </label>
+
+          <button
+            onClick={()=>{ if(fileArsipTerpilih) handlePilihFileArsip(fileArsipTerpilih); }}
+            disabled={!fileArsipTerpilih || uploadingArsip}
+            className="w-full text-[10px] font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 rounded py-1.5 text-center transition-all">
+            {uploadingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"⬆️ Upload"}
+          </button>
+
+          {/* Hapus Data Arsip — pilih tahun mana yang mau dihapus dari
+              data yang sudah pernah diupload. Ada konfirmasi dulu
+              sebelum benar-benar terhapus supaya tidak salah pencet. */}
+          <div className="border-t border-gray-200 pt-2 mt-2 space-y-2">
+            <p className="text-[10px] font-semibold text-red-700 uppercase">🗑️ Hapus Data Arsip</p>
+            <p className="text-[9px] text-black leading-snug">
+              Pilih tahun datanya, lalu hapus data arsip tahun tsb yang
+              sudah pernah diupload sebelumnya.
+            </p>
+            <select
+              value={hapusTahun}
+              onChange={(e)=>{ setHapusTahun(Number(e.target.value)); setConfirmHapusArsip(false); }}
+              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-red-400/30"
+            >
+              {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
+            </select>
+
+            {confirmHapusArsip ? (
+              <div className="space-y-1.5">
+                <p className="text-[9px] text-red-700 font-semibold text-center">
+                  Yakin hapus semua data arsip tahun {hapusTahun}?
+                </p>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={handleHapusArsip}
+                    disabled={deletingArsip}
+                    className="flex-1 text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
+                    {deletingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"Ya, Hapus"}
+                  </button>
+                  <button
+                    onClick={()=>setConfirmHapusArsip(false)}
+                    disabled={deletingArsip}
+                    className="flex-1 text-[10px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded py-1.5 text-center transition-all">
+                    Batal
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={()=>setConfirmHapusArsip(true)}
+                disabled={deletingArsip}
+                className="w-full text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
+                🗑️ Hapus Data Tahun {hapusTahun}
+              </button>
+            )}
+          </div>
+
+          <button onClick={()=>{setShowUploadArsip(false); setFileArsipTerpilih(null); setConfirmHapusArsip(false);}}
+            className="w-full text-[10px] text-black hover:text-gray-600 text-center">Tutup</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// TIPE DATA BARIS TABEL HASIL
+// ══════════════════════════════════════════════════════════
+
+interface DisplayItem {
+  id_boxing: number;
+  kode: string;
+  jenis: string;
+  uraian: string;
+  unit: string;
+  penyebab: string;
+  rencana: string;
+  hasil: string;
+  tglPelaksanaan: string;
+  statusReview: string;
+  statusBoxing: string;
+  approvalStaf: string | null;
+  tglMasuk: string | null;
+  isSelesai: boolean;
+}
+
+// ══════════════════════════════════════════════════════════
+// KOMPONEN UTAMA
+// ══════════════════════════════════════════════════════════
+
 export default function RecapitulationTable() {
   const [rekapData,  setRekapData]  = useState<RekapItem[]>([]);
   const [prosesData, setProsesData] = useState<ProsesItem[]>([]);
@@ -347,56 +566,10 @@ export default function RecapitulationTable() {
   const [showPicker, setShowPicker] = useState(false);
   const [kaP4M, setKaP4M] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
 
-  // ✅ state utk fitur "Upload Data Lama" (arsip Excel s/d 10 tahun
-  // ke belakang) yang tampil di sebelah tombol Excel pada bar Export.
-  const tahunSekarang = new Date().getFullYear();
-  const [showUploadArsip, setShowUploadArsip] = useState(false);
-  const [uploadTahun, setUploadTahun] = useState<number>(tahunSekarang - 1);
-  const [uploadingArsip, setUploadingArsip] = useState(false);
-  const [fileArsipTerpilih, setFileArsipTerpilih] = useState<File | null>(null);
-  const fileArsipRef = useRef<HTMLInputElement>(null);
-  const tahunPilihanArsip = Array.from({ length: 11 }, (_, i) => tahunSekarang - i); // tahun ini + 10 tahun lalu
-
-  // ✅ state utk fitur "Hapus Data Arsip" — staf pilih tahun mana yang
-  // mau dihapus datanya (dari yang sudah pernah diupload via Upload Data Lama).
-  const [hapusTahun, setHapusTahun] = useState<number>(tahunSekarang - 1);
-  const [deletingArsip, setDeletingArsip] = useState(false);
-  const [confirmHapusArsip, setConfirmHapusArsip] = useState(false);
-
-  async function handleHapusArsip() {
-    setDeletingArsip(true); setError(""); setMsg("");
-    try {
-      const res = await stafApi.deleteArsipRekap(hapusTahun);
-      setMsg(res.message ?? `Berhasil menghapus data arsip tahun ${hapusTahun}.`);
-      setTimeout(()=>setMsg(""),6000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Gagal menghapus data arsip.");
-      setTimeout(()=>setError(""),5000);
-    } finally {
-      setDeletingArsip(false);
-      setConfirmHapusArsip(false);
-    }
-  }
-
-  async function handlePilihFileArsip(file: File) {
-    setUploadingArsip(true); setError(""); setMsg("");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("tahun", String(uploadTahun));
-      const res = await stafApi.uploadArsipRekap(formData);
-      setMsg(res.message ?? `Berhasil mengimpor data arsip tahun ${uploadTahun}.`);
-      setShowUploadArsip(false);
-      setTimeout(()=>setMsg(""),6000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Gagal mengunggah file arsip.");
-      setTimeout(()=>setError(""),5000);
-    } finally {
-      setUploadingArsip(false);
-      setFileArsipTerpilih(null);
-      if (fileArsipRef.current) fileArsipRef.current.value = "";
-    }
-  }
+  // ✅ data arsip (hasil "Upload Data Lama") untuk tahun yang sedang
+  // dipilih di filter "Tahunan" — ikut tampil di tabel/statistik layar.
+  const [arsipData, setArsipData] = useState<ArsipItem[]>([]);
+  const [loadingArsip, setLoadingArsip] = useState(false);
 
   useEffect(() => {
     // Ambil data penandatangan (Kepala P4M) untuk ditempel di PDF Rekapitulasi
@@ -409,12 +582,6 @@ export default function RecapitulationTable() {
       })
       .catch(() => { /* nonfatal — PDF tetap bisa dicetak tanpa TTD */ });
   }, []);
-
-  // ✅ data arsip (hasil Upload Data Lama) untuk tahun yang sedang
-  // dipilih di filter "Tahunan" — sebelumnya arsip ini cuma kepanggil
-  // pas Export Excel, gak pernah ikut tampil di tabel/statistik layar.
-  const [arsipData, setArsipData] = useState<ArsipItem[]>([]);
-  const [loadingArsip, setLoadingArsip] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -434,6 +601,14 @@ export default function RecapitulationTable() {
 
   // ✅ Setiap kali mode "tahunan" aktif dan tahun yang dipilih berubah,
   // ambil data arsip tahun itu supaya ikut muncul di tabel & statistik.
+  const fetchArsipTahun = useCallback((tahun: number) => {
+    setLoadingArsip(true);
+    return stafApi.getArsipRekap(tahun)
+      .then((res) => setArsipData(res.data ?? []))
+      .catch(() => setArsipData([]))
+      .finally(() => setLoadingArsip(false));
+  }, []);
+
   useEffect(() => {
     if (filterMode !== "tahunan") { setArsipData([]); return; }
     let batal = false;
@@ -445,10 +620,20 @@ export default function RecapitulationTable() {
     return () => { batal = true; };
   }, [filterMode, selectedDate]);
 
+  // ✅ Dipanggil oleh ArsipDataManager setelah berhasil hapus arsip suatu
+  // tahun. Kalau tabel lagi nampilin tahun itu, langsung refresh datanya
+  // juga supaya baris yang terhapus ikut hilang dari tampilan tanpa perlu
+  // staf reload halaman manual.
+  function handleArsipDeleted(tahun: number) {
+    if (filterMode === "tahunan" && selectedDate.getFullYear() === tahun) {
+      fetchArsipTahun(tahun);
+    }
+  }
+
   const selesaiBoxingIds = new Set(rekapData.map(d=>d.id_boxing));
   const dipantauData     = prosesData.filter(p=>!selesaiBoxingIds.has(p.id_boxing));
 
-  const allItems = [
+  const allItems: DisplayItem[] = [
     ...rekapData.map(d=>({
       id_boxing:d.id_boxing, kode:d.kode_laporan, jenis:d.jenis_laporan??"—",
       uraian:d.uraian_ketidaksesuaian??"—", unit:d.nama_unit??"—",
@@ -510,7 +695,6 @@ export default function RecapitulationTable() {
 
   const filteredItems   = allItems.filter(d=>isInFilter(d.tglMasuk));
   const totalAll        = filteredItems.length;
-  const selesaiCount    = filteredItems.filter(d=>d.isSelesai).length;
   const ditindakCount   = filteredItems.filter(d=>d.statusReview==="ditindaklanjuti").length;
   const tidakDitindak   = filteredItems.filter(d=>d.statusReview==="tidak_ditindaklanjuti").length;
   const menungguCount   = filteredItems.filter(d=>!["ditindaklanjuti","tidak_ditindaklanjuti"].includes(d.statusReview)).length;
@@ -535,6 +719,30 @@ export default function RecapitulationTable() {
       setPendingReopen(prev => { const n = new Set(prev); n.delete(id_boxing); return n; });
       setError(err instanceof Error?err.message:"Gagal."); setTimeout(()=>setError(""),4000);
     }
+  }
+
+  // ✅ Warna & label status di tabel disamakan dengan kategori "Rekap
+  // Status Tindak Lanjut" (statistik atas) dan Excel Ringkasan: Hijau =
+  // Ditindaklanjuti, Merah = Tidak Ditindaklanjuti, Kuning = Menunggu/
+  // Proses. `butuhAksiStaf` tetap diambil dari labelStatusLengkap supaya
+  // tombol aksi di kolom "Tindakan" tidak berubah perilakunya.
+  function statusFor(item: DisplayItem) {
+    const isReopenPending = pendingReopen.has(item.id_boxing);
+    const reopenAction = getReopenAction(item.statusBoxing, item.statusReview);
+    const { butuhAksiStaf } = labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
+
+    let label: string, cls: string;
+    if (isReopenPending) {
+      label = "⏳ Dipantau";               cls = "bg-yellow-100 text-yellow-700";
+    } else if (item.statusReview === "ditindaklanjuti") {
+      label = "✅ Ditindaklanjuti";         cls = "bg-green-100 text-green-700";
+    } else if (item.statusReview === "tidak_ditindaklanjuti") {
+      label = "❌ Tidak Ditindaklanjuti";    cls = "bg-red-100 text-red-700";
+    } else {
+      label = "⏳ Menunggu / Proses";       cls = "bg-yellow-100 text-yellow-700";
+    }
+    const statusInfo = { label, cls, butuhAksiStaf };
+    return { isReopenPending, reopenAction, statusInfo };
   }
 
   if(loading) return(
@@ -639,10 +847,10 @@ export default function RecapitulationTable() {
                 const ids=new Set(rekapData.map(d=>d.id_boxing));
                 return !ids.has(p.id_boxing)&&isInFilter(p.created_at??null);
               });
-              // ✅ FIX: Data arsip sekarang ikut mengikuti filter di layar —
-              // kalau lagi mode "Tahunan" dan pilih tahun tertentu, cuma
-              // arsip tahun itu yang disertakan (bukan semua tahun) supaya
-              // export Excel sesuai dengan tahun yang lagi dipilih di layar.
+              // ✅ Data arsip ikut mengikuti filter di layar — kalau lagi
+              // mode "Tahunan" dan pilih tahun tertentu, cuma arsip tahun
+              // itu yang disertakan (bukan semua tahun) supaya export
+              // Excel sesuai dengan tahun yang lagi dipilih di layar.
               // Untuk mode lain (Semua/Harian/Mingguan/Bulanan), semua
               // tahun arsip yang pernah diupload tetap disertakan.
               let arsipExport: ArsipItem[] = [];
@@ -661,125 +869,7 @@ export default function RecapitulationTable() {
           {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel
         </button>
 
-        {/* Upload Data Lama — di samping tombol Excel. Staf pilih
-            tahun (s/d 10 tahun ke belakang) lalu unggah file Excel data
-            tahun tsb; datanya akan ikut muncul rapi per tahun saat Excel
-            di-export lagi lewat tombol di atas. */}
-        <div className="relative">
-          <button
-            onClick={()=>setShowUploadArsip(v=>!v)}
-            disabled={uploadingArsip}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 text-white text-[10px] font-bold rounded transition-all">
-            {uploadingArsip?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📁"} Upload Data Lama
-          </button>
-
-          {showUploadArsip && (
-            <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2">
-              <p className="text-[10px] font-semibold text-black uppercase">🗃️ Upload Data Excel Tahun Lalu</p>
-              <p className="text-[9px] text-black leading-snug">
-                Pilih tahun datanya, lalu pilih file Excel (.xlsx/.xls) yang kolomnya
-                seperti hasil export ini (Kode Laporan, Uraian, Penyebab, dst).
-                Bisa untuk 1 sampai 10 tahun ke belakang. Selain file Excel tidak
-                akan bisa dipilih.
-              </p>
-              <select
-                value={uploadTahun}
-                onChange={(e)=>setUploadTahun(Number(e.target.value))}
-                className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-              >
-                {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
-              </select>
-
-              {/* Input file asli disembunyikan; label di bawah ini yang jadi
-                  tombol pemicunya supaya teks bawaan browser "No file chosen"
-                  tidak ikut tampil. accept diperluas dengan MIME type resmi
-                  supaya dialog "buka file" lebih ketat menyaring file Excel. */}
-              <input
-                ref={fileArsipRef}
-                type="file"
-                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                onChange={(e)=>{
-                  const file = e.target.files?.[0];
-                  if(!file){ setFileArsipTerpilih(null); return; }
-                  // Jaga-jaga: validasi ekstensi lagi di sisi klien, kalau2
-                  // dialog OS/browser tertentu tetap mengizinkan pilih file lain.
-                  if(!/\.(xlsx|xls)$/i.test(file.name)){
-                    setError("Hanya file Excel (.xlsx / .xls) yang diperbolehkan.");
-                    setTimeout(()=>setError(""),5000);
-                    setFileArsipTerpilih(null);
-                    if (fileArsipRef.current) fileArsipRef.current.value = "";
-                    return;
-                  }
-                  setFileArsipTerpilih(file);
-                }}
-                className="hidden"
-              />
-              <label
-                onClick={()=>fileArsipRef.current?.click()}
-                className="w-full block cursor-pointer text-center text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded py-1.5 px-2"
-              >
-                📁 {fileArsipTerpilih ? fileArsipTerpilih.name : "Pilih File Excel"}
-              </label>
-
-              <button
-                onClick={()=>{ if(fileArsipTerpilih) handlePilihFileArsip(fileArsipTerpilih); }}
-                disabled={!fileArsipTerpilih || uploadingArsip}
-                className="w-full text-[10px] font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 rounded py-1.5 text-center transition-all">
-                {uploadingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"⬆️ Upload"}
-              </button>
-
-              {/* Hapus Data Arsip — pilih tahun mana yang mau dihapus dari
-                  data yang sudah pernah diupload. Ada konfirmasi dulu
-                  sebelum benar-benar terhapus supaya tidak salah pencet. */}
-              <div className="border-t border-gray-200 pt-2 mt-2 space-y-2">
-                <p className="text-[10px] font-semibold text-red-700 uppercase">🗑️ Hapus Data Arsip</p>
-                <p className="text-[9px] text-black leading-snug">
-                  Pilih tahun datanya, lalu hapus data arsip tahun tsb yang
-                  sudah pernah diupload sebelumnya.
-                </p>
-                <select
-                  value={hapusTahun}
-                  onChange={(e)=>{ setHapusTahun(Number(e.target.value)); setConfirmHapusArsip(false); }}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-red-400/30"
-                >
-                  {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
-                </select>
-
-                {confirmHapusArsip ? (
-                  <div className="space-y-1.5">
-                    <p className="text-[9px] text-red-700 font-semibold text-center">
-                      Yakin hapus semua data arsip tahun {hapusTahun}?
-                    </p>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={handleHapusArsip}
-                        disabled={deletingArsip}
-                        className="flex-1 text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
-                        {deletingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"Ya, Hapus"}
-                      </button>
-                      <button
-                        onClick={()=>setConfirmHapusArsip(false)}
-                        disabled={deletingArsip}
-                        className="flex-1 text-[10px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded py-1.5 text-center transition-all">
-                        Batal
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={()=>setConfirmHapusArsip(true)}
-                    disabled={deletingArsip}
-                    className="w-full text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
-                    🗑️ Hapus Data Tahun {hapusTahun}
-                  </button>
-                )}
-              </div>
-
-              <button onClick={()=>{setShowUploadArsip(false); setFileArsipTerpilih(null); setConfirmHapusArsip(false);}}
-                className="w-full text-[10px] text-black hover:text-gray-600 text-center">Tutup</button>
-            </div>
-          )}
-        </div>
+        <ArsipDataManager onDeleteSuccess={handleArsipDeleted} />
 
         <span className="text-[9px] text-gray-400">PDF:</span>
         {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
@@ -787,7 +877,8 @@ export default function RecapitulationTable() {
             onClick={async ()=>{ setExportingPDF(kat); await exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M); setExportingPDF(null); }}
             disabled={exportingPDF===kat}
             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
-            📄 {kat.charAt(0).toUpperCase()+kat.slice(1)}
+            {exportingPDF===kat?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📄"}
+            {kat.charAt(0).toUpperCase()+kat.slice(1)}
           </button>
         ))}
         <span className="text-[9px] text-gray-400 ml-auto italic hidden sm:block">
@@ -812,13 +903,7 @@ export default function RecapitulationTable() {
           </div>
         ):(
           filteredItems.map((item,index)=>{
-            const isReopenPending = pendingReopen.has(item.id_boxing);
-            const reopenAction = getReopenAction(item.statusBoxing, item.statusReview);
-            const statusInfo = isReopenPending
-              ? { label: "⏳ Dipantau", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: false }
-              : item.isSelesai
-                ? { label: "✓ Selesai", cls: "bg-green-100 text-green-700", butuhAksiStaf: false }
-                : labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
+            const { isReopenPending, reopenAction, statusInfo } = statusFor(item);
             return (
               <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-175 border-t-2 border-black text-[11px]">
                 <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
@@ -872,13 +957,7 @@ export default function RecapitulationTable() {
           <div className="p-8 text-center text-gray-400 italic">Tidak ada data untuk periode ini.</div>
         ) : (
           filteredItems.map((item,index)=>{
-            const isReopenPending = pendingReopen.has(item.id_boxing);
-            const reopenAction = getReopenAction(item.statusBoxing, item.statusReview);
-            const statusInfo = isReopenPending
-              ? { label: "⏳ Dipantau", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: false }
-              : item.isSelesai
-                ? { label: "✓ Selesai", cls: "bg-green-100 text-green-700", butuhAksiStaf: false }
-                : labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
+            const { isReopenPending, reopenAction, statusInfo } = statusFor(item);
             return (
               <div key={`m-${item.id_boxing}-${index}`} className="border-t-2 border-black p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
