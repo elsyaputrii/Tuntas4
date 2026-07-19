@@ -51,6 +51,41 @@ export default function StaffP4MLayout({
     }
   }, [router]);
 
+  // Auto-logout saat token JWT expired — nggak nunggu ada request ke server dulu.
+// Baca field "exp" dari payload token, lalu pasang timer yang otomatis
+// logout + redirect ke login TEPAT saat waktunya habis.
+useEffect(() => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  let expiredAtMs: number | null = null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp) expiredAtMs = payload.exp * 1000; // exp dari JWT dalam detik
+  } catch {
+    return; // token rusak/format aneh, biar auth check di atas yang tangani
+  }
+  if (!expiredAtMs) return;
+
+  const doAutoLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    router.push('/staff-p4m/login'); // beda per file: /ka-p4m/login, /kepala-unit/login
+  };
+
+  const sisaWaktu = expiredAtMs - Date.now();
+
+  // Kalau ternyata pas dibuka token sudah kadaluarsa (misal tab lama dibuka lagi)
+  if (sisaWaktu <= 0) {
+    doAutoLogout();
+    return;
+  }
+
+  const timer = setTimeout(doAutoLogout, sisaWaktu);
+  return () => clearTimeout(timer);
+}, [router]);
+
   useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem('darkMode') === 'true';

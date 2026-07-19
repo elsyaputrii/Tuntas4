@@ -3,14 +3,6 @@ const express = require("express");
 const router = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const { pool } = require("../config/db");
-// ✅ FITUR PINDAH KEWENANGAN: keputusan "diterima/ditolak" atas hasil
-// tindak lanjut Kepala Unit sekarang jadi wewenang Ka P4M, BUKAN Staf
-// P4M lagi. Staf P4M cuma boleh lihat & pantau (lewat /staf/proses),
-// tidak boleh memutuskan ulang-atau-tidak. Fungsi setApprovalStaf tetap
-// hidup di stafController.js (logic-nya tidak berubah), tapi sekarang
-// di-mount di endpoint /ka-p4m/approval-hasil, jadi otomatis kena
-// roleMiddleware("ka_p4m") dari router.use di bawah — bukan lagi
-// roleMiddleware("staf_p4m") seperti sebelumnya di stafRoutes.js.
 const { setApprovalStaf } = require("../controllers/stafController");
 
 router.use(authMiddleware);
@@ -102,14 +94,6 @@ router.patch("/keputusan", async (req, res) => {
     }
 
     const row = rows[0];
-    // ✅ FIX: sebelumnya endpoint ini menolak (400) kalau status_review
-    // sudah bukan "menunggu_keputusan_ka" lagi. Itu bikin fitur "Edit
-    // Keputusan" (tombol pensil kuning di tabel) tidak pernah bisa
-    // dipakai, karena tombol itu justru muncul untuk rancangan yang
-    // SUDAH diputuskan (ditindaklanjuti / tidak_ditindaklanjuti).
-    // Sekarang endpoint ini boleh dipanggil ulang untuk kedua status
-    // tersebut (mode edit), dan hanya menolak kalau rancangan belum
-    // pernah diputuskan sama sekali dalam kondisi yang tidak valid.
     const editableStatus = [
       "menunggu_keputusan_ka",
       "ditindaklanjuti",
@@ -139,9 +123,9 @@ router.patch("/keputusan", async (req, res) => {
     } else {
       await conn.query(
         `UPDATE rancangan_tindakan
-         SET status_review = 'tidak_ditindaklanjuti', aksi_masukan = NULL, updated_at = NOW()
+         SET status_review = 'tidak_ditindaklanjuti', aksi_masukan = ?, updated_at = NOW()
          WHERE id_rancangan = ?`,
-        [id_rancangan]
+        [aksi_masukan?.trim() || null, id_rancangan]
       );
       await conn.query(
         `UPDATE boxing_ketidaksesuaian SET status = 'di_staff' WHERE id_boxing = ?`,

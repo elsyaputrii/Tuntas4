@@ -197,11 +197,21 @@ export default function DashboardKepalaUnitP4MPage() {
     fetchData();
   }, [isChecking]);
 
+  // Batas waktu (SLA) sebelum laporan yang belum selesai dianggap "Overdue".
+  const SLA_HARI = 7;
+
   const stats = {
     total: dataLaporan.length,
     diproses: dataLaporan.filter((i) => i.status !== "Close").length,
     selesai: dataLaporan.filter((i) => i.status === "Close").length,
-    overdue: dataLaporan.filter((i) => i.status === "Overdue").length,
+    overdue: dataLaporan.filter((i) => {
+      if (i.status === "Close") return false;
+      if (!i.tanggal_submit) return false;
+      const tanggalMasuk = new Date(i.tanggal_submit).getTime();
+      if (isNaN(tanggalMasuk)) return false;
+      const hariBerjalan = (Date.now() - tanggalMasuk) / (1000 * 60 * 60 * 24);
+      return hariBerjalan > SLA_HARI;
+    }).length,
   };
 
   if (isChecking || loading) {

@@ -52,6 +52,7 @@ interface ProsesItem {
   lampiran_hasil: string | null;
   tanggal_pelaksanaan: string | null;
   approval_staf: string | null;
+  catatan_approval: string | null;
   created_at?: string | null;
 }
 
@@ -154,11 +155,18 @@ export default function ProcessMonitorTable() {
 
     if (apprVal) {
       return (
-        <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
-          apprVal === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
-        }`}>
-          {apprVal === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
-        </span>
+        <div className="flex flex-col items-center gap-1">
+          <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
+            apprVal === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
+          }`}>
+            {apprVal === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
+          </span>
+          {item.catatan_approval && (
+            <p className="text-[9px] text-gray-500 italic text-center max-w-55">
+              {item.catatan_approval} <span className="text-gray-400">(alasan dari Ka P4M)</span>
+            </p>
+          )}
+        </div>
       );
     }
 
@@ -284,7 +292,7 @@ export default function ProcessMonitorTable() {
         {/* ── DESKTOP ── */}
         <div className="hidden lg:block">
           <div
-            className="min-w-[860px] font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]"
+            className="min-w-215 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]"
             style={{ display: "table", tableLayout: "fixed", width: "100%" }}
           >
             <div style={{ display: "table-row" }}>
@@ -296,7 +304,7 @@ export default function ProcessMonitorTable() {
           </div>
 
           {aktif.length === 0 && selesai.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 italic min-w-[860px]">Belum ada laporan diproses.</div>
+            <div className="p-8 text-center text-gray-400 italic min-w-215">Belum ada laporan diproses.</div>
           ) : (
             <>
               {aktif.map((item) => {
@@ -304,7 +312,7 @@ export default function ProcessMonitorTable() {
                 return (
                   <div
                     key={`${item.id_laporan}-${item.id_boxing}`}
-                    className="min-w-[860px] border-t-2 border-black"
+                    className="min-w-215 border-t-2 border-black"
                     style={{ display: "table", tableLayout: "fixed", width: "100%" }}
                   >
                     <div style={{ display: "table-row" }}>
@@ -332,6 +340,11 @@ export default function ProcessMonitorTable() {
                       <div style={{ display: "table-cell", width: "15%" }} className="border-r-2 border-black p-3 align-top">
                         {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
                         {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
+                        {item.approval_staf && item.approval_staf !== "menunggu" && item.catatan_approval && (
+                          <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">
+                            {item.catatan_approval} <span className="text-gray-400">(alasan dari Ka P4M)</span>
+                          </p>
+                        )}
                       </div>
 
                       <div style={{ display: "table-cell", width: "32%" }} className="border-r-2 border-black p-3 align-top">
@@ -368,7 +381,7 @@ export default function ProcessMonitorTable() {
 
               {selesai.length > 0 && (
                 <>
-                  <div className="bg-gray-100 px-3 py-1 text-[10px] font-bold uppercase border-t-2 border-black min-w-[860px]">
+                  <div className="bg-gray-100 px-3 py-1 text-[10px] font-bold uppercase border-t-2 border-black min-w-215">
                     Sudah selesai — gunakan tab Rekapitulasi untuk membuka kembali
                   </div>
                   {selesai.map((item) => {
@@ -376,7 +389,7 @@ export default function ProcessMonitorTable() {
                     return (
                       <div
                         key={`${item.id_laporan}-${item.id_boxing}`}
-                        className="min-w-[860px] border-t-2 border-black"
+                        className="min-w-215 border-t-2 border-black"
                         style={{ display: "table", tableLayout: "fixed", width: "100%" }}
                       >
                         <div style={{ display: "table-row" }}>
@@ -403,6 +416,11 @@ export default function ProcessMonitorTable() {
                           <div style={{ display: "table-cell", width: "15%" }} className="border-r-2 border-black p-3 align-top">
                             {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
                             {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
+                            {item.approval_staf && item.approval_staf !== "menunggu" && item.catatan_approval && (
+                              <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">
+                                {item.catatan_approval} <span className="text-gray-400">(alasan dari Ka P4M)</span>
+                              </p>
+                            )}
                           </div>
 
                           <div style={{ display: "table-cell", width: "32%" }} className="border-r-2 border-black p-3 align-top">

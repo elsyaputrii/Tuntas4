@@ -7,7 +7,6 @@ import {
   Clock,
   TrendingUp,
   BarChart3,
-  FileSpreadsheet,
 } from "lucide-react";
 import {
   LineChart,
@@ -25,17 +24,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { stafApi } from "@/lib/api";
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 export default function DashboardStaff() {
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dataLaporan, setDataLaporan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState("semua");
-  const [filterUnit, setFilterUnit] = useState("semua");
 
   const [chartData, setChartData] = useState([
     { bulan: "Jan", total: 0, diproses: 0, selesai: 0 },
@@ -53,9 +47,10 @@ export default function DashboardStaff() {
   ]);
 
   const [statusData, setStatusData] = useState([
+    { name: "Diterima", value: 0, color: "#3b82f6" },
+    { name: "Distribusi", value: 0, color: "#8b5cf6" },
     { name: "Diproses", value: 0, color: "#f59e0b" },
-    { name: "Review", value: 0, color: "#8b5cf6" },
-    { name: "Tindak Lanjut", value: 0, color: "#06b6d4" },
+    { name: "Review Ka-P4M", value: 0, color: "#6366f1" },
     { name: "Selesai", value: 0, color: "#10b981" },
   ]);
 
@@ -131,17 +126,20 @@ export default function DashboardStaff() {
       setChartData(newChartData);
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const diproses = data.filter((d: any) => d.status !== "Close" && d.status !== "Diterima").length;
+      const diterima = data.filter((d: any) => d.status === "Diterima").length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const distribusi = data.filter((d: any) => d.status === "Distribusi").length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const diproses = data.filter((d: any) => d.status === "Diproses").length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const review = data.filter((d: any) => d.status === "Review Ka-P4M").length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tindakLanjut = data.filter((d: any) => d.status === "Tindak Lanjut").length;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const selesai = data.filter((d: any) => d.status === "Close").length;
       setStatusData([
+        { name: "Diterima", value: diterima, color: "#3b82f6" },
+        { name: "Distribusi", value: distribusi, color: "#8b5cf6" },
         { name: "Diproses", value: diproses, color: "#f59e0b" },
-        { name: "Review", value: review, color: "#8b5cf6" },
-        { name: "Tindak Lanjut", value: tindakLanjut, color: "#06b6d4" },
+        { name: "Review Ka-P4M", value: review, color: "#6366f1" },
         { name: "Selesai", value: selesai, color: "#10b981" },
       ]);
       
@@ -152,73 +150,26 @@ export default function DashboardStaff() {
     }
   };
 
-  // ========== EXPORT EXCEL ==========
-  const exportToExcel = () => {
-    const exportData = dataLaporan.map((item, idx) => ({
-      No: idx + 1,
-      Uraian: item.isi_laporan || '-',
-      Penyebab: item.penyebab || '-',
-      RTL: item.rencana_tindak_lanjut || '-',
-      Status: item.status || '-',
-      Hasil: item.hasil_tindak_lanjut || '-',
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
-    XLSX.writeFile(wb, `Laporan_Staff_P4M_${new Date().toLocaleDateString('id-ID')}.xlsx`);
-  };
-
-  // ========== EXPORT PDF ==========
-  const exportToPDF = () => {
-    const doc = new jsPDF('landscape', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    doc.setFontSize(16);
-    doc.text('Laporan Staff P4M', pageWidth / 2, 15, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 22, { align: 'center' });
-
-    const tableData = dataLaporan.map((item, idx) => [
-      (idx + 1).toString(),
-      item.isi_laporan?.substring(0, 50) || '-',
-      item.penyebab || '-',
-      item.rencana_tindak_lanjut || '-',
-      item.status || '-',
-      item.hasil_tindak_lanjut || '-',
-    ]);
-
-    autoTable(doc, {
-      head: [['No', 'Uraian', 'Penyebab', 'RTL', 'Status', 'Hasil']],
-      body: tableData,
-      startY: 30,
-      styles: { fontSize: 7, cellPadding: 1.5 },
-      headStyles: { fillColor: [59, 75, 101] },
-      alternateRowStyles: { fillColor: [240, 240, 240] },
-      margin: { left: 10, right: 10 },
-    });
-
-    doc.save(`Laporan_Staff_P4M_${new Date().toLocaleDateString('id-ID')}.pdf`);
-  };
-
   const totalLaporan = dataLaporan.length;
   const prosesCount = dataLaporan.filter((item) => item.status !== "Close").length;
   const selesaiCount = dataLaporan.filter((item) => item.status === "Close").length;
-  const overdueCount = dataLaporan.filter((item) => item.status === "Overdue").length;
 
-  const daftarUnit = ["semua", "Akademik", "BMN dan Pengadaan", "Career Development Center", "Jurusan Elektro", "K3L", "Kehumasan dan Protokoler", "Kemahasiswaan", "Kerjasama", "P4M", "Perencanaan", "Perpustakaan", "Satgas PPKPT", "Shilau", "Sub Bagian Umum", "UPA PP", "UPA TIK"];
+  // Batas waktu (SLA) sebelum laporan yang belum selesai dianggap "Overdue".
+  // Ubah angka ini kalau ternyata aturan SLA di kampus beda.
+  const SLA_HARI = 7;
 
-  const getWarnaStatus = (status: string) => {
-    switch (status) {
-      case "Diterima": return "bg-blue-100 text-blue-700";
-      case "Distribusi": return "bg-purple-100 text-purple-700";
-      case "Diproses": return "bg-yellow-100 text-yellow-700";
-      case "Review Ka-P4M": return "bg-indigo-100 text-indigo-700";
-      case "Tindak Lanjut": return "bg-cyan-100 text-cyan-700";
-      case "Close": return "bg-green-100 text-green-700";
-      default: return "bg-gray-100 text-gray-700";
-    }
-  };
+  const overdueCount = dataLaporan.filter((item) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const it = item as any;
+    if (it.status === "Close") return false; // sudah selesai, gak mungkin overdue
+    if (!it.tanggal_submit) return false;
+
+    const tanggalMasuk = new Date(it.tanggal_submit).getTime();
+    if (isNaN(tanggalMasuk)) return false;
+
+    const hariBerjalan = (Date.now() - tanggalMasuk) / (1000 * 60 * 60 * 24);
+    return hariBerjalan > SLA_HARI;
+  }).length;
 
   if (loading) {
     return (
@@ -316,75 +267,6 @@ export default function DashboardStaff() {
               <Bar dataKey="selesai" fill="#10b981" name="Selesai" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* FILTER */}
-      <div className="mt-6 flex flex-wrap justify-between items-center gap-3">
-        <div className="flex gap-2">
-          <button 
-            onClick={exportToExcel}
-            className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition"
-          >
-            <FileSpreadsheet size={14} /> Excel
-          </button>
-          <button 
-            onClick={exportToPDF}
-            className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition"
-          >
-            <FileText size={14} /> PDF
-          </button>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border">
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-transparent text-sm">
-              <option value="semua">Semua Status</option>
-              <option value="Distribusi">Distribusi</option>
-              <option value="Diproses">Diproses</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border">
-            <select value={filterUnit} onChange={(e) => setFilterUnit(e.target.value)} className="bg-transparent text-sm">
-              {daftarUnit.map((u) => (<option key={u} value={u}>{u === "semua" ? "Semua Unit" : u}</option>))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* TABEL LAPORAN */}
-      <div className="mt-4 overflow-x-auto">
-        <div className="bg-white rounded-2xl shadow-md border overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-center text-sm">No</th>
-                <th className="px-4 py-3 text-left text-sm">Uraian</th>
-                <th className="px-4 py-3 text-left text-sm">Penyebab</th>
-                <th className="px-4 py-3 text-left text-sm">RTL</th>
-                <th className="px-4 py-3 text-center text-sm">Status</th>
-                <th className="px-4 py-3 text-left text-sm">Hasil</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dataLaporan.slice(0, 5).map((item, idx) => (
-                <tr key={item.id} className="border-b">
-                  <td className="px-4 py-3 text-center text-sm">{idx + 1}</td>
-                  <td className="px-4 py-3 text-sm">{item.isi_laporan?.substring(0, 50)}...</td>
-                  <td className="px-4 py-3 text-sm">{item.penyebab || "-"}</td>
-                  <td className="px-4 py-3 text-sm">{item.rencana_tindak_lanjut || "-"}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getWarnaStatus(item.status)}`}>{item.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">{item.hasil_tindak_lanjut || "-"}</td>
-                </tr>
-              ))}
-              {dataLaporan.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-8 text-slate-400">Belum ada data</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </>
