@@ -201,11 +201,14 @@ export async function exportPDFRekap(
   const qrTextRekap = `LAPORAN REKAPITULASI TUNTAS - Polibatam\nPeriode: ${labelKat[kategori]}\nPenandatangan: ${jabatanPenandatanganRekap}\nDicetak: ${tglCetakRekap}`;
   const qrDataUrlRekap = await generateQrDataUrl(qrTextRekap);
 
-  function badgeReview(sr: string) {
-    if (sr === "ditindaklanjuti")       return `<span class="badge badge-green">✓ Ditindaklanjuti</span>`;
-    if (sr === "tidak_ditindaklanjuti") return `<span class="badge badge-red">✗ Tidak</span>`;
-    if (sr === "menunggu_keputusan_ka") return `<span class="badge badge-yellow">⏳ Ka P4M</span>`;
-    return `<span class="badge badge-gray">—</span>`;
+  // ✅ Sama seperti exportExcel.ts: "Selesai" (rekapData) SELALU tampil
+  // "Ditindaklanjuti", "Masih Dipantau" (dipantauData) SELALU tampil
+  // "Menunggu / Proses" — nggak lihat raw status_review lagi, supaya
+  // nggak ada satu tabel yang isinya campur dua label berbeda.
+  function badgeReview(isSelesai: boolean) {
+    return isSelesai
+      ? `<span class="badge badge-green">✓ Ditindaklanjuti</span>`
+      : `<span class="badge badge-yellow">⏳ Menunggu / Proses</span>`;
   }
 
   const tableRows = allRows.map((r) => {
@@ -227,7 +230,7 @@ export async function exportPDFRekap(
         ` : ""}
       </td>
       <td class="center">${r.tgl}</td>
-      <td class="center">${badgeReview(r.statusReview)}</td>
+      <td class="center">${badgeReview(r.isSelesai)}</td>
       <td class="center">
         <span class="badge ${r.isSelesai ? "badge-blue" : "badge-yellow"}">
           ${r.isSelesai ? "Selesai" : "Dipantau"}

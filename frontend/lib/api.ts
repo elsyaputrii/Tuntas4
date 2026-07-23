@@ -64,8 +64,31 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
-  const data     = await response.json();
+  // Batas waktu tunggu respons server. Tanpa ini, kalau server lagi
+  // down/query macet, fetch() bakal nunggu SELAMANYA — bikin UI nyangkut
+  // di loading terus (spinner nggak pernah berhenti), padahal harusnya
+  // dianggap gagal biar user bisa tahu & coba lagi.
+  const TIMEOUT_MS = 15000; // 15 detik
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Server tidak merespons. Periksa koneksi Anda dan coba lagi.");
+    }
+    throw new Error("Gagal terhubung ke server. Periksa koneksi Anda dan coba lagi.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const data = await response.json();
 
   if (!response.ok) {
     // Kalau request ini SUDAH bawa token, tapi server tetap balas 401 →
@@ -153,12 +176,6 @@ export const stafApi = {
       body: JSON.stringify({ id_boxing, keputusan }),
     }),
 
-  // ❌ DIHAPUS: setApprovalBoxing. Keputusan "diterima/ditolak" atas hasil
-  // tindak lanjut unit sekarang HANYA wewenang Ka P4M — lihat
-  // kaP4MApi.setApprovalHasil di bawah. Staf P4M cuma pantau lewat
-  // getProsesMonitor/getRekapitulasi, tidak lagi punya endpoint untuk
-  // memutuskan ulang-atau-tidak.
-
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
 
@@ -173,13 +190,6 @@ export const stafApi = {
 
 // ─────────────────────────────────────────────
 // KA P4M — semua endpoint butuh role = ka_p4m
-//
-// PERBAIKAN UTAMA:
-// Sebelumnya KaP4MReviewTable.tsx dan KaP4MHasilTable.tsx
-// memanggil stafApi.getProsesMonitor() dan stafApi.reviewRancangan()
-// → Ini salah! Ka P4M bukan Staf P4M → kena 403 Forbidden
-//
-// Sekarang Ka P4M punya endpoint sendiri: /api/ka-p4m/...
 // ─────────────────────────────────────────────
 export const kaP4MApi = {
   getProsesMonitor: () => apiFetch("/ka-p4m/proses"),
@@ -191,14 +201,9 @@ export const kaP4MApi = {
   }) =>
     apiFetch("/ka-p4m/keputusan", { method: "PATCH", body: JSON.stringify(body) }),
 
-  // ✅ FITUR BARU: Ka P4M memantau data Kepala Unit (read-only, semua unit)
   getKepalaUnitLaporanMasuk: () => apiFetch("/ka-p4m/kepala-unit/laporan-masuk"),
   getKepalaUnitLaporanHasil: () => apiFetch("/ka-p4m/kepala-unit/laporan-hasil"),
 
-  // ✅ FITUR PINDAH: dulu stafApi.setApprovalBoxing. Sekarang keputusan
-  // "diterima" (→ laporan otomatis Selesai) atau "ditolak" (→ balik ke
-  // Kepala Unit untuk revisi hasil) atas hasil tindak lanjut unit adalah
-  // wewenang Ka P4M, bukan Staf P4M lagi.
   setApprovalHasil: (
     id_boxing: number,
     approval: "diterima" | "ditolak",
@@ -237,7 +242,6 @@ export const userApi = {
     apiFetch(`/users/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteUser: (id: number) =>
     apiFetch(`/users/${id}`, { method: "DELETE" }),
-  // Tanda tangan (TTD) digital akun — ditempel otomatis di PDF
   uploadTandaTangan: (id: number, file: File) => {
     const formData = new FormData();
     formData.append("tanda_tangan", file);

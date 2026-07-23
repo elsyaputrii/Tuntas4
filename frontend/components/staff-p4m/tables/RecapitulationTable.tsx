@@ -695,9 +695,17 @@ export default function RecapitulationTable() {
 
   const filteredItems   = allItems.filter(d=>isInFilter(d.tglMasuk));
   const totalAll        = filteredItems.length;
-  const ditindakCount   = filteredItems.filter(d=>d.statusReview==="ditindaklanjuti").length;
-  const tidakDitindak   = filteredItems.filter(d=>d.statusReview==="tidak_ditindaklanjuti").length;
-  const menungguCount   = filteredItems.filter(d=>!["ditindaklanjuti","tidak_ditindaklanjuti"].includes(d.statusReview)).length;
+  // ✅ Disamakan persis dengan Excel: "Ditindaklanjuti" = laporan yang
+  // boxing-nya sudah "selesai" (sama seperti isi sheet "Laporan
+  // Selesai"), "Menunggu / Proses" = sisanya (sama seperti sheet
+  // "Laporan Masih Dipantau"). Tidak lagi lihat raw status_review
+  // per-item, supaya nggak ada laporan yang sebenarnya masih di sheet
+  // "Masih Dipantau" tapi ke-hitung sebagai "Ditindaklanjuti" di sini.
+  const ditindakCount   = filteredItems.filter(d=>d.isSelesai).length;
+  // "Tidak Ditindaklanjuti" digabung ke "Menunggu / Proses" — tidak
+  // ditampilkan sebagai kategori terpisah lagi di Rekap Status Tindak
+  // Lanjut maupun di Excel.
+  const menungguCount   = filteredItems.filter(d=>!d.isSelesai).length;
 
   const mingguSelected = getWeekOfMonth(selectedDate);
   const labelFilter:Record<FilterMode,string>={
@@ -722,10 +730,12 @@ export default function RecapitulationTable() {
   }
 
   // ✅ Warna & label status di tabel disamakan dengan kategori "Rekap
-  // Status Tindak Lanjut" (statistik atas) dan Excel Ringkasan: Hijau =
-  // Ditindaklanjuti, Merah = Tidak Ditindaklanjuti, Kuning = Menunggu/
-  // Proses. `butuhAksiStaf` tetap diambil dari labelStatusLengkap supaya
-  // tombol aksi di kolom "Tindakan" tidak berubah perilakunya.
+  // Status Tindak Lanjut" (statistik atas) dan Excel: Hijau = Ditindak-
+  // lanjuti (laporan yang boxing-nya sudah "selesai" — sama seperti sheet
+  // "Laporan Selesai"), Kuning = Menunggu / Proses (sisanya — sama
+  // seperti sheet "Laporan Masih Dipantau"). `butuhAksiStaf` tetap
+  // diambil dari labelStatusLengkap supaya tombol aksi di kolom
+  // "Tindakan" tidak berubah perilakunya.
   function statusFor(item: DisplayItem) {
     const isReopenPending = pendingReopen.has(item.id_boxing);
     const reopenAction = getReopenAction(item.statusBoxing, item.statusReview);
@@ -734,10 +744,8 @@ export default function RecapitulationTable() {
     let label: string, cls: string;
     if (isReopenPending) {
       label = "⏳ Dipantau";               cls = "bg-yellow-100 text-yellow-700";
-    } else if (item.statusReview === "ditindaklanjuti") {
+    } else if (item.isSelesai) {
       label = "✅ Ditindaklanjuti";         cls = "bg-green-100 text-green-700";
-    } else if (item.statusReview === "tidak_ditindaklanjuti") {
-      label = "❌ Tidak Ditindaklanjuti";    cls = "bg-red-100 text-red-700";
     } else {
       label = "⏳ Menunggu / Proses";       cls = "bg-yellow-100 text-yellow-700";
     }
@@ -817,7 +825,6 @@ export default function RecapitulationTable() {
               <tbody>
                 {[
                   {label:"✅ Ditindaklanjuti",count:ditindakCount,cls:"bg-green-50 text-green-800"},
-                  {label:"❌ Tidak Ditindaklanjuti",count:tidakDitindak,cls:"bg-red-50 text-red-800"},
                   {label:"⏳ Menunggu / Proses",count:menungguCount,cls:"bg-yellow-50 text-yellow-800"},
                   {label:"📂 Total",count:totalAll,cls:"bg-gray-50 text-gray-800 font-bold"},
                 ].map(r=>(

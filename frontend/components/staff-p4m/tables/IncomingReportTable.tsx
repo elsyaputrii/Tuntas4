@@ -4,6 +4,8 @@ import { stafApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import { ChevronDown, X, Search, Calendar } from "lucide-react";
 import { DAFTAR_UNIT_UMUM } from "@/lib/unitsUmum";
+import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
+import { toLocalDate, fmtTgl } from "@/lib/exportHelpers";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 const DAFTAR_UNIT = DAFTAR_UNIT_UMUM;
@@ -20,35 +22,16 @@ interface LaporanMasuk {
   createdAt?: string;
 }
 
-type Periode = "semua" | "harian" | "mingguan" | "bulanan" | "tahunan";
-
-const FILTER_OPTIONS: { key: Periode; label: string }[] = [
-  { key: "semua", label: "Semua" },
-  { key: "harian", label: "Hari Ini" },
-  { key: "mingguan", label: "Minggu Ini" },
-  { key: "bulanan", label: "Bulan Ini" },
-  { key: "tahunan", label: "Tahun Ini" },
-];
-
-// 🔍 DEBUG: Fungsi untuk cek tanggal
 function getTanggal(item: LaporanMasuk): Date | null {
   const raw = item.tanggal_lapor || item.created_at || item.createdAt;
-  
-  console.log(`🔍 Item ${item.id_laporan} - Raw date:`, raw);
-  
-  if (!raw) {
-    console.warn(`⚠️ Item ${item.id_laporan} TIDAK ADA tanggal`);
-    return null;
-  }
-  
+  if (!raw) return null;
   const d = new Date(raw);
-  if (isNaN(d.getTime())) {
-    console.warn(`⚠️ Item ${item.id_laporan} - INVALID date:`, raw);
-    return null;
-  }
-  
-  console.log(`✅ Item ${item.id_laporan} - Parsed date:`, d);
-  return d;
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function getTanggalIso(item: LaporanMasuk): string | null {
+  const raw = item.tanggal_lapor || item.created_at || item.createdAt;
+  return raw ?? null;
 }
 
 function formatTanggal(item: LaporanMasuk): string {
@@ -59,66 +42,6 @@ function formatTanggal(item: LaporanMasuk): string {
     month: "long",
     year: "numeric",
   });
-}
-
-function isSameWeek(a: Date, b: Date): boolean {
-  const startOfWeek = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = (day === 0 ? -6 : 1) - day;
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + diff);
-    return d;
-  };
-  return startOfWeek(a).getTime() === startOfWeek(b).getTime();
-}
-
-// 🔍 DEBUG: Fungsi filter dengan log
-function cocokPeriode(item: LaporanMasuk, periode: Periode): boolean {
-  if (periode === "semua") {
-    console.log(`📋 Item ${item.id_laporan} - FILTER: SEMUA -> TRUE`);
-    return true;
-  }
-  
-  const tgl = getTanggal(item);
-  if (!tgl) {
-    console.warn(`⚠️ Item ${item.id_laporan} - TIDAK ADA TANGGAL -> FALSE`);
-    return false;
-  }
-  
-  const now = new Date();
-  let result = false;
-
-  switch (periode) {
-    case "harian": {
-      const isToday = tgl.toDateString() === now.toDateString();
-      console.log(`📅 Item ${item.id_laporan} - HARIAN: ${tgl.toDateString()} === ${now.toDateString()} -> ${isToday}`);
-      result = isToday;
-      break;
-    }
-    case "mingguan": {
-      const isThisWeek = isSameWeek(tgl, now);
-      console.log(`📅 Item ${item.id_laporan} - MINGGUAN: ${isThisWeek}`);
-      result = isThisWeek;
-      break;
-    }
-    case "bulanan": {
-      const isThisMonth = tgl.getMonth() === now.getMonth() && tgl.getFullYear() === now.getFullYear();
-      console.log(`📅 Item ${item.id_laporan} - BULANAN: ${isThisMonth}`);
-      result = isThisMonth;
-      break;
-    }
-    case "tahunan": {
-      const isThisYear = tgl.getFullYear() === now.getFullYear();
-      console.log(`📅 Item ${item.id_laporan} - TAHUNAN: ${isThisYear}`);
-      result = isThisYear;
-      break;
-    }
-    default:
-      result = true;
-  }
-  
-  return result;
 }
 
 // ============================================
@@ -265,7 +188,8 @@ export default function IncomingReportTable() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [modalSrc, setModalSrc] = useState<string | null>(null);
-  const [periode, setPeriode] = useState<Periode>("semua");
+  const [filterMode, setFilterMode] = useState<FilterMode>("semua");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchData();
@@ -277,28 +201,13 @@ export default function IncomingReportTable() {
       setError("");
       
       const res = await stafApi.getLaporanMasuk();
-      console.log("📊 ===== DATA DARI API =====");
-      console.log("📊 Full response:", res);
-      console.log("📊 Data array:", res.data);
-      
-      // Cek setiap item
-      res.data.forEach((item: any, index: number) => {
-        console.log(`📊 Item ${index + 1}:`, {
-          id: item.id_laporan,
-          tanggal_lapor: item.tanggal_lapor,
-          created_at: item.created_at,
-          createdAt: item.createdAt,
-          hasDate: !!(item.tanggal_lapor || item.created_at || item.createdAt)
-        });
-      });
-      
+
       // Proses data
       const dataWithDate = res.data.map((item: any) => ({
         ...item,
         tanggal_lapor: item.tanggal_lapor || item.created_at || item.createdAt || null
       }));
-      
-      console.log("✅ Data setelah diproses:", dataWithDate);
+
       setLaporan(dataWithDate);
       
     } catch (err) {
@@ -337,39 +246,26 @@ export default function IncomingReportTable() {
     }
   }
 
-  // 🔍 DEBUG: Filter dengan log detail
   const laporanTampil = useMemo(() => {
-    console.log("\n🔍 ===== FILTER DEBUG =====");
-    console.log(`🔍 Periode: ${periode}`);
-    console.log(`🔍 Total laporan: ${laporan.length}`);
-    
-    // Log semua laporan sebelum filter
-    laporan.forEach(item => {
-      const tgl = getTanggal(item);
-      console.log(`🔍 Laporan ${item.id_laporan}:`, {
-        tanggal: tgl,
-        dateString: tgl?.toDateString(),
-        month: tgl?.getMonth(),
-        year: tgl?.getFullYear(),
-        sekarang: new Date().toDateString()
-      });
-    });
-    
-    const filtered = laporan.filter((item) => {
-      const match = cocokPeriode(item, periode);
-      return match;
-    });
-    
-    console.log(`✅ Hasil filter: ${filtered.length} laporan dari ${laporan.length}`);
-    console.log("✅ Data yang tampil:", filtered.map(f => f.id_laporan));
-    console.log("🔍 ===== END FILTER DEBUG =====\n");
-    
+    const filtered = laporan.filter((item) =>
+      isInPeriodFilter(filterMode, selectedDate, toLocalDate, getTanggalIso(item))
+    );
+
     return filtered.slice().sort((a, b) => {
       const ta = getTanggal(a)?.getTime() ?? 0;
       const tb = getTanggal(b)?.getTime() ?? 0;
       return tb - ta;
     });
-  }, [laporan, periode]);
+  }, [laporan, filterMode, selectedDate]);
+
+  const highlightedDates = useMemo(() => {
+    return new Set(
+      laporan
+        .map((item) => getTanggal(item))
+        .filter((d): d is Date => d !== null)
+        .map((d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)
+    );
+  }, [laporan]);
 
   if (loading) {
     return (
@@ -383,28 +279,19 @@ export default function IncomingReportTable() {
     <>
       {modalSrc && <ImageModal src={modalSrc} onClose={() => setModalSrc(null)} />}
 
-      {/* FILTER BUTTONS */}
-      <div className="w-full border-2 border-black bg-white p-3 mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-bold uppercase text-gray-500 mr-1">Filter:</span>
-        {FILTER_OPTIONS.map((opt) => (
-          <button
-            key={opt.key}
-            onClick={() => {
-              console.log(`🔄 ===== KLIK FILTER: ${opt.key} =====`);
-              setPeriode(opt.key);
-            }}
-            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide border transition-all ${
-              periode === opt.key
-                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-100 hover:border-gray-400"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-        <span className="ml-auto text-[10px] text-gray-400 font-bold uppercase">
-          {laporanTampil.length} laporan
-        </span>
+      {/* FILTER PERIODE */}
+      <div className="mb-3">
+        <PeriodFilterBar
+          filterMode={filterMode}
+          onFilterModeChange={setFilterMode}
+          selectedDate={selectedDate}
+          onSelectedDateChange={setSelectedDate}
+          highlightedDates={highlightedDates}
+          showCalendar={false}
+        />
+        <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase">
+          {laporanTampil.length} laporan · {labelPeriodFilter(filterMode, selectedDate, fmtTgl)}
+        </p>
       </div>
 
       {/* TABLE */}

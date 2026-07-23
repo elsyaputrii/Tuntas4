@@ -128,11 +128,20 @@ export function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-/** Label bahasa Indonesia untuk status_review */
+/** Label bahasa Indonesia untuk status_review.
+ *  ⚠️ PENTING: nilai mentahnya sering disalahsangka dari namanya. Sesuai
+ *  keputusan Ka P4M di KaP4MReviewTable.tsx & ProcessMonitorTable.tsx:
+ *    - "ditindaklanjuti"       = 🔄 Perbaikan Berkelanjutan → laporan MASIH
+ *      berjalan/dipantau terus, BELUM selesai.
+ *    - "tidak_ditindaklanjuti" = ✅ Sesuai → laporan sudah diputuskan tidak
+ *      perlu tindak lanjut lagi, alias SUDAH selesai/ditindaklanjuti.
+ *  Jadi label yang ditampilkan sengaja "dibalik" dari nama field mentahnya
+ *  supaya sesuai maknanya, dan konsisten dengan Rekap Status Tindak Lanjut
+ *  di RecapitulationTable.tsx. */
 export function labelStatusReview(sr: string | null | undefined): string {
   switch (sr) {
-    case "ditindaklanjuti":       return "Ditindaklanjuti";
-    case "tidak_ditindaklanjuti": return "Tidak Ditindaklanjuti";
+    case "tidak_ditindaklanjuti": return "Ditindaklanjuti";
+    case "ditindaklanjuti":       return "Menunggu / Proses";
     case "menunggu_keputusan_ka": return "Menunggu Ka P4M";
     default: return "—";
   }

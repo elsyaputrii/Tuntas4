@@ -14,24 +14,24 @@ interface KolomTabel {
   width: number;
 }
 
-// ✅ RAPI: lebar kolom dipangkas supaya sheet tidak lagi memanjang ke
-// samping (sebelumnya total lebar ±245, sekarang ±178). Isi/urutan/nama
-// kolom TIDAK berubah sama sekali — cuma lebarnya lebih pas dengan
-// panjang teks yang biasanya muncul, dan teks panjang tetap aman karena
-// tiap sel sudah wrapText + tinggi baris otomatis 40px.
+// ✅ RAPI v2: lebar kolom dilebarin lagi khusus untuk kolom-kolom yang
+// sebelumnya kepotong/wrap jadi 2 baris di header (mis. "Tgl Pelaksanaan",
+// "Status Review", "Status Proses") sehingga kelihatan sempit & berantakan.
+// Kolom teks panjang (Uraian/Penyebab/Rencana/Hasil) tetap dijaga secukupnya
+// supaya sheet tidak balik memanjang berlebihan ke samping.
 const KOLOM: KolomTabel[] = [
   { header: "No",                    key: "no",          width: 5  },
-  { header: "Kode Laporan",          key: "kode",        width: 12 },
-  { header: "Jenis Laporan",         key: "jenis",       width: 11 },
-  { header: "Tgl Masuk",             key: "tglMasuk",    width: 11 },
+  { header: "Kode Laporan",          key: "kode",        width: 13 },
+  { header: "Jenis Laporan",         key: "jenis",       width: 13 },
+  { header: "Tgl Masuk",             key: "tglMasuk",    width: 13 },
   { header: "Uraian Ketidaksesuaian",key: "uraian",      width: 28 },
-  { header: "Unit",                  key: "unit",        width: 13 },
+  { header: "Unit",                  key: "unit",        width: 14 },
   { header: "Penyebab",              key: "penyebab",    width: 20 },
   { header: "Rencana Tindakan",      key: "rencana",     width: 20 },
-  { header: "Hasil Tindak Lanjut",   key: "hasil",       width: 20 },
-  { header: "Tgl Pelaksanaan",       key: "tglPelaks",   width: 12 },
-  { header: "Status Review",         key: "statusReview",width: 15 },
-  { header: "Status Proses",         key: "statusBoxing",width: 14 },
+  { header: "Hasil Tindak Lanjut",   key: "hasil",       width: 22 },
+  { header: "Tgl Pelaksanaan",       key: "tglPelaks",   width: 17 },
+  { header: "Status Review",         key: "statusReview",width: 18 },
+  { header: "Status Proses",         key: "statusBoxing",width: 17 },
 ];
 
 // ─── Baris data laporan ────────────────────────────────────
@@ -63,7 +63,12 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
       rencana:      d.rencana_tindakan     ?? "—",
       hasil:        d.hasil_tindakan       ?? "—",
       tglPelaks:    fmtTgl(d.tanggal_pelaksanaan),
-      statusReview: labelStatusReview(d.status_review),
+      // ✅ Sheet "Laporan Selesai" isinya SUDAH PASTI laporan yang tuntas
+      // (id_boxing-nya ada di rekapData) — jadi Status Review-nya selalu
+      // "Ditindaklanjuti", nggak perlu lihat raw status_review lagi
+      // (yang sebelumnya malah bikin bingung karena satu sheet bisa
+      // kelihatan campur "Ditindaklanjuti"/"Tidak Ditindaklanjuti").
+      statusReview: "Ditindaklanjuti",
       statusBoxing: "Selesai",
       tglMasuk:     fmtTgl(d.created_at ?? null),
     };
@@ -79,7 +84,13 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
       rencana:      p.rencana_tindakan ?? "—",
       hasil:        p.hasil_tindakan   ?? "—",
       tglPelaks:    fmtTgl(p.tanggal_pelaksanaan),
-      statusReview: labelStatusReview(p.status_review),
+      // ✅ Sheet "Laporan Masih Dipantau" isinya laporan yang BELUM
+      // tuntas (masih ada tahap lanjutan, apa pun keputusan review-nya
+      // sejauh ini) — jadi Status Review-nya selalu "Menunggu / Proses".
+      // Progres detailnya (lagi di tahap mana persisnya: di unit, di
+      // Staf, dst) tetap kelihatan lengkap di kolom "Status Proses"
+      // sebelah kanannya lewat labelStatusBoxing().
+      statusReview: "Menunggu / Proses",
       statusBoxing: labelStatusBoxing(p.status_boxing),
       tglMasuk:     fmtTgl(p.created_at ?? null),
     };
@@ -139,18 +150,17 @@ export async function exportExcel(
   const dipantauData        = prosesData.filter((p) => !selesaiBoxingIds.has(p.id_boxing));
 
   const totalSemua          = rekapData.length + dipantauData.length;
-  const jumlahDitindaklanjuti =
-    rekapData.filter((d) => d.status_review === "ditindaklanjuti").length +
-    dipantauData.filter((p) => p.status_review === "ditindaklanjuti").length;
-  const jumlahTidakDitindak =
-    rekapData.filter((d) => d.status_review === "tidak_ditindaklanjuti").length +
-    dipantauData.filter((p) => p.status_review === "tidak_ditindaklanjuti").length;
-  // ✅ FIX: dulu kategori "Menunggu/Proses" ini nggak dihitung sama sekali
-  // di Ringkasan Excel — padahal di halaman web (Rekap Status Tindak
-  // Lanjut) ada. Sekarang dihitung sama persis: total dikurangi yang
-  // sudah py Ditindaklanjuti dan Tidak Ditindaklanjuti, supaya angka di
-  // Excel dan di layar web selalu sinkron.
-  const jumlahMenunggu = totalSemua - jumlahDitindaklanjuti - jumlahTidakDitindak;
+  // ✅ Disamakan persis dengan isi sheet "Laporan Selesai" (=rekapData)
+  // dan "Laporan Masih Dipantau" (=dipantauData): "Ditindaklanjuti" =
+  // jumlah baris di sheet Selesai, "Menunggu / Proses" = jumlah baris di
+  // sheet Masih Dipantau. TIDAK lagi lihat raw status_review per-item,
+  // supaya angka Ringkasan selalu pas kalau dijumlah sama baris di dua
+  // sheet lainnya (sebelumnya bisa beda kalau ada laporan yang review-nya
+  // sudah "Sesuai" tapi boxing-nya belum ditutup Ka P4M di tab Hasil
+  // Tindak Lanjut — laporan itu tetap dihitung "Ditindaklanjuti" padahal
+  // masih nangkring di sheet Masih Dipantau).
+  const jumlahDitindaklanjuti = rekapData.length;
+  const jumlahMenunggu        = dipantauData.length;
 
   const tglExport = new Date().toLocaleDateString("id-ID", {
     day: "2-digit", month: "long", year: "numeric",
@@ -226,13 +236,12 @@ export async function exportExcel(
 
   // Baris statistik ringkasan — sekarang PERSIS sama kategorinya dengan
   // tabel "Rekap Status Tindak Lanjut" di halaman web (Ditindaklanjuti /
-  // Tidak Ditindaklanjuti / Menunggu-Proses / Total), termasuk kolom
-  // persentase-nya, supaya angka di Excel nggak lagi kelihatan beda
-  // sendiri dari yang ditampilkan di layar.
+  // Menunggu-Proses / Total), termasuk kolom persentase-nya, supaya angka
+  // di Excel nggak lagi kelihatan beda sendiri dari yang ditampilkan di
+  // layar.
   const pct = (n: number) => (totalSemua > 0 ? `${((n / totalSemua) * 100).toFixed(1)}%` : "—");
   const statistik: [string, number, string, string][] = [
     ["Ditindaklanjuti",       jumlahDitindaklanjuti, pct(jumlahDitindaklanjuti), "FFD1FAE5"],
-    ["Tidak Ditindaklanjuti", jumlahTidakDitindak,   pct(jumlahTidakDitindak),   "FFFEE2E2"],
     ["Menunggu / Proses",     jumlahMenunggu,        pct(jumlahMenunggu),        KUNING_BG ],
     ["Total Semua Laporan",   totalSemua,            pct(totalSemua),           ABU_MUDA  ],
   ];
@@ -296,14 +305,17 @@ export async function exportExcel(
     headerRow.eachCell((cell: any) => styleHeader(cell));
     headerRow.height = 28;
 
-    // Freeze header — ✅ FIX: sebelumnya topLeftCell di-set manual ke "A5",
-    // yang di beberapa aplikasi (terutama Google Sheets & Excel Online)
-    // bisa bikin baris header kelihatan "dobel" secara visual (baris
-    // beku render ulang tumpang tindih sama baris pertama area scroll).
-    // Data aslinya sebenarnya cuma ada SATU baris header — sudah dicek
-    // langsung dengan generate file-nya. topLeftCell dihapus, biarkan
-    // Excel/Google Sheets hitung otomatis biar rendering-nya konsisten.
-    ws.views = [{ state: "frozen", xSplit: 0, ySplit: 4 }];
+    // ⚠️ Sengaja TIDAK pakai "freeze panes" (baris judul dibekukan pas
+    // scroll). Sebelumnya pakai ws.views = [{state:"frozen", ...}], tapi
+    // ternyata perilakunya nggak konsisten antar versi Excel — di
+    // sebagian Excel Desktop malah bikin baris judul & header kerender
+    // DOBEL secara visual pas file dibuka/discroll (bukan data asli yang
+    // dobel, cuma glitch tampilan, tapi tetap bikin bingung). Ganti
+    // topLeftCell juga sudah dicoba dan nggak konsisten (fix untuk satu
+    // versi Excel malah bikin versi lain dobel). Daripada gambling per
+    // versi Excel yang dipakai user, freeze-nya dihapus total — lebih
+    // aman & konsisten di semua versi, cuma judul & header jadi ikut
+    // scroll biasa (nggak nempel di atas lagi).
 
     // Lebar kolom
     KOLOM.forEach((k, i) => {

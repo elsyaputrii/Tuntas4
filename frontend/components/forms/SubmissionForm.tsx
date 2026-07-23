@@ -155,7 +155,7 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-6 flex items-center gap-2 text-sm text-blue-700 max-w-sm mx-auto">
-            <span className="text-green-500 flex-shrink-0">➕</span>
+            <span className="text-green-500 shrink-0">➕</span>
             <span>Simpan nomor tiket ini untuk memantau status laporan Anda.</span>
           </div>
 
@@ -218,7 +218,7 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
         <div className="space-y-5">
           {/* Input Status */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <label className="sm:w-44 text-sm font-semibold text-gray-700 flex-shrink-0">
+            <label className="sm:w-44 text-sm font-semibold text-gray-700 shrink-0">
               Input Status <span className="text-red-500">*</span>
             </label>
             <div className="flex-1 relative">
@@ -238,7 +238,7 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
 
           {/* Jenis Laporan */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <label className="sm:w-44 text-sm font-semibold text-gray-700 flex-shrink-0">
+            <label className="sm:w-44 text-sm font-semibold text-gray-700 shrink-0">
               Jenis Laporan <span className="text-red-500">*</span>
             </label>
             <div className="flex-1 relative">
@@ -258,7 +258,7 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
 
           {/* Masukan/Saran */}
           <div className="flex flex-col sm:flex-row gap-2">
-            <label className="sm:w-44 text-sm font-semibold text-gray-700 flex-shrink-0 pt-2">
+            <label className="sm:w-44 text-sm font-semibold text-gray-700 shrink-0 pt-2">
               Masukan/Saran <span className="text-red-500">*</span>
             </label>
             <div className="flex-1">
@@ -275,7 +275,7 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
 
           {/* Tanggal Kejadian */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <label className="sm:w-44 text-sm font-semibold text-gray-700 flex-shrink-0">
+            <label className="sm:w-44 text-sm font-semibold text-gray-700 shrink-0">
               Tanggal Kejadian <span className="text-red-500">*</span>
             </label>
             <div className="flex-1 relative">
@@ -304,7 +304,7 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
                   </div>
                   {/* Days */}
                   <div className="grid grid-cols-7 gap-0.5">
-                    {Array.from({ length: getFirstDay(calMonth, calYear) === 0 ? 6 : getFirstDay(calMonth, calYear) - 1 }).map((_, i) => <div key={i} />)}
+                    {Array.from({ length: getFirstDay(calMonth, calYear) }).map((_, i) => <div key={i} />)}
                     {Array.from({ length: getDaysInMonth(calMonth, calYear) }).map((_, i) => {
                       const day = i + 1;
                       const today = getToday();
@@ -350,7 +350,7 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
 
           {/* Upload Bukti */}
           <div className="flex flex-col sm:flex-row gap-2">
-            <label className="sm:w-44 text-sm font-semibold text-gray-700 flex-shrink-0 pt-2">Upload Bukti (Opsional)</label>
+            <label className="sm:w-44 text-sm font-semibold text-gray-700 shrink-0 pt-2">Upload Bukti (Opsional)</label>
             <div className="flex-1">
               <p className="text-xs text-gray-400 mb-2">Upload foto, dokumen, atau screenshot sebagai bukti</p>
               <div

@@ -1,9 +1,11 @@
 "use client";
 // FILE: frontend/components/staff-p4m/tables/ProcessMonitorTable.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { stafApi, authApi, userApi } from "@/lib/api";
 import { exportPDFProses } from "@/lib/exportPdf";
+import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
+import { toLocalDate, fmtTgl } from "@/lib/exportHelpers";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -78,6 +80,8 @@ export default function ProcessMonitorTable() {
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [meSignature, setMeSignature] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
+  const [filterMode, setFilterMode] = useState<FilterMode>("semua");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   useEffect(() => { fetchData(); }, []);
 
@@ -190,8 +194,24 @@ export default function ProcessMonitorTable() {
     }
   }
 
-  const aktif = data.filter((d) => d.status_boxing !== "selesai");
-  const selesai = data.filter((d) => d.status_boxing === "selesai");
+  const filteredData = useMemo(
+    () => data.filter((d) => isInPeriodFilter(filterMode, selectedDate, toLocalDate, d.created_at ?? null)),
+    [data, filterMode, selectedDate]
+  );
+
+  const highlightedDates = useMemo(() => {
+    return new Set(
+      data
+        .filter((d) => d.created_at)
+        .map((d) => {
+          const dt = toLocalDate(d.created_at as string);
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+        })
+    );
+  }, [data]);
+
+  const aktif = filteredData.filter((d) => d.status_boxing !== "selesai");
+  const selesai = filteredData.filter((d) => d.status_boxing === "selesai");
 
   function renderCard(item: ProsesItem) {
     const rev = item.status_review ? reviewBadge[item.status_review] : null;
@@ -282,6 +302,21 @@ export default function ProcessMonitorTable() {
     <>
       {/* ── IMAGE MODAL ── */}
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
+
+      {/* ── FILTER PERIODE ── */}
+      <div className="mb-3">
+        <PeriodFilterBar
+          filterMode={filterMode}
+          onFilterModeChange={setFilterMode}
+          selectedDate={selectedDate}
+          onSelectedDateChange={setSelectedDate}
+          highlightedDates={highlightedDates}
+          showCalendar={false}
+        />
+        <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase">
+          {filteredData.length} laporan · {labelPeriodFilter(filterMode, selectedDate, fmtTgl)}
+        </p>
+      </div>
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
