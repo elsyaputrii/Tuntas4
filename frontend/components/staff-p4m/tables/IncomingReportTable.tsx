@@ -199,17 +199,17 @@ export default function IncomingReportTable() {
     try {
       setLoading(true);
       setError("");
-      
+
       const res = await stafApi.getLaporanMasuk();
 
       // Proses data
-      const dataWithDate = res.data.map((item: any) => ({
+      const dataWithDate: LaporanMasuk[] = res.data.map((item: LaporanMasuk) => ({
         ...item,
-        tanggal_lapor: item.tanggal_lapor || item.created_at || item.createdAt || null
+        tanggal_lapor: item.tanggal_lapor || item.created_at || item.createdAt || undefined,
       }));
 
       setLaporan(dataWithDate);
-      
+
     } catch (err) {
       console.error("❌ Error fetch data:", err);
       setError("Gagal memuat data. Pastikan kamu sudah login.");
@@ -225,18 +225,18 @@ export default function IncomingReportTable() {
       setTimeout(() => setError(""), 3000);
       return;
     }
-    
+
     setError("");
     setSuccessMsg("");
-    
+
     try {
       setLoadingKirim(id_laporan);
       await stafApi.distribusiLaporan({ id_laporan, unit_tujuan: units });
-      
+
       const kode = `LAP-${String(id_laporan).padStart(5, "0")}`;
       setSuccessMsg(`✅ ${kode} dikirim ke: ${units.join(", ")}`);
       setTimeout(() => setSuccessMsg(""), 5000);
-      
+
       fetchData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Gagal mendistribusikan.");
