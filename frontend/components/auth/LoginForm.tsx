@@ -7,16 +7,20 @@ import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { Eye, EyeOff, User, Lock } from "lucide-react";
 
+// Ke mana user diarahkan setelah login, berdasarkan role yang
+// dikembalikan backend — bukan dari path yang diakses.
+const REDIRECT_BY_ROLE: Record<string, string> = {
+  staf_p4m: "/staff-p4m",
+  ka_p4m: "/ka-p4m",
+  kepala_unit: "/kepala-unit",
+};
+
 interface LoginFormProps {
-  role: "staf_p4m" | "ka_p4m" | "kepala_unit";
-  forgotPasswordPath: string;
-  redirectAfterLogin: string;
+  forgotPasswordPath?: string;
 }
 
 export default function LoginForm({
-  role,
-  forgotPasswordPath,
-  redirectAfterLogin,
+  forgotPasswordPath = "/forgot-password",
 }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,20 +39,17 @@ export default function LoginForm({
     try {
       setLoading(true);
 
-      let res;
-      if (role === "staf_p4m") {
-        res = await authApi.loginStaf(email, password);
-      } else if (role === "ka_p4m") {
-        res = await authApi.loginKaP4M(email, password);
-      } else {
-        res = await authApi.loginKepalaUnit(email, password);
-      }
+      // Satu endpoint untuk semua role — backend yang menentukan
+      // role dari akunnya, tidak perlu dipilih di sini.
+      const res = await authApi.login(email, password);
 
       if (res?.data?.token) {
         localStorage.setItem("token", res.data.token);
         localStorage.setItem("user", JSON.stringify(res.data.user));
         localStorage.setItem("role", res.data.user.role);
-        router.push(redirectAfterLogin);
+
+        const tujuan = REDIRECT_BY_ROLE[res.data.user.role] || "/login";
+        router.push(tujuan);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login gagal. Periksa email dan password.");

@@ -105,10 +105,17 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
       return;
     }
 
+    // Ubah "DD/MM/YYYY" (tampilan) -> "YYYY-MM-DD" (format tanggal DB)
+    const tanggalKejadianISO = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
     const formData = new FormData();
     formData.append("status_pelapor", status);
     formData.append("jenis_laporan", jenis);
     formData.append("deskripsi", deskripsi);
+    // ✅ FIX: sebelumnya tanggal yang dipilih user di kalender TIDAK
+    // pernah dikirim ke server, jadi laporan yang di-backdate tetap
+    // tersimpan dengan tanggal hari ini (created_at). Sekarang dikirim.
+    formData.append("tanggal_kejadian", tanggalKejadianISO);
     if (file) formData.append("lampiran", file);
     try {
       setLoading(true);

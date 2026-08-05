@@ -6,13 +6,20 @@ const express = require("express");
 const router  = express.Router();
 const { authMiddleware } = require("../middleware/authMiddleware");
 const {
+  login,
   loginStaf,
   loginKaP4M,
   loginKepalaUnit,
   getMe,
 } = require("../controllers/authController");
 
-// ── Login per role ────────────────────────────────────────
+// ── Login gabungan (dipakai halaman /login) ─────────────────
+// POST /api/auth/login → role dideteksi otomatis dari akun
+router.post("/login", login);
+
+// ── Login per role (LAMA, dibiarkan aktif untuk kompatibilitas
+//    kalau ada yang masih memanggilnya, tapi frontend baru
+//    sudah tidak menggunakan endpoint ini lagi) ───────────────
 // POST /api/auth/staf/login        → khusus Staf P4M
 // POST /api/auth/kap4m/login       → khusus Ka P4M
 // POST /api/auth/kepala-unit/login → khusus Kepala Unit

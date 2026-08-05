@@ -202,7 +202,7 @@ router.get("/kepala-unit/laporan-hasil", async (req, res) => {
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
-        l.created_at AS tanggal_laporan,
+        COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan,
         p.lampiran AS lampiran_hasil, p.tanggal AS tanggal_pelaksanaan
       FROM boxing_ketidaksesuaian b

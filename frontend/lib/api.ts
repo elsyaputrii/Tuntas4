@@ -10,43 +10,20 @@ function getToken(): string | null {
 // AUTO-LOGOUT — dipanggil setiap kali server bilang token invalid/expired
 // ─────────────────────────────────────────────
 
-// Path login berbeda untuk tiap role
-function loginPathByRole(role: string | null): string {
-  switch (role) {
-    case "ka_p4m":
-      return "/ka-p4m/login";
-    case "kepala_unit":
-      return "/kepala-unit/login";
-    case "staf_p4m":
-      return "/staff-p4m/login";
-    default:
-      // fallback kalau role tidak diketahui/tidak tersimpan
-      return "/staff-p4m/login";
-  }
-}
+// Login sekarang cuma satu pintu untuk semua role: /login
+// (role tidak lagi menentukan path halaman login)
+const LOGIN_PATH = "/login";
 
 function forceLogout() {
   if (typeof window === "undefined") return;
-
-  // Ambil role SEBELUM localStorage dibersihkan, biar tau harus diarahkan ke
-  // halaman login yang mana (staf / ka-p4m / kepala-unit)
-  let role: string | null = null;
-  try {
-    const userRaw = localStorage.getItem("user");
-    role = userRaw ? JSON.parse(userRaw).role : localStorage.getItem("role");
-  } catch {
-    role = localStorage.getItem("role");
-  }
 
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   localStorage.removeItem("role");
 
-  const target = loginPathByRole(role);
-
   // Hindari redirect berulang kalau memang sudah di halaman login
   if (!window.location.pathname.includes("/login")) {
-    window.location.href = target;
+    window.location.href = LOGIN_PATH;
   }
 }
 
@@ -130,6 +107,10 @@ export const civitasApi = {
 // AUTH — login, forgot password, reset password
 // ─────────────────────────────────────────────
 export const authApi = {
+  // Login gabungan — role dideteksi otomatis oleh backend dari akunnya
+  login: (email: string, password: string) =>
+    apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  // Endpoint lama per-role, disimpan hanya untuk kompatibilitas
   loginStaf: (email: string, password: string) =>
     apiFetch("/auth/staf/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   loginKaP4M: (email: string, password: string) =>

@@ -218,6 +218,101 @@ async function loginKepalaUnit(req, res) {
 }
 
 // ============================================================
+// LOGIN GABUNGAN — POST /api/auth/login
+// Satu pintu untuk semua role (staf_p4m, ka_p4m, kepala_unit).
+// Role TIDAK diminta dari user — diambil otomatis dari kolom
+// `role` di tabel pengguna, sesuai akun yang berhasil login.
+// Dipakai oleh halaman /login tunggal di frontend.
+// ============================================================
+async function login(req, res) {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Email dan password wajib diisi.",
+    });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_pengguna, nama, email, password, role, nip
+       FROM pengguna WHERE email = ? LIMIT 1`,
+      [email]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Email atau password salah.",
+      });
+    }
+
+    const user = rows[0];
+
+    const passwordCocok = await bcrypt.compare(password, user.password);
+    if (!passwordCocok) {
+      return res.status(401).json({
+        success: false,
+        message: "Email atau password salah.",
+      });
+    }
+
+    // Ambil data tambahan sesuai role akun (bukan sesuai endpoint,
+    // karena endpoint-nya sekarang cuma satu untuk semua role)
+    let dataTambahan = {};
+
+    if (user.role === "staf_p4m") {
+      const [stafRows] = await pool.query(
+        `SELECT id_staf FROM staf_p4m WHERE id_pengguna = ?`,
+        [user.id_pengguna]
+      );
+      dataTambahan.id_staf = stafRows[0]?.id_staf || null;
+    } else if (user.role === "ka_p4m") {
+      const [kaRows] = await pool.query(
+        `SELECT id_ka FROM ka_p4m WHERE id_pengguna = ?`,
+        [user.id_pengguna]
+      );
+      dataTambahan.id_ka = kaRows[0]?.id_ka || null;
+    } else if (user.role === "kepala_unit") {
+      const [kepalaRows] = await pool.query(
+        `SELECT id_kepala, unit FROM kepala_unit WHERE id_pengguna = ?`,
+        [user.id_pengguna]
+      );
+      dataTambahan.id_kepala = kepalaRows[0]?.id_kepala || null;
+      dataTambahan.unit = kepalaRows[0]?.unit || null;
+    } else {
+      // Role tidak dikenali / akun belum di-setup dengan benar
+      return res.status(403).json({
+        success: false,
+        message: "Role akun tidak dikenali. Hubungi admin.",
+      });
+    }
+
+    const token = buatToken(user);
+
+    return res.status(200).json({
+      success: true,
+      message: `Selamat datang, ${user.nama}!`,
+      data: {
+        token,
+        user: {
+          id: user.id_pengguna,
+          ...dataTambahan,
+          nama: user.nama,
+          email: user.email,
+          role: user.role,
+          nip: user.nip,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error login:", error);
+    return res.status(500).json({ success: false, message: "Terjadi kesalahan server." });
+  }
+}
+
+// ============================================================
 // CEK TOKEN — GET /api/auth/me
 // Dipakai frontend untuk cek apakah token masih berlaku
 // ============================================================
@@ -228,4 +323,4 @@ async function getMe(req, res) {
   });
 }
 
-module.exports = { loginStaf, loginKaP4M, loginKepalaUnit, getMe };
+module.exports = { login, loginStaf, loginKaP4M, loginKepalaUnit, getMe };

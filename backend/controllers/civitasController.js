@@ -9,13 +9,31 @@ const { pool } = require("../config/db");
 // nama_pelapor otomatis 'Anonim' karena DEFAULT di DB
 // ============================================================
 async function kirimLaporan(req, res) {
-  const { status_pelapor, jenis_laporan, deskripsi } = req.body;
+  const { status_pelapor, jenis_laporan, deskripsi, tanggal_kejadian } = req.body;
 
   // Validasi field yang wajib ada
-  if (!status_pelapor || !jenis_laporan || !deskripsi) {
+  if (!status_pelapor || !jenis_laporan || !deskripsi || !tanggal_kejadian) {
     return res.status(400).json({
       success: false,
-      message: "Status pelapor, jenis laporan, dan deskripsi wajib diisi.",
+      message: "Status pelapor, jenis laporan, deskripsi, dan tanggal kejadian wajib diisi.",
+    });
+  }
+
+  // Validasi format & pastikan tanggal kejadian tidak di masa depan
+  // (frontend sudah validasi ini, tapi backend tidak boleh percaya begitu saja)
+  const tglKejadian = new Date(`${tanggal_kejadian}T00:00:00`);
+  if (isNaN(tglKejadian.getTime())) {
+    return res.status(400).json({
+      success: false,
+      message: "Format tanggal kejadian tidak valid.",
+    });
+  }
+  const hariIni = new Date();
+  hariIni.setHours(0, 0, 0, 0);
+  if (tglKejadian > hariIni) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal kejadian tidak boleh lebih besar dari hari ini.",
     });
   }
 
@@ -46,9 +64,9 @@ async function kirimLaporan(req, res) {
     // nama_pelapor = 'Anonim' → karena laporan anonim
     const [result] = await pool.query(
       `INSERT INTO laporan_ketidaksesuaian
-        (id_civitas, nama_pelapor, status_pelapor, jenis_laporan, deskripsi, lampiran, status)
-       VALUES (NULL, 'Anonim', ?, ?, ?, ?, 'menunggu')`,
-      [status_pelapor, jenis_laporan, deskripsi, lampiran]
+        (id_civitas, nama_pelapor, status_pelapor, jenis_laporan, deskripsi, lampiran, status, tanggal_kejadian)
+       VALUES (NULL, 'Anonim', ?, ?, ?, ?, 'menunggu', ?)`,
+      [status_pelapor, jenis_laporan, deskripsi, lampiran, tanggal_kejadian]
     );
 
     const id_laporan = result.insertId;

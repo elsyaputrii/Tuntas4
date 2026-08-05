@@ -192,7 +192,7 @@ async function getLaporanHasil(req, res) {
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
-        l.created_at AS tanggal_laporan,
+        COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan,
         p.lampiran AS lampiran_hasil, p.tanggal AS tanggal_pelaksanaan
       FROM boxing_ketidaksesuaian b
@@ -245,7 +245,7 @@ async function getRiwayat(req, res) {
         b.id_boxing, b.unit_tujuan AS nama_unit, b.status AS status_boxing,
         b.approval_staf, b.catatan_approval,
         l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
-        l.created_at AS tanggal_laporan,
+        COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         r.penyebab, r.deskripsi AS rencana_tindakan, r.status_review, r.aksi_masukan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan, p.lampiran AS lampiran_hasil,
         p.tanggal AS tanggal_pelaksanaan, p.created_at AS tanggal_kirim_hasil
@@ -303,7 +303,7 @@ async function submitPelaksanaan(req, res) {
     // ulang setelah ditolak Staf akan ditolak backend dengan 403.
     const [boxingRows] = await pool.query(
       `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing, b.approval_staf,
-              l.created_at AS tanggal_laporan, r.updated_at AS tanggal_ditindaklanjuti
+              COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan, r.updated_at AS tanggal_ditindaklanjuti
        FROM boxing_ketidaksesuaian b
        JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
        JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan

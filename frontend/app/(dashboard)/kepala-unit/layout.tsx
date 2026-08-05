@@ -41,16 +41,16 @@ export default function KepalaUnitLayout({
     const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
     if (!token || !userRaw) {
-      router.push('/kepala-unit/login');
+      router.push('/login');
       return;
     }
     try {
       const user = JSON.parse(userRaw);
       if (user.role !== 'kepala_unit') {
-        router.push('/kepala-unit/login');
+        router.push('/login');
       }
     } catch {
-      router.push('/kepala-unit/login');
+      router.push('/login');
     }
   }, [router]);
 
@@ -74,7 +74,7 @@ useEffect(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
-    router.push('/kepala-unit/login'); // beda per file: /ka-p4m/login, /kepala-unit/login
+    router.push('/login'); // beda per file: /ka-p4m/login, /kepala-unit/login
   };
 
   const sisaWaktu = expiredAtMs - Date.now();
@@ -189,7 +189,7 @@ useEffect(() => {
           <button
             onClick={() => {
               localStorage.clear();
-              router.push('/kepala-unit/login');
+              router.push('/login');
             }}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:bg-white/5 transition"
           >
