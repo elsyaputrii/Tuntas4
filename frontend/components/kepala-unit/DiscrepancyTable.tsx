@@ -233,24 +233,26 @@ export default function DiscrepancyTable() {
                 </div>
 
                 {/* Kolom 3: Penyebab */}
-                <div className="w-[20%] border-r-2 border-black p-5">
+                <div className="w-[20%] border-r-2 border-black p-5 flex items-center justify-center">
                   <textarea
-                    className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    className="w-full min-h-30 h-30 border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed overflow-y-auto"
                     placeholder={editable ? "Ketik penyebab di sini..." : "—"}
                     value={penyebab[item.id_boxing] || ""}
                     onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
                     disabled={!editable}
+                    spellCheck={false}
                   />
                 </div>
 
                 {/* Kolom 4: Rencana */}
-                <div className="w-[20%] border-r-2 border-black p-5">
+                <div className="w-[20%] border-r-2 border-black p-5 flex items-center justify-center">
                   <textarea
-                    className="w-full h-32 border border-black p-2 text-xs text-black outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    className="w-full min-h-30 h-30 border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed overflow-y-auto"
                     placeholder={editable ? "Ketik rencana di sini..." : "—"}
                     value={rencana[item.id_boxing] || ""}
                     onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
                     disabled={!editable}
+                    spellCheck={false}
                   />
                 </div>
 

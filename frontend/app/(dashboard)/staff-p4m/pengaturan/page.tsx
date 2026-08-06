@@ -3,278 +3,286 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Moon,
-  Sun,
-  Bell,
-  BellOff,
-  Globe,
-  Key,
+  User,
+  Mail,
+  Building,
+  Calendar,
+  Edit,
   Save,
-  CheckCircle,
-  Lock,
+  X,
+  Camera,
 } from 'lucide-react';
 
-export default function PengaturanStaffPage() {
+interface UserProfile {
+  id: number;
+  nama_lengkap: string;
+  email: string;
+  role: string;
+  unit: string;
+  username: string;
+  created_at: string;
+}
+
+export default function ProfilKaP4MPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifikasiEmail, setNotifikasiEmail] = useState(true);
-  const [bahasa, setBahasa] = useState('id');
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  // Auth check
-  useEffect(() => {
+  const [isAuthorized, setIsAuthorized] = useState(() => {
+    if (typeof window === 'undefined') return false;
     const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    if (!token || role !== 'staf_p4m') {
-      router.replace('/staff-p4m/login');
-      return;
+    const userRaw = localStorage.getItem('user');
+    if (!token || !userRaw) return false;
+    try {
+      const user = JSON.parse(userRaw);
+      return user.role === 'kepala_unit';
+    } catch {
+      return false;
     }
-    setIsChecking(false);
-  }, [router]);
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile>({
+    id: 0,
+    nama_lengkap: '',
+    email: '',
+    role: '',
+    unit: '',
+    username: '',
+    created_at: '',
+  });
+  const [editForm, setEditForm] = useState(profile);
+  const [avatar, setAvatar] = useState<string | null>(null);
 
-  // Load preferences dari localStorage
+  // Auth check — redirect kalau belum login/role salah
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved === 'true') {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
+    if (!isAuthorized) {
+      router.replace('/kepala-unit/login');
     }
+  }, [isAuthorized, router]);
 
-    const savedNotif = localStorage.getItem('notifikasiEmail');
-    if (savedNotif !== null) {
-      setNotifikasiEmail(savedNotif === 'true');
-    }
+  // Ambil data user
+  useEffect(() => {
+    if (!isAuthorized) return;
+    fetchUserData();
+  }, [isAuthorized]);
 
-    const savedBahasa = localStorage.getItem('bahasa');
-    if (savedBahasa) {
-      setBahasa(savedBahasa);
-    }
-  }, []);
-
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('darkMode', 'true');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('darkMode', 'false');
-    }
-  };
-
-  const handleSaveSettings = () => {
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-
-    // Simpan preferensi ke localStorage
-    localStorage.setItem('notifikasiEmail', String(notifikasiEmail));
-    localStorage.setItem('bahasa', bahasa);
-
-    alert('✅ Pengaturan berhasil disimpan!');
-  };
-
-  const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      alert('⚠️ Harap isi semua field password!');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      alert('⚠️ Password baru dan konfirmasi tidak cocok!');
-      return;
-    }
-
+  const fetchUserData = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/users/change-password', {
+      const response = await fetch('http://localhost:5000/api/users/profile', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+        setEditForm(data);
+      } else {
+        // Data dummy (kalau API belum siap)
+        const dummy = {
+          id: 1,
+          nama_lengkap: 'Kepala Unit',
+          email: 'kepala.unit@polibatam.ac.id',
+          role: 'kepala_unit',
+          unit: '-',
+          username: 'kepala_unit',
+          created_at: '2024-01-01',
+        };
+        setProfile(dummy);
+        setEditForm(dummy);
+      }
+    } catch (error) {
+      console.error('Gagal ambil data user:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          oldPassword,
-          newPassword,
+          nama_lengkap: editForm.nama_lengkap,
+          email: editForm.email,
         }),
       });
 
       if (response.ok) {
-        alert('✅ Password berhasil diubah!');
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
+        const updated = await response.json();
+        setProfile(updated);
+        setEditForm(updated);
+        setIsEditing(false);
+        alert('✅ Profil berhasil diperbarui!');
       } else {
-        alert('❌ Gagal mengubah password. Cek password lama!');
+        alert('Gagal menyimpan perubahan');
       }
     } catch (error) {
-      console.error('Error changing password:', error);
-      alert('❌ Gagal mengubah password');
+      console.error('Error:', error);
+      alert('Gagal menyimpan perubahan');
     }
   };
 
-  if (isChecking) {
+  const handleCancel = () => {
+    setEditForm(profile);
+    setIsEditing(false);
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setAvatar(url);
+    }
+  };
+
+  if (!isAuthorized || loading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500">Memuat data profil...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
-        ⚙️ Pengaturan
-      </h2>
-
-      {/* Mode Gelap */}
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 mb-4 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {darkMode ? <Moon size={22} className="text-blue-500" /> : <Sun size={22} className="text-yellow-500" />}
-            <div>
-              <h3 className="font-semibold text-slate-700 dark:text-white">Mode Gelap</h3>
-              <p className="text-xs text-slate-400">Tampilan gelap untuk kenyamanan mata</p>
-            </div>
-          </div>
-          <button
-            onClick={toggleDarkMode}
-            className={`relative w-12 h-6 rounded-full transition ${
-              darkMode ? 'bg-blue-600' : 'bg-slate-300'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition ${
-                darkMode ? 'right-0.5' : 'left-0.5'
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* Notifikasi Email */}
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 mb-4 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {notifikasiEmail ? (
-              <Bell size={22} className="text-blue-500" />
+    <div className="max-w-3xl mx-auto p-6">
+      {/* Header Avatar */}
+      <div className="text-center mb-8">
+        <div className="relative inline-block">
+          <div className="w-28 h-28 rounded-full bg-linear-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto mb-3 overflow-hidden">
+            {avatar ? (
+              <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <BellOff size={22} className="text-slate-400" />
+              <span className="text-4xl">{profile.nama_lengkap?.charAt(0) || '👤'}</span>
             )}
-            <div>
-              <h3 className="font-semibold text-slate-700 dark:text-white">Notifikasi Email</h3>
-              <p className="text-xs text-slate-400">Terima notifikasi melalui email</p>
-            </div>
           </div>
-          <button
-            onClick={() => setNotifikasiEmail(!notifikasiEmail)}
-            className={`relative w-12 h-6 rounded-full transition ${
-              notifikasiEmail ? 'bg-blue-600' : 'bg-slate-300'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition ${
-                notifikasiEmail ? 'right-0.5' : 'left-0.5'
-              }`}
-            />
-          </button>
+          {isEditing && (
+            <label className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full cursor-pointer hover:bg-blue-600 transition">
+              <Camera size={14} />
+              <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+            </label>
+          )}
         </div>
-      </div>
-
-      {/* Bahasa */}
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 mb-4 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center gap-3 mb-3">
-          <Globe size={22} className="text-blue-500" />
-          <div>
-            <h3 className="font-semibold text-slate-700 dark:text-white">Bahasa</h3>
-            <p className="text-xs text-slate-400">Pilih bahasa aplikasi</p>
-          </div>
-        </div>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+        {!isEditing ? (
+          <>
+            <h2 className="text-2xl font-bold text-slate-700 dark:text-white mt-2">
+              {profile.nama_lengkap}
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 capitalize">
+              {profile.role?.replace('_', ' ')}
+            </p>
+          </>
+        ) : (
+          <div className="mt-2">
             <input
-              type="radio"
-              name="bahasa"
-              value="id"
-              checked={bahasa === 'id'}
-              onChange={(e) => setBahasa(e.target.value)}
-              className="w-4 h-4 text-blue-600"
+              type="text"
+              value={editForm.nama_lengkap}
+              onChange={(e) => setEditForm({ ...editForm, nama_lengkap: e.target.value })}
+              className="text-center text-2xl font-bold bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1 outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <span className="text-slate-700 dark:text-white text-sm">Bahasa Indonesia</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="bahasa"
-              value="en"
-              checked={bahasa === 'en'}
-              onChange={(e) => setBahasa(e.target.value)}
-              className="w-4 h-4 text-blue-600"
-            />
-            <span className="text-slate-700 dark:text-white text-sm">English</span>
-          </label>
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Ganti Password */}
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 mb-4 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center gap-3 mb-4">
-          <Key size={22} className="text-blue-500" />
-          <div>
-            <h3 className="font-semibold text-slate-700 dark:text-white">Ganti Password</h3>
-            <p className="text-xs text-slate-400">Ubah password akun Anda</p>
+      {/* Info Detail */}
+      <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-slate-700 dark:text-white mb-4 flex items-center gap-2">
+          <User size={18} /> Informasi Akun
+        </h3>
+
+        {/* Username (readonly) */}
+        <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
+          <User size={18} className="text-slate-400" />
+          <div className="flex-1">
+            <p className="text-xs text-slate-400">Username</p>
+            <p className="text-slate-700 dark:text-white">{profile.username}</p>
           </div>
         </div>
-        <div className="space-y-3">
-          <input
-            type="password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            placeholder="Password Lama"
-            className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Password Baru"
-            className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Konfirmasi Password Baru"
-            className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          />
+
+        {/* Email */}
+        <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
+          <Mail size={18} className="text-slate-400" />
+          <div className="flex-1">
+            <p className="text-xs text-slate-400">Email</p>
+            {!isEditing ? (
+              <p className="text-slate-700 dark:text-white">{profile.email}</p>
+            ) : (
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                className="w-full bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1 outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Role (readonly) */}
+        <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
+          <Building size={18} className="text-slate-400" />
+          <div className="flex-1">
+            <p className="text-xs text-slate-400">Role</p>
+            <p className="text-slate-700 dark:text-white capitalize">
+              {profile.role?.replace('_', ' ')}
+            </p>
+          </div>
+        </div>
+
+        {/* Unit (readonly) */}
+        <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
+          <Building size={18} className="text-slate-400" />
+          <div className="flex-1">
+            <p className="text-xs text-slate-400">Unit</p>
+            <p className="text-slate-700 dark:text-white">{profile.unit || '-'}</p>
+          </div>
+        </div>
+
+        {/* Join Date */}
+        <div className="flex items-center gap-4 p-3">
+          <Calendar size={18} className="text-slate-400" />
+          <div className="flex-1">
+            <p className="text-xs text-slate-400">Bergabung Sejak</p>
+            <p className="text-slate-700 dark:text-white">
+              {profile.created_at
+                ? new Date(profile.created_at).toLocaleDateString('id-ID')
+                : '-'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tombol Aksi */}
+      <div className="flex justify-end gap-3 mt-6">
+        {!isEditing ? (
           <button
-            onClick={handleChangePassword}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm transition"
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition"
           >
-            <Lock size={14} /> Ubah Password
+            <Edit size={16} /> Edit Profil
           </button>
-        </div>
+        ) : (
+          <>
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-2 px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl transition"
+            >
+              <X size={16} /> Batal
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl transition"
+            >
+              <Save size={16} /> Simpan
+            </button>
+          </>
+        )}
       </div>
-
-      {/* Tombol Simpan Pengaturan */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSaveSettings}
-          className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl transition"
-        >
-          <Save size={16} /> Simpan Semua Pengaturan
-        </button>
-      </div>
-
-      {/* Notifikasi Sukses */}
-      {saveSuccess && (
-        <div className="fixed bottom-5 right-5 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
-          <CheckCircle size={16} /> Pengaturan berhasil disimpan!
-        </div>
-      )}
     </div>
   );
 }

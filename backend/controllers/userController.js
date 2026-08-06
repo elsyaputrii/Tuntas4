@@ -197,6 +197,145 @@ async function updateUser(req, res) {
   }
 }
 
+// ── Helper: ambil data profil lengkap 1 akun (gabung tabel per-role) ──
+async function fetchProfileById(id) {
+  const [rows] = await pool.query(
+    `SELECT
+      p.id_pengguna AS id,
+      p.nama        AS nama_lengkap,
+      p.email       AS email,
+      p.role        AS role,
+      p.username    AS username,
+      p.created_at  AS created_at,
+      ku.unit       AS unit_kepala
+    FROM pengguna p
+    LEFT JOIN kepala_unit ku ON ku.id_pengguna = p.id_pengguna
+    WHERE p.id_pengguna = ?`,
+    [id]
+  );
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  const UNIT_DEFAULT = { staf_p4m: "P4M", ka_p4m: "P4M" };
+
+  return {
+    id: row.id,
+    nama_lengkap: row.nama_lengkap,
+    email: row.email,
+    role: row.role,
+    unit: row.unit_kepala || UNIT_DEFAULT[row.role] || "-",
+    username: row.username || row.email.split("@")[0],
+    created_at: row.created_at,
+  };
+}
+
+// ── GET /api/users/profile — profil akun yang sedang login ───────────
+// Dipakai halaman "Profil Saya" (Staf P4M, Kepala Unit, KA-P4M) untuk
+// menampilkan data akun milik user itu sendiri (bukan CRUD akun lain).
+async function getProfile(req, res) {
+  try {
+    const profile = await fetchProfileById(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+    return res.status(200).json(profile);
+  } catch (error) {
+    console.error("Error getProfile:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengambil data profil." });
+  }
+}
+
+// ── PUT /api/users/profile — update profil akun yang sedang login ────
+async function updateProfile(req, res) {
+  const userId = req.user.id;
+  const { nama_lengkap, email } = req.body;
+
+  if (!nama_lengkap?.trim() || !email?.trim()) {
+    return res.status(400).json({ success: false, message: "Nama dan email wajib diisi." });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const [existing] = await conn.query("SELECT role FROM pengguna WHERE id_pengguna = ?", [userId]);
+    if (existing.length === 0) {
+      conn.release();
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+    const role = existing[0].role;
+
+    await conn.beginTransaction();
+
+    await conn.query("UPDATE pengguna SET nama = ?, email = ? WHERE id_pengguna = ?", [
+      nama_lengkap,
+      email,
+      userId,
+    ]);
+
+    // Sinkronkan juga ke tabel profil per-role biar data nama/email konsisten
+    if (role === "staf_p4m") {
+      await conn.query("UPDATE staf_p4m SET nama = ?, email = ? WHERE id_pengguna = ?", [
+        nama_lengkap,
+        email,
+        userId,
+      ]);
+    } else if (role === "kepala_unit") {
+      await conn.query("UPDATE kepala_unit SET nama = ? WHERE id_pengguna = ?", [nama_lengkap, userId]);
+    } else if (role === "ka_p4m") {
+      await conn.query("UPDATE ka_p4m SET nama = ? WHERE id_pengguna = ?", [nama_lengkap, userId]);
+    }
+
+    await conn.commit();
+
+    const updated = await fetchProfileById(userId);
+    return res.status(200).json(updated);
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error updateProfile:", error);
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ success: false, message: "Email sudah dipakai akun lain." });
+    }
+    return res.status(500).json({ success: false, message: "Gagal menyimpan perubahan." });
+  } finally {
+    conn.release();
+  }
+}
+
+// ── PUT /api/users/change-password — ganti password akun sendiri ─────
+// Dipakai halaman "Pengaturan". Beda dari updateUser/:id (itu buat Staf
+// P4M ganti password akun ORANG LAIN); ini user ganti password DIRI
+// SENDIRI, jadi wajib verifikasi password lama dulu.
+async function changePassword(req, res) {
+  const userId = req.user.id;
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: "Password lama dan baru wajib diisi." });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: "Password baru minimal 6 karakter." });
+  }
+
+  try {
+    const [rows] = await pool.query("SELECT password FROM pengguna WHERE id_pengguna = ?", [userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    const cocok = await bcrypt.compare(oldPassword, rows[0].password);
+    if (!cocok) {
+      return res.status(400).json({ success: false, message: "Password lama tidak sesuai." });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await pool.query("UPDATE pengguna SET password = ? WHERE id_pengguna = ?", [hashed, userId]);
+
+    return res.status(200).json({ success: true, message: "Password berhasil diubah." });
+  } catch (error) {
+    console.error("Error changePassword:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengubah password." });
+  }
+}
+
 // ── DELETE /api/users/:id — hapus akun ───────────────────────────────
 async function deleteUser(req, res) {
   const { id } = req.params;
@@ -289,4 +428,7 @@ module.exports = {
   deleteUser,
   uploadTandaTangan,
   deleteTandaTangan,
+  getProfile,
+  updateProfile,
+  changePassword,
 };

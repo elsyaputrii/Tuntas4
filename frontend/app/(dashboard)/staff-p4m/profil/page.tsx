@@ -43,7 +43,6 @@ export default function ProfilStaffPage() {
   // Auth check
   useEffect(() => {
     const token = localStorage.getItem('token');
-     alert('Token yang dipakai: ' + token); 
     const role = localStorage.getItem('role');
     if (!token || role !== 'staf_p4m') {
       router.replace('/staff-p4m/login');
@@ -135,7 +134,7 @@ export default function ProfilStaffPage() {
 
   if (isChecking || loading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-100 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-slate-500">Memuat data profil...</p>
@@ -149,7 +148,7 @@ export default function ProfilStaffPage() {
       {/* Header Avatar */}
       <div className="text-center mb-8">
         <div className="relative inline-block">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto mb-3 overflow-hidden">
+          <div className="w-28 h-28 rounded-full bg-linear-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto mb-3 overflow-hidden">
             {avatar ? (
               <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
             ) : (

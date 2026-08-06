@@ -12,9 +12,21 @@ const {
   deleteUser,
   uploadTandaTangan,
   deleteTandaTangan,
+  getProfile,
+  updateProfile,
+  changePassword,
 } = require("../controllers/userController");
 
 router.use(authMiddleware);
+
+// Profil & ganti password akun sendiri — semua role yang sudah login
+// boleh akses, TIDAK dibatasi hanya staf_p4m. Harus didaftarkan sebelum
+// roleMiddleware & sebelum route "/:id" biar "profile"/"change-password"
+// tidak ketangkap sebagai :id.
+router.get("/profile", getProfile);
+router.put("/profile", updateProfile);
+router.put("/change-password", changePassword);
+
 router.use(roleMiddleware("staf_p4m"));
 
 router.get("/", getUsers);

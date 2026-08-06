@@ -1,11 +1,7 @@
-import LoginForm from '@/components/auth/LoginForm';
+import { redirect } from "next/navigation";
 
+// Halaman login sekarang disatukan di /login.
+// Path ini dipertahankan supaya link/bookmark lama tidak 404.
 export default function KepalaUnitLoginPage() {
-  return (
-    <LoginForm 
-      role="kepala_unit" 
-      forgotPasswordPath="/kepala-unit/forgot-password"
-      redirectAfterLogin="/kepala-unit"
-    />
-  );
+  redirect("/login");
 }

@@ -77,11 +77,21 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
       throw new Error("Sesi Anda telah berakhir. Silakan login ulang.");
     }
 
-    // 403 = user SUDAH login tapi tidak berhak atas resource ini
-    // (role salah, akun tidak terdaftar sebagai staf/ka-p4m/kepala unit, dll).
-    // Beda dengan 401 di atas: sesi TIDAK dihapus & TIDAK di-redirect,
-    // cukup tampilkan peringatan supaya user tahu kenapa gagal.
+    // 403 = user SUDAH login tapi tidak berhak atas resource ini.
+    // Kasus khusus: pesan role-mismatch ("... hanya untuk: ...") padahal
+    // halaman ini sendiri sudah lolos pengecekan role saat load — ini
+    // biasanya artinya localStorage token/role KETIMPA oleh login akun lain
+    // di tab/browser yang sama (token & role disimpan global, bukan per-tab).
+    // Untuk kasus ini, treat seperti sesi invalid: paksa logout + redirect,
+    // supaya user tidak stuck dengan sesi campur-aduk.
     if (response.status === 403 && typeof window !== "undefined") {
+      const isRoleMismatch = typeof data.message === "string" && data.message.includes("hanya untuk");
+      if (isRoleMismatch) {
+        forceLogout();
+        throw new Error(
+          "Sesi Anda tidak valid lagi untuk halaman ini — kemungkinan ada akun lain yang login di tab/browser yang sama. Silakan login ulang."
+        );
+      }
       window.alert(data.message || "Akses ditolak. Anda tidak memiliki izin untuk aksi ini.");
     }
 

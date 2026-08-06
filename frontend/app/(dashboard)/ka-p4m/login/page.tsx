@@ -1,11 +1,7 @@
-import LoginForm from '@/components/auth/LoginForm';
+import { redirect } from "next/navigation";
 
+// Halaman login sekarang disatukan di /login.
+// Path ini dipertahankan supaya link/bookmark lama tidak 404.
 export default function KaP4MLoginPage() {
-  return (
-    <LoginForm 
-      role="ka_p4m" 
-      forgotPasswordPath="/ka-p4m/forgot-password"
-      redirectAfterLogin="/ka-p4m"
-    />
-  );
+  redirect("/login");
 }

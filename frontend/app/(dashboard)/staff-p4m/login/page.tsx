@@ -1,11 +1,7 @@
-import LoginForm from '@/components/auth/LoginForm';
+import { redirect } from "next/navigation";
 
+// Halaman login sekarang disatukan di /login.
+// Path ini dipertahankan supaya link/bookmark lama tidak 404.
 export default function StaffP4MLoginPage() {
-  return (
-    <LoginForm 
-      role="staf_p4m" 
-      forgotPasswordPath="/staff-p4m/forgot-password"
-      redirectAfterLogin="/staff-p4m"
-    />
-  );
+  redirect("/login");
 }

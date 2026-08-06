@@ -16,65 +16,54 @@ import {
 
 export default function PengaturanKaP4MPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifikasiEmail, setNotifikasiEmail] = useState(true);
-  const [bahasa, setBahasa] = useState('id');
+  const [isAuthorized, setIsAuthorized] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const token = localStorage.getItem('token');
+    const userRaw = localStorage.getItem('user');
+    if (!token || !userRaw) return false;
+    try {
+      const user = JSON.parse(userRaw);
+      return user.role === 'kepala_unit';
+    } catch {
+      return false;
+    }
+  });
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('darkMode') === 'true';
+  });
+  const [notifikasiEmail, setNotifikasiEmail] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('notifikasiEmail');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [bahasa, setBahasa] = useState(() => {
+    if (typeof window === 'undefined') return 'id';
+    return localStorage.getItem('bahasa') || 'id';
+  });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Auth check
+  // Auth check — redirect kalau belum login/role salah
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userRaw = localStorage.getItem('user');
-    if (!token || !userRaw) {
-      router.replace('/ka-p4m/login');
-      return;
+    if (!isAuthorized) {
+      router.replace('/kepala-unit/login');
     }
-    try {
-      const user = JSON.parse(userRaw);
-      if (user.role !== 'ka_p4m') {
-        router.replace('/ka-p4m/login');
-        return;
-      }
-    } catch {
-      router.replace('/ka-p4m/login');
-      return;
-    }
-    setIsChecking(false);
-  }, [router]);
+  }, [isAuthorized, router]);
 
-  // Load preferences dari localStorage
+  // Sinkronkan class "dark" di <html> setiap kali darkMode berubah.
+  // Ini murni memperbarui sistem eksternal (DOM), bukan setState di
+  // dalam effect, jadi tidak memicu cascading render.
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved === 'true') {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
-    }
-
-    const savedNotif = localStorage.getItem('notifikasiEmail');
-    if (savedNotif !== null) {
-      setNotifikasiEmail(savedNotif === 'true');
-    }
-
-    const savedBahasa = localStorage.getItem('bahasa');
-    if (savedBahasa) {
-      setBahasa(savedBahasa);
-    }
-  }, []);
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
 
   const toggleDarkMode = () => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('darkMode', 'true');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('darkMode', 'false');
-    }
+    localStorage.setItem('darkMode', String(newDarkMode));
   };
 
   const handleSaveSettings = () => {
@@ -113,12 +102,20 @@ export default function PengaturanKaP4MPage() {
       });
 
       if (response.ok) {
-        alert('✅ Password berhasil diubah!');
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
+        alert('✅ Password berhasil diubah! Silakan login kembali.');
+
+        // Password berubah → sesi lama nggak valid lagi secara logika,
+        // jadi paksa logout & balik ke halaman login.
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user');
+        router.replace('/kepala-unit/login');
       } else {
-        alert('❌ Gagal mengubah password. Cek password lama!');
+        const data = await response.json().catch(() => null);
+        alert(`❌ ${data?.message || 'Gagal mengubah password. Cek password lama!'}`);
       }
     } catch (error) {
       console.error('Error changing password:', error);
@@ -126,9 +123,9 @@ export default function PengaturanKaP4MPage() {
     }
   };
 
-  if (isChecking) {
+  if (!isAuthorized) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-100 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
