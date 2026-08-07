@@ -207,6 +207,7 @@ async function fetchProfileById(id) {
       p.role        AS role,
       p.username    AS username,
       p.created_at  AS created_at,
+      p.foto_profil AS foto_profil,
       ku.unit       AS unit_kepala
     FROM pengguna p
     LEFT JOIN kepala_unit ku ON ku.id_pengguna = p.id_pengguna
@@ -226,6 +227,7 @@ async function fetchProfileById(id) {
     unit: row.unit_kepala || UNIT_DEFAULT[row.role] || "-",
     username: row.username || row.email.split("@")[0],
     created_at: row.created_at,
+    foto_profil: row.foto_profil || null,
   };
 }
 
@@ -336,6 +338,75 @@ async function changePassword(req, res) {
   }
 }
 
+// ── POST /api/users/profile/foto — upload foto profil akun sendiri ───
+// Beda dari uploadTandaTangan (itu tanda tangan akun ORANG LAIN, dikelola
+// Staf P4M lewat Data Akun); ini user upload foto profil DIRI SENDIRI,
+// dipakai halaman "Profil Saya" untuk semua role.
+async function uploadFotoProfil(req, res) {
+  const userId = req.user.id;
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "Tidak ada file foto yang diunggah." });
+  }
+
+  try {
+    const [existing] = await pool.query(
+      "SELECT foto_profil FROM pengguna WHERE id_pengguna = ?",
+      [userId]
+    );
+    if (existing.length === 0) {
+      fs.unlink(path.join(UPLOAD_DIR, req.file.filename), () => {});
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    // Hapus foto lama (kalau ada) supaya folder uploads tidak menumpuk
+    const fotoLama = existing[0].foto_profil;
+    if (fotoLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fotoLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET foto_profil = ? WHERE id_pengguna = ?", [
+      req.file.filename,
+      userId,
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Foto profil berhasil diunggah.",
+      foto_profil: req.file.filename,
+    });
+  } catch (error) {
+    fs.unlink(path.join(UPLOAD_DIR, req.file.filename), () => {});
+    console.error("Error uploadFotoProfil:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengunggah foto profil." });
+  }
+}
+
+// ── DELETE /api/users/profile/foto — hapus foto profil akun sendiri ──
+async function deleteFotoProfil(req, res) {
+  const userId = req.user.id;
+  try {
+    const [existing] = await pool.query(
+      "SELECT foto_profil FROM pengguna WHERE id_pengguna = ?",
+      [userId]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    const fotoLama = existing[0].foto_profil;
+    if (fotoLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fotoLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET foto_profil = NULL WHERE id_pengguna = ?", [userId]);
+    return res.status(200).json({ success: true, message: "Foto profil berhasil dihapus." });
+  } catch (error) {
+    console.error("Error deleteFotoProfil:", error);
+    return res.status(500).json({ success: false, message: "Gagal menghapus foto profil." });
+  }
+}
+
 // ── DELETE /api/users/:id — hapus akun ───────────────────────────────
 async function deleteUser(req, res) {
   const { id } = req.params;
@@ -431,4 +502,6 @@ module.exports = {
   getProfile,
   updateProfile,
   changePassword,
+  uploadFotoProfil,
+  deleteFotoProfil,
 };

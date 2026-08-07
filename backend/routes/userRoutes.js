@@ -5,6 +5,7 @@ const express = require("express");
 const router = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const uploadSignature = require("../middleware/signatureUploadMiddleware");
+const uploadAvatar = require("../middleware/avatarUploadMiddleware");
 const {
   getUsers,
   createUser,
@@ -15,6 +16,8 @@ const {
   getProfile,
   updateProfile,
   changePassword,
+  uploadFotoProfil,
+  deleteFotoProfil,
 } = require("../controllers/userController");
 
 router.use(authMiddleware);
@@ -26,6 +29,10 @@ router.use(authMiddleware);
 router.get("/profile", getProfile);
 router.put("/profile", updateProfile);
 router.put("/change-password", changePassword);
+
+// Foto profil akun sendiri — sama seperti di atas, semua role boleh akses.
+router.post("/profile/foto", uploadAvatar.single("foto"), uploadFotoProfil);
+router.delete("/profile/foto", deleteFotoProfil);
 
 router.use(roleMiddleware("staf_p4m"));
 
