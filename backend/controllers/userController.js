@@ -208,6 +208,7 @@ async function fetchProfileById(id) {
       p.username    AS username,
       p.created_at  AS created_at,
       p.foto_profil AS foto_profil,
+      p.tanggal_bergabung AS tanggal_bergabung,
       ku.unit       AS unit_kepala
     FROM pengguna p
     LEFT JOIN kepala_unit ku ON ku.id_pengguna = p.id_pengguna
@@ -228,6 +229,9 @@ async function fetchProfileById(id) {
     username: row.username || row.email.split("@")[0],
     created_at: row.created_at,
     foto_profil: row.foto_profil || null,
+    // Fallback ke created_at kalau kolom baru ini belum keisi (akun lama
+    // sebelum migration, atau belum sempat di-UPDATE backfill-nya)
+    tanggal_bergabung: row.tanggal_bergabung || row.created_at,
   };
 }
 
@@ -250,10 +254,21 @@ async function getProfile(req, res) {
 // ── PUT /api/users/profile — update profil akun yang sedang login ────
 async function updateProfile(req, res) {
   const userId = req.user.id;
-  const { nama_lengkap, email } = req.body;
+  const { nama_lengkap, email, tanggal_bergabung } = req.body;
 
   if (!nama_lengkap?.trim() || !email?.trim()) {
     return res.status(400).json({ success: false, message: "Nama dan email wajib diisi." });
+  }
+
+  // tanggal_bergabung sifatnya opsional — kalau dikirim, harus format
+  // YYYY-MM-DD (bawaan <input type="date"> di frontend) dan bukan tanggal
+  // masa depan.
+  if (tanggal_bergabung) {
+    const validFormat = /^\d{4}-\d{2}-\d{2}$/.test(tanggal_bergabung);
+    const notFuture = new Date(tanggal_bergabung) <= new Date();
+    if (!validFormat || !notFuture) {
+      return res.status(400).json({ success: false, message: "Tanggal bergabung tidak valid." });
+    }
   }
 
   const conn = await pool.getConnection();
@@ -267,11 +282,18 @@ async function updateProfile(req, res) {
 
     await conn.beginTransaction();
 
-    await conn.query("UPDATE pengguna SET nama = ?, email = ? WHERE id_pengguna = ?", [
-      nama_lengkap,
-      email,
-      userId,
-    ]);
+    if (tanggal_bergabung) {
+      await conn.query(
+        "UPDATE pengguna SET nama = ?, email = ?, tanggal_bergabung = ? WHERE id_pengguna = ?",
+        [nama_lengkap, email, tanggal_bergabung, userId]
+      );
+    } else {
+      await conn.query("UPDATE pengguna SET nama = ?, email = ? WHERE id_pengguna = ?", [
+        nama_lengkap,
+        email,
+        userId,
+      ]);
+    }
 
     // Sinkronkan juga ke tabel profil per-role biar data nama/email konsisten
     if (role === "staf_p4m") {

@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import NotifikasiBell from '@/components/notifikasi/NotifikasiBell';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+
 export default function KaP4MLayout({
   children,
 }: {
@@ -37,6 +39,7 @@ export default function KaP4MLayout({
     return false;
   });
   const [showProfile, setShowProfile] = useState(false);
+  const [fotoProfil, setFotoProfil] = useState<string | null>(null);
 
   // Auth check
   useEffect(() => {
@@ -94,6 +97,25 @@ useEffect(() => {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
+
+  // Ambil foto profil buat ditampilkan di navbar. Dipanggil ulang tiap
+  // pindah halaman biar foto langsung update kalau baru saja diganti di
+  // halaman Profil Saya.
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    fetch(`${BASE_URL}/api/users/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.foto_profil) setFotoProfil(data.foto_profil);
+      })
+      .catch(() => {
+        // Gagal ambil foto bukan hal fatal, cukup tampilkan icon default
+      });
+  }, [pathname]);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -262,8 +284,16 @@ useEffect(() => {
 
                 <div className="relative">
                   <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                      <User size={16} />
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                      {fotoProfil ? (
+                        <img
+                          src={`${BASE_URL}/uploads/${fotoProfil}`}
+                          alt="Foto profil"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User size={16} />
+                      )}
                     </div>
                     <ChevronDown size={14} />
                   </button>
@@ -400,8 +430,16 @@ useEffect(() => {
 
               <div className="relative">
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
-                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                    <User size={16} />
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                    {fotoProfil ? (
+                      <img
+                        src={`${BASE_URL}/uploads/${fotoProfil}`}
+                        alt="Foto profil"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User size={16} />
+                    )}
                   </div>
                   <ChevronDown size={14} />
                 </button>

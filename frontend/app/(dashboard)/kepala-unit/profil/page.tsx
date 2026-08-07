@@ -13,6 +13,8 @@ import {
   Camera,
 } from 'lucide-react';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+
 interface UserProfile {
   id: number;
   nama_lengkap: string;
@@ -21,6 +23,8 @@ interface UserProfile {
   unit: string;
   username: string;
   created_at: string;
+  foto_profil: string | null;
+  tanggal_bergabung: string | null;
 }
 
 export default function ProfilKaP4MPage() {
@@ -36,9 +40,12 @@ export default function ProfilKaP4MPage() {
     unit: '',
     username: '',
     created_at: '',
+    foto_profil: null,
+    tanggal_bergabung: null,
   });
   const [editForm, setEditForm] = useState(profile);
-  const [avatar, setAvatar] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
 
   // Auth check
   useEffect(() => {
@@ -88,6 +95,8 @@ export default function ProfilKaP4MPage() {
           unit: '-',
           username: 'kepala_unit',
           created_at: '2024-01-01',
+          foto_profil: null,
+          tanggal_bergabung: '2024-01-01',
         };
         setProfile(dummy);
         setEditForm(dummy);
@@ -111,6 +120,7 @@ export default function ProfilKaP4MPage() {
         body: JSON.stringify({
           nama_lengkap: editForm.nama_lengkap,
           email: editForm.email,
+          tanggal_bergabung: editForm.tanggal_bergabung,
         }),
       });
 
@@ -119,7 +129,14 @@ export default function ProfilKaP4MPage() {
         setProfile(updated);
         setEditForm(updated);
         setIsEditing(false);
-        alert('✅ Profil berhasil diperbarui!');
+        alert('✅ Profil berhasil diperbarui! Silakan login kembali.');
+
+        // Data akun berubah (nama/email) → sesi lama nggak valid lagi
+        // secara logika, jadi paksa logout & balik ke halaman login.
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user');
+        router.replace('/kepala-unit/login');
       } else {
         alert('Gagal menyimpan perubahan');
       }
@@ -134,11 +151,45 @@ export default function ProfilKaP4MPage() {
     setIsEditing(false);
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setAvatar(url);
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      alert('⚠️ Format foto harus PNG, JPG, atau WEBP.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('⚠️ Ukuran foto maksimal 2MB.');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('foto', file);
+
+      const response = await fetch(`${BASE_URL}/api/users/profile/foto`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.success) {
+        setProfile((prev) => ({ ...prev, foto_profil: data.foto_profil }));
+        setEditForm((prev) => ({ ...prev, foto_profil: data.foto_profil }));
+        setAvatarVersion((v) => v + 1);
+      } else {
+        alert(data?.message || 'Gagal mengunggah foto profil.');
+      }
+    } catch (error) {
+      console.error('Error upload foto profil:', error);
+      alert('Gagal mengunggah foto profil.');
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
     }
   };
 
@@ -159,8 +210,14 @@ export default function ProfilKaP4MPage() {
       <div className="text-center mb-8">
         <div className="relative inline-block">
           <div className="w-28 h-28 rounded-full bg-linear-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto mb-3 overflow-hidden">
-            {avatar ? (
-              <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+            {uploadingAvatar ? (
+              <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+            ) : profile.foto_profil ? (
+              <img
+                src={`${BASE_URL}/uploads/${profile.foto_profil}?v=${avatarVersion}`}
+                alt="Foto profil"
+                className="w-full h-full object-cover"
+              />
             ) : (
               <span className="text-4xl">{profile.nama_lengkap?.charAt(0) || '👤'}</span>
             )}
@@ -168,7 +225,13 @@ export default function ProfilKaP4MPage() {
           {isEditing && (
             <label className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full cursor-pointer hover:bg-blue-600 transition">
               <Camera size={14} />
-              <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+              <input
+                type="file"
+                className="hidden"
+                accept="image/png, image/jpeg, image/webp"
+                onChange={handleAvatarChange}
+                disabled={uploadingAvatar}
+              />
             </label>
           )}
         </div>
@@ -246,16 +309,30 @@ export default function ProfilKaP4MPage() {
           </div>
         </div>
 
-        {/* Join Date */}
+        {/* Bergabung Sejak (bisa diedit: tahun, bulan, tanggal) */}
         <div className="flex items-center gap-4 p-3">
           <Calendar size={18} className="text-slate-400" />
           <div className="flex-1">
             <p className="text-xs text-slate-400">Bergabung Sejak</p>
-            <p className="text-slate-700 dark:text-white">
-              {profile.created_at
-                ? new Date(profile.created_at).toLocaleDateString('id-ID')
-                : '-'}
-            </p>
+            {!isEditing ? (
+              <p className="text-slate-700 dark:text-white">
+                {profile.tanggal_bergabung
+                  ? new Date(profile.tanggal_bergabung).toLocaleDateString('id-ID')
+                  : '-'}
+              </p>
+            ) : (
+              <input
+                type="date"
+                max={new Date().toISOString().split('T')[0]}
+                value={
+                  editForm.tanggal_bergabung
+                    ? new Date(editForm.tanggal_bergabung).toISOString().split('T')[0]
+                    : ''
+                }
+                onChange={(e) => setEditForm({ ...editForm, tanggal_bergabung: e.target.value })}
+                className="bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1 outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            )}
           </div>
         </div>
       </div>
