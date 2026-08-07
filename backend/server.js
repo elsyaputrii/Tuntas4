@@ -14,6 +14,7 @@ const forgotPasswordRoutes = require("./routes/forgotPasswordRoutes");
 const kepalaUnitRoutes     = require("./routes/kepalaUnitRoutes");
 const kaP4MRoutes          = require("./routes/kaP4MRoutes");
 const userRoutes           = require("./routes/userRoutes");    // ← BARU
+const notifikasiRoutes     = require("./routes/notifikasiRoutes"); // ← BARU (lonceng notifikasi)
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use("/api/staf",        stafRoutes);
 app.use("/api/kepala-unit", kepalaUnitRoutes);
 app.use("/api/ka-p4m",      kaP4MRoutes);
 app.use("/api/users",       userRoutes);             // ← BARU
+app.use("/api/notifikasi",  notifikasiRoutes);       // ← BARU (lonceng notifikasi)
 
 app.get("/", (req, res) => {
   res.json({ success: true, message: "TUNTAS4 Backend API berjalan 🚀" });

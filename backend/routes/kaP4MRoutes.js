@@ -4,6 +4,7 @@ const router = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const { pool } = require("../config/db");
 const { setApprovalStaf } = require("../controllers/stafController");
+const { notifikasiUntukPengguna } = require("../utils/notifikasi");
 
 router.use(authMiddleware);
 router.use(roleMiddleware("ka_p4m"));
@@ -81,9 +82,11 @@ router.patch("/keputusan", async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const [rows] = await conn.query(
-      `SELECT r.id_rancangan, r.id_boxing, r.status_review, b.id_laporan
+      `SELECT r.id_rancangan, r.id_boxing, r.status_review, b.id_laporan,
+              b.unit_tujuan, k.id_pengguna AS id_pengguna_kepala
        FROM rancangan_tindakan r
        JOIN boxing_ketidaksesuaian b ON b.id_boxing = r.id_boxing
+       LEFT JOIN kepala_unit k ON k.id_kepala = b.id_kepala
        WHERE r.id_rancangan = ?`,
       [id_rancangan]
     );
@@ -144,6 +147,22 @@ router.patch("/keputusan", async (req, res) => {
       keputusan === "ditindaklanjuti"
         ? "Laporan ditindaklanjuti. Masukan telah dikirim ke Kepala Unit."
         : "Laporan tidak ditindaklanjuti. Langsung ke Staf P4M.";
+
+    // Kasih tau kepala unit terkait soal keputusan Ka P4M
+    if (row.id_pengguna_kepala) {
+      notifikasiUntukPengguna(row.id_pengguna_kepala, {
+        judul:
+          keputusan === "ditindaklanjuti"
+            ? "Rancangan Disetujui Ka P4M"
+            : "Rancangan Tidak Ditindaklanjuti",
+        pesan:
+          keputusan === "ditindaklanjuti"
+            ? `Rancangan tindakan untuk unit ${row.unit_tujuan} disetujui Ka P4M. Silakan lanjutkan pelaksanaan.`
+            : `Rancangan tindakan untuk unit ${row.unit_tujuan} tidak ditindaklanjuti oleh Ka P4M.`,
+        jenis: "keputusan_ka",
+        link: "/kepala-unit/ketidaksesuaian-masuk",
+      });
+    }
 
     return res.status(200).json({ success: true, message: pesan });
   } catch (error) {

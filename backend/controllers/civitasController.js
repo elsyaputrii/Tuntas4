@@ -2,6 +2,7 @@
 // Civitas bersifat ANONIM — tidak perlu nama, tidak perlu login
 
 const { pool } = require("../config/db");
+const { notifikasiUntukRole } = require("../utils/notifikasi");
 
 // ============================================================
 // KIRIM LAPORAN — tanpa nama, tanpa login
@@ -70,6 +71,15 @@ async function kirimLaporan(req, res) {
     );
 
     const id_laporan = result.insertId;
+    const kode_laporan_notif = `LAP-${String(id_laporan).padStart(5, "0")}`;
+
+    // Kasih tau semua akun staf_p4m ada laporan baru masuk (in-app + email)
+    notifikasiUntukRole("staf_p4m", {
+      judul: "Laporan Baru Masuk",
+      pesan: `Ada laporan baru (${kode_laporan_notif}) dari ${status_pelapor} yang perlu diperiksa dan didistribusikan.`,
+      jenis: "laporan_masuk",
+      link: "/staff-p4m/laporan-masuk",
+    });
 
     return res.status(201).json({
       success: true,

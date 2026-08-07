@@ -68,6 +68,7 @@
 //   memang bagian yang mau direvisi.
 
 const { pool } = require("../config/db");
+const { notifikasiUntukPengguna } = require("../utils/notifikasi");
 const { UNITS_UMUM } = require("../constants/unitsUmum");
 
 // ============================================================
@@ -201,9 +202,10 @@ async function distribusiLaporan(req, res) {
     await conn.beginTransaction();
 
     const insertedIds = [];
+    const kepalaUntukNotif = []; // { id_pengguna, unit } — dinotif setelah commit sukses
     for (const unit of unitArray) {
       const [kepalaRows] = await conn.query(
-        `SELECT id_kepala, nama FROM kepala_unit WHERE unit = ? LIMIT 1`,
+        `SELECT id_kepala, id_pengguna, nama FROM kepala_unit WHERE unit = ? LIMIT 1`,
         [unit]
       );
 
@@ -216,7 +218,8 @@ async function distribusiLaporan(req, res) {
         });
       }
 
-      const { id_kepala } = kepalaRows[0];
+      const { id_kepala, id_pengguna: id_pengguna_kepala } = kepalaRows[0];
+      kepalaUntukNotif.push({ id_pengguna: id_pengguna_kepala, unit });
 
       const [result] = await conn.query(
         `INSERT INTO boxing_ketidaksesuaian
@@ -233,6 +236,16 @@ async function distribusiLaporan(req, res) {
     );
 
     await conn.commit();
+
+    // Kasih tau tiap kepala unit terkait ada laporan baru masuk ke unitnya
+    for (const k of kepalaUntukNotif) {
+      notifikasiUntukPengguna(k.id_pengguna, {
+        judul: "Laporan Baru untuk Unit Anda",
+        pesan: `Ada laporan ketidaksesuaian baru yang didistribusikan ke unit ${k.unit}. Mohon segera ditindaklanjuti.`,
+        jenis: "distribusi_unit",
+        link: "/kepala-unit/ketidaksesuaian-masuk",
+      });
+    }
 
     return res.status(201).json({
       success: true,

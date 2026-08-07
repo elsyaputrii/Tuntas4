@@ -32,6 +32,7 @@
 // "pernah ditolak Staf P4M" untuk laporan yang sudah lolos revisi.
 
 const { pool } = require("../config/db");
+const { notifikasiUntukRole } = require("../utils/notifikasi");
 
 // ✅ FITUR BARU: akun Ka P4M digabung dengan Kepala Unit P4M.
 // Kalau yang login role-nya ka_p4m, langsung anggap dia Kepala Unit
@@ -159,6 +160,14 @@ async function submitRancangan(req, res) {
       `UPDATE boxing_ketidaksesuaian SET status = 'diproses' WHERE id_boxing = ?`,
       [id_boxing],
     );
+
+    // Kasih tau Ka P4M ada rancangan tindakan yang perlu diputuskan
+    notifikasiUntukRole("ka_p4m", {
+      judul: "Rancangan Tindakan Perlu Diputuskan",
+      pesan: `Kepala unit ${kepala.unit} mengirim rancangan tindakan yang perlu keputusan Anda (ditindaklanjuti atau tidak).`,
+      jenis: "rancangan_masuk",
+      link: "/ka-p4m/proses-pengaduan",
+    });
 
     return res.status(200).json({
       success: true,
