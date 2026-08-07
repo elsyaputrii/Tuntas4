@@ -30,13 +30,23 @@ export default function StaffP4MLayout({
   const pathname = usePathname();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  // Pola sama kayak ka-p4m/kepala-unit: baca darkMode langsung pas
+  // inisialisasi state (bukan lewat useEffect + setState terpisah),
+  // biar nggak kena warning "setState synchronously within an effect".
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('darkMode') === 'true';
+    }
+    return false;
+  });
   const [showProfile, setShowProfile] = useState(false);
   const [fotoProfil, setFotoProfil] = useState<string | null>(null);
 
   // Auth check
   useEffect(() => {
+    // Halaman reset password diakses TANPA login (dari link email)
+    if (pathname?.includes('/reset-password')) return;
+
     const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
     if (!token || !userRaw) {
@@ -51,7 +61,7 @@ export default function StaffP4MLayout({
     } catch {
       router.push('/login');
     }
-  }, [router]);
+  }, [router, pathname]);
 
   // Auto-logout saat token JWT expired — nggak nunggu ada request ke server dulu.
 // Baca field "exp" dari payload token, lalu pasang timer yang otomatis
@@ -88,12 +98,6 @@ useEffect(() => {
   return () => clearTimeout(timer);
 }, [router]);
 
-  useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem('darkMode') === 'true';
-    setDarkMode(saved);
-  }, []);
-
   // Ambil foto profil buat ditampilkan di navbar. Dipanggil ulang tiap
   // pindah halaman (pathname berubah) biar foto langsung update kalau
   // baru saja diganti di halaman Profil Saya.
@@ -114,10 +118,9 @@ useEffect(() => {
   }, [pathname]);
 
   useEffect(() => {
-    if (mounted) {
-      document.documentElement.classList.toggle('dark', darkMode);
-    }
-  }, [darkMode, mounted]);
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
+
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -135,7 +138,7 @@ useEffect(() => {
 
   const isActive = (path: string) => pathname === path;
 
-  if (pathname?.includes('/login')) {
+  if (pathname?.includes('/login') || pathname?.includes('/reset-password')) {
     return <>{children}</>;
   }
 
@@ -224,7 +227,7 @@ useEffect(() => {
 
             <div className="flex items-center gap-2">
               <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-white/10 transition">
-                {mounted ? (darkMode ? <Sun size={18} /> : <Moon size={18} />) : <Moon size={18} />}
+                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
               <NotifikasiBell />
@@ -233,6 +236,7 @@ useEffect(() => {
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
                     {fotoProfil ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={`${BASE_URL}/uploads/${fotoProfil}`}
                         alt="Foto profil"

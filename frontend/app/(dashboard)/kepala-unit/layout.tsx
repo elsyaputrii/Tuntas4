@@ -15,7 +15,6 @@ import {
   Moon,
   User,
   ChevronDown,
-  Bell,
 } from 'lucide-react';
 import NotifikasiBell from '@/components/notifikasi/NotifikasiBell';
 
@@ -41,6 +40,9 @@ export default function KepalaUnitLayout({
 
   // Auth check
   useEffect(() => {
+    // Halaman reset password diakses TANPA login (dari link email)
+    if (pathname?.includes('/reset-password')) return;
+
     const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
     if (!token || !userRaw) {
@@ -55,7 +57,7 @@ export default function KepalaUnitLayout({
     } catch {
       router.push('/login');
     }
-  }, [router]);
+  }, [router, pathname]);
 
   // Auto-logout saat token JWT expired — nggak nunggu ada request ke server dulu.
 // Baca field "exp" dari payload token, lalu pasang timer yang otomatis
@@ -150,7 +152,7 @@ useEffect(() => {
 
   const isActive = (path: string) => pathname === path;
 
-  if (pathname?.includes('/login')) {
+  if (pathname?.includes('/login') || pathname?.includes('/reset-password')) {
     return <>{children}</>;
   }
 
@@ -246,6 +248,7 @@ useEffect(() => {
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
                     {fotoProfil ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={`${BASE_URL}/uploads/${fotoProfil}`}
                         alt="Foto profil"

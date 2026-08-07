@@ -55,11 +55,18 @@ export default function ResetPasswordForm({ loginPath }: ResetPasswordFormProps)
   }
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 z-0">
-        
+        <Image
+          src="/poltek.jpg"
+          alt="Polibatam Background"
+          fill
+          className="object-cover"
+          priority
+        />
       </div>
+      <div className="absolute inset-0 z-0 bg-white/50" />
 
       <div className="relative z-10 w-full max-w-sm bg-[#7C93A7] p-10 rounded-[30px] shadow-2xl mx-4">
 
