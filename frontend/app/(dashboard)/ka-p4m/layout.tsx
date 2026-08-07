@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   Bell,
 } from 'lucide-react';
+import NotifikasiBell from '@/components/notifikasi/NotifikasiBell';
 
 export default function KaP4MLayout({
   children,
@@ -36,7 +37,6 @@ export default function KaP4MLayout({
     return false;
   });
   const [showProfile, setShowProfile] = useState(false);
-  const [showNotif, setShowNotif] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -258,22 +258,7 @@ useEffect(() => {
                   {darkMode ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
 
-                <div className="relative">
-                  <button onClick={() => setShowNotif(!showNotif)} className="p-2 rounded-full hover:bg-white/10 transition">
-                    <Bell size={18} />
-                  </button>
-                  {showNotif && (
-                    <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
-                      <div className="p-3 border-b flex justify-between">
-                        <span className="font-semibold text-slate-700 dark:text-white">Notifikasi</span>
-                        <button onClick={() => setShowNotif(false)}><X size={16} className="text-slate-700 dark:text-white" /></button>
-                      </div>
-                      <div className="p-8 text-center text-slate-400 text-sm">
-                        Belum ada notifikasi
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <NotifikasiBell />
 
                 <div className="relative">
                   <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">
@@ -411,22 +396,7 @@ useEffect(() => {
                 {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
 
-              <div className="relative">
-                <button onClick={() => setShowNotif(!showNotif)} className="p-2 rounded-full hover:bg-white/10 transition">
-                  <Bell size={18} />
-                </button>
-                {showNotif && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
-                    <div className="p-3 border-b flex justify-between">
-                      <span className="font-semibold text-slate-700 dark:text-white">Notifikasi</span>
-                      <button onClick={() => setShowNotif(false)}><X size={16} className="text-slate-700 dark:text-white" /></button>
-                    </div>
-                    <div className="p-8 text-center text-slate-400 text-sm">
-                      Belum ada notifikasi
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NotifikasiBell />
 
               <div className="relative">
                 <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 rounded-full hover:bg-white/10 transition">

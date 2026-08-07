@@ -223,6 +223,18 @@ export const kepalaUnitApi = {
 };
 
 // ─────────────────────────────────────────────
+// NOTIFIKASI — lonceng 🔔, dipakai semua role (staf_p4m, kepala_unit, ka_p4m)
+// ─────────────────────────────────────────────
+export const notifikasiApi = {
+  getList: () => apiFetch("/notifikasi"),
+  getUnreadCount: () => apiFetch("/notifikasi/unread-count"),
+  markAsRead: (id: number) =>
+    apiFetch(`/notifikasi/${id}/read`, { method: "PATCH" }),
+  markAllAsRead: () =>
+    apiFetch("/notifikasi/read-all", { method: "PATCH" }),
+};
+
+// ─────────────────────────────────────────────
 // USERS — kelola akun (Data Akun), khusus staf_p4m
 // ─────────────────────────────────────────────
 export const userApi = {
