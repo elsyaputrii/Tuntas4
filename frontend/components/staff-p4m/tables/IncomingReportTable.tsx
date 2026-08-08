@@ -20,6 +20,22 @@ interface LaporanMasuk {
   tanggal_lapor?: string;
   created_at?: string;
   createdAt?: string;
+  tanggal_kejadian?: string;
+}
+
+function formatTanggalKejadian(item: LaporanMasuk): string {
+  if (!item.tanggal_kejadian) return "Tanggal kejadian tidak diketahui";
+  // tanggal_kejadian dari DB formatnya "YYYY-MM-DD" (DATE, bukan timestamp),
+  // jangan pakai `new Date(...)` langsung karena bisa ke-geser 1 hari akibat
+  // timezone parsing (UTC vs WIB) — parse manual per bagian saja.
+  const [y, m, d] = item.tanggal_kejadian.split("-").map(Number);
+  if (!y || !m || !d) return "Tanggal kejadian tidak diketahui";
+  const dateObj = new Date(y, m - 1, d);
+  return dateObj.toLocaleString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function getTanggal(item: LaporanMasuk): Date | null {
@@ -333,7 +349,10 @@ export default function IncomingReportTable() {
                     {item.deskripsi}
                   </div>
                   <p className="mt-3 text-[9px] text-gray-500 font-bold flex items-center gap-1">
-                    <Calendar size={10} /> {formatTanggal(item)}
+                    <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}
+                  </p>
+                  <p className="mt-1 text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                    <Calendar size={10} /> Tanggal kejadian: {formatTanggalKejadian(item)}
                   </p>
                   {item.lampiran && (
                     <button
@@ -392,7 +411,10 @@ export default function IncomingReportTable() {
                   {item.deskripsi}
                 </div>
                 <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
-                  <Calendar size={10} /> {formatTanggal(item)}
+                  <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}
+                </p>
+                <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                  <Calendar size={10} /> Tanggal kejadian: {formatTanggalKejadian(item)}
                 </p>
                 {item.lampiran && (
                   <button

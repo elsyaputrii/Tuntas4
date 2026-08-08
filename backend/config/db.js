@@ -35,6 +35,14 @@ const pool = mysql.createPool({
   // koneksi tidak dikasih tahu timezone-nya. Ini yang bikin filter
   // HARI INI / MINGGU INI / BULAN INI di Laporan Masuk meleset.
   timezone: "+07:00",
+
+  // ✅ FIX: kolom bertipe DATE (mis. tanggal_kejadian) dipaksa selalu
+  // dikembalikan sebagai string murni "YYYY-MM-DD", bukan objek Date JS.
+  // Kalau dibiarkan jadi objek Date, res.json() bakal manggil
+  // .toISOString() otomatis (selalu ke UTC) — itu bisa menggeser
+  // tanggalnya mundur 1 hari tergantung timezone server. String polos
+  // sama sekali tidak kena masalah ini.
+  dateStrings: ["DATE"],
 });
 
 // ============================================================

@@ -86,6 +86,7 @@ async function getLaporanMasuk(req, res) {
         deskripsi,
         lampiran,
         status,
+        tanggal_kejadian,
         created_at
       FROM laporan_ketidaksesuaian
       WHERE status = 'menunggu'
