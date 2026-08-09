@@ -57,12 +57,11 @@ export default function KaP4MHasilTable() {
     setError("");
     try {
       const res = await kaP4MApi.getProsesMonitor();
-      // ✅ PERUBAHAN: sebelumnya di-filter hanya yang status_boxing==='di_staff'
-      // && ada hasil_tindakan. Sekarang SEMUA laporan ditampilkan supaya Ka P4M
-      // bisa memutuskan "siap/tidak" dari tahap manapun, tidak perlu menunggu
-      // Kepala Unit mengisi hasil pelaksanaan dulu. Yang sudah 'selesai' tetap
-      // disembunyikan karena sudah final (dan backend akan menolak approval
-      // ulang untuk status ini).
+      // ✅ Semua laporan yang belum 'selesai' ditampilkan di tabel ini apa pun
+      // tahapnya, supaya Ka P4M bisa memantau progresnya. Tapi tombol
+      // keputusan (✓/✗) baru muncul kalau `hasil_tindakan` sudah diisi
+      // Kepala Unit — sebelum itu, hanya ditampilkan tapi tidak bisa
+      // diputuskan (lihat render kolom "Keputusan Ka P4M" di bawah).
       const filtered = (res.data as HasilItem[]).filter(
         (item) => item.status_boxing !== "selesai"
       );
@@ -83,8 +82,17 @@ export default function KaP4MHasilTable() {
     return `${BASE_URL}/uploads/${lampiran}`;
   }
 
-  function openModal(id_boxing: number, keputusan: "diterima" | "ditolak") {
-    setModal({ open: true, id_boxing, keputusan, catatan: "" });
+  function openModal(item: HasilItem, keputusan: "diterima" | "ditolak") {
+    // 🚫 Kalau status_review dari Proses Pengaduan masih "Perbaikan
+    // Berkelanjutan" (ditindaklanjuti), Ka P4M belum boleh memutuskan
+    // apa pun sebelum Kepala Unit mengisi hasil tindak lanjutnya.
+    // Kalau statusnya "Sesuai"/selesai (tidak_ditindaklanjuti) atau field
+    // lainnya, gak ada yang perlu ditunggu dari Kepala Unit → langsung bisa.
+    if (item.status_review === "ditindaklanjuti" && !item.hasil_tindakan) {
+      setError("Hasil tindak lanjut belum diisi Kepala Unit");
+      return;
+    }
+    setModal({ open: true, id_boxing: item.id_boxing, keputusan, catatan: "" });
     setError("");
   }
 
@@ -205,7 +213,7 @@ export default function KaP4MHasilTable() {
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Bisa diputuskan dari tahap manapun, tidak perlu menunggu Kepala Unit mengisi hasil pelaksanaan dulu.
+          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Khusus status "Perbaikan Berkelanjutan", keputusan baru bisa diambil setelah Kepala Unit mengisi hasil tindak lanjut.
         </p>
         {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
         {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
@@ -290,7 +298,7 @@ export default function KaP4MHasilTable() {
                   <div className="flex gap-3">
                     <button
                       type="button"
-                      onClick={() => openModal(item.id_boxing, "diterima")}
+                      onClick={() => openModal(item, "diterima")}
                       title="Terima hasil — laporan otomatis Selesai"
                       className="w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 text-white text-lg font-bold flex items-center justify-center shadow"
                     >
@@ -298,7 +306,7 @@ export default function KaP4MHasilTable() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => openModal(item.id_boxing, "ditolak")}
+                      onClick={() => openModal(item, "ditolak")}
                       title="Tolak — kembalikan ke unit untuk revisi hasil"
                       className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-lg font-bold flex items-center justify-center shadow"
                     >
