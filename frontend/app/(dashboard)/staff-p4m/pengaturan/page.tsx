@@ -14,6 +14,8 @@ import {
   Lock,
 } from 'lucide-react';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+
 export default function PengaturanStaffPage() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(() => {
@@ -85,7 +87,7 @@ export default function PengaturanStaffPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/users/change-password', {
+      const response = await fetch(`${BASE_URL}/api/users/change-password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
