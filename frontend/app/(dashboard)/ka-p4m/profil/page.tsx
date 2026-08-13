@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   User,
   Mail,
@@ -209,14 +210,16 @@ export default function ProfilKaP4MPage() {
       {/* Header Avatar */}
       <div className="text-center mb-8">
         <div className="relative inline-block">
-          <div className="w-28 h-28 rounded-full bg-linear-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto mb-3 overflow-hidden">
+          <div className="w-28 h-28 rounded-full bg-linear-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto mb-3 overflow-hidden relative">
             {uploadingAvatar ? (
               <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
             ) : profile.foto_profil ? (
-              <img
+              <Image
                 src={`${BASE_URL}/uploads/${profile.foto_profil}?v=${avatarVersion}`}
                 alt="Foto profil"
-                className="w-full h-full object-cover"
+                fill
+                sizes="112px"
+                className="object-cover"
               />
             ) : (
               <span className="text-4xl">{profile.nama_lengkap?.charAt(0) || '👤'}</span>

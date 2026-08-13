@@ -18,7 +18,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http:/
 
 export default function PengaturanStaffPage() {
   const router = useRouter();
-  const [isAuthorized, setIsAuthorized] = useState(() => {
+  const [isAuthorized] = useState(() => {
     if (typeof window === 'undefined') return false;
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('role');
@@ -122,7 +122,7 @@ export default function PengaturanStaffPage() {
 
   if (!isAuthorized) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-100 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );

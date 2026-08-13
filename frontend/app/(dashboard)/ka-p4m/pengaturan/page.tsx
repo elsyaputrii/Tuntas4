@@ -18,7 +18,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http:/
 
 export default function PengaturanKaP4MPage() {
   const router = useRouter();
-  const [isAuthorized, setIsAuthorized] = useState(() => {
+  const [isAuthorized] = useState(() => {
     if (typeof window === 'undefined') return false;
     const token = localStorage.getItem('token');
     const userRaw = localStorage.getItem('user');
