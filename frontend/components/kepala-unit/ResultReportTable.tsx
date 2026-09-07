@@ -112,9 +112,10 @@ export default function ResultReportTable() {
       </div>
 
       {laporanList.map((item, idx) => {
+        const sesuaiTanpaTindakLanjut = item.status_review === "tidak_ditindaklanjuti";
         const sudahTerkirim =
           !!item.id_pelaksanaan && item.status_boxing !== "menunggu_pelaksanaan";
-        const showForm = !sudahTerkirim;
+        const showForm = !sudahTerkirim && !sesuaiTanpaTindakLanjut;
         return (
           <div key={item.id_boxing} className={`flex min-h-50 ${idx > 0 ? "border-t-2 border-black" : ""}`}>
             <div className="w-[25%] border-r-2 border-black p-4">
@@ -128,8 +129,10 @@ export default function ResultReportTable() {
               <p className="text-[11px] text-gray-700">{item.rencana_tindakan}</p>
             </div>
             <div className="w-[10%] border-r-2 border-black p-4 flex items-center justify-center">
-              <span className={`font-bold text-center text-[10px] ${sudahTerkirim ? "text-green-600" : "text-blue-600"}`}>
-                {sudahTerkirim ? "Terkirim" : "Input hasil"}
+              <span className={`font-bold text-center text-[10px] ${
+                sesuaiTanpaTindakLanjut ? "text-emerald-600" : sudahTerkirim ? "text-green-600" : "text-blue-600"
+              }`}>
+                {sesuaiTanpaTindakLanjut ? "✅ Sesuai" : sudahTerkirim ? "Terkirim" : "Input hasil"}
               </span>
             </div>
             <div className="flex-1 p-5">
@@ -138,7 +141,21 @@ export default function ResultReportTable() {
                   <span className="font-bold text-blue-800">Masukan Ka P4M:</span> {item.aksi_masukan}
                 </div>
               )}
-              {sudahTerkirim ? (
+              {sesuaiTanpaTindakLanjut ? (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-bold text-emerald-700">
+                    ✅ Dinyatakan Sesuai oleh Ka P4M
+                  </div>
+                  <p className="text-[11px] text-gray-600">
+                    Laporan ini tidak memerlukan tindak lanjut dari unit Anda. Tidak perlu mengisi bukti pelaksanaan.
+                  </p>
+                  {item.aksi_masukan && (
+                    <div className="p-2 bg-emerald-50 border border-emerald-200 text-[11px]">
+                      <span className="font-bold text-emerald-800">Catatan Ka P4M:</span> {item.aksi_masukan}
+                    </div>
+                  )}
+                </div>
+              ) : sudahTerkirim ? (
                 <div className="space-y-2">
                   <div className="text-[11px] text-gray-600">
                     <span className="font-medium">Tanggal:</span>{" "}

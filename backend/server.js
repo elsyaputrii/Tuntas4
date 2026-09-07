@@ -19,10 +19,24 @@ const notifikasiRoutes     = require("./routes/notifikasiRoutes"); // ← BARU (
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
+// FRONTEND_URL boleh diisi banyak origin dipisah koma, contoh:
+// FRONTEND_URL=https://tuntas.polibatam.ac.id,http://localhost:3000
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000")
+  .split(",")
+  .map((url) => url.trim());
+
 app.use(cors({
-  origin:         process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: function (origin, callback) {
+    // izinkan request tanpa origin (misal dari Postman/curl)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS: " + origin));
+    }
+  },
   methods:        ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  credentials:    true,
 }));
 
 app.use(express.json());

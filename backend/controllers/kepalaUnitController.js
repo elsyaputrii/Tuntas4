@@ -185,6 +185,13 @@ async function submitRancangan(req, res) {
 // ✅ FIX: query getLaporanHasil sekarang punya 2 kondisi (OR) — lihat
 // penjelasan di komentar atas file. Ditambahkan juga b.approval_staf ke
 // SELECT supaya frontend bisa kasih konteks "ditolak, perlu revisi".
+//
+// ✅ FIX 2: laporan dengan keputusan Ka P4M = "tidak_ditindaklanjuti" (Sesuai)
+// sekarang IKUT ditampilkan di sini juga — tapi sifatnya read-only (tidak
+// perlu isi bukti pelaksanaan, karena memang tidak ada tindak lanjut yang
+// perlu dikerjakan). Frontend (ResultReportTable.tsx) yang menentukan
+// apakah suatu baris perlu form isian atau cuma ditampilkan sebagai info,
+// berdasarkan field status_review yang ada di SELECT di bawah.
 async function getLaporanHasil(req, res) {
   try {
     const kepala = await getKepalaInfo(req);
@@ -210,7 +217,8 @@ async function getLaporanHasil(req, res) {
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
         AND (
-          r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan'
+          (r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan')
+          OR r.status_review = 'tidak_ditindaklanjuti'
         )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],

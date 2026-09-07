@@ -14,18 +14,22 @@ interface LaporanItem {
   isi_laporan: string;
   lampiran_laporan: string | null;
   status_boxing: string;
+  approval_staf: string | null;
+  catatan_approval: string | null;
   penyebab: string | null;
   rencana_tindakan: string | null;
   status_review: string | null;
-  catatan_review: string | null;
   created_at?: string | null;
 }
 
+// ✅ Vocabulary status_review SUDAH DIPERBARUI mengikuti migrate_alur_v2.sql.
+// Di tab ini (Ketidaksesuaian Masuk), status_review yang mungkin muncul
+// HANYA: null (belum pernah diisi) atau "menunggu_keputusan_ka" (sudah
+// dikirim, menunggu keputusan Ka P4M). Begitu Ka P4M memutuskan
+// "ditindaklanjuti"/"tidak_ditindaklanjuti", baris otomatis pindah ke
+// tab lain (Laporan Hasil / ditangani Staf) dan tidak lagi muncul di sini.
 const statusBadge: Record<string, { label: string; cls: string }> = {
-  menunggu_review:  { label: "⏳ Menunggu Review Staf P4M", cls: "text-blue-500 bg-blue-50 border-blue-200" },
-  disetujui:        { label: "✓ Disetujui",                 cls: "text-green-600 bg-green-50 border-green-200" },
-  tidak_disetujui:  { label: "✗ Tidak Disetujui",           cls: "text-red-500 bg-red-50 border-red-200" },
-  revisi:           { label: "⚠ Perlu Revisi",              cls: "text-yellow-600 bg-yellow-50 border-yellow-200" },
+  menunggu_keputusan_ka: { label: "⏳ Menunggu Keputusan Ka P4M", cls: "text-blue-500 bg-blue-50 border-blue-200" },
 };
 
 export default function DiscrepancyTable() {
@@ -76,8 +80,15 @@ export default function DiscrepancyTable() {
     } finally { setSending((prev) => ({ ...prev, [id_boxing]: false })); }
   };
 
-  const isEditable = (status: string | null) =>
-    !status || status === "revisi" || status === "tidak_disetujui";
+  // ✅ FIX: Kolom bisa diisi kalau (a) belum pernah dikirim sama sekali
+  // (status_review masih null), ATAU (b) baru saja ditolak Staf P4M
+  // (approval_staf === "ditolak") — sesuai reset di setApprovalStaf
+  // (stafController.js) yang mengembalikan status_review ke
+  // "menunggu_keputusan_ka" supaya laporan bisa direvisi ulang.
+  // Selama menunggu keputusan Ka P4M (status_review sudah terisi TAPI
+  // belum ditolak Staf), kolom sengaja dikunci.
+  const isEditable = (item: LaporanItem) =>
+    !item.status_review || item.approval_staf === "ditolak";
 
   if (loading) return (
     <div className="w-full border-2 border-black bg-white p-12 text-center">
@@ -115,8 +126,11 @@ export default function DiscrepancyTable() {
         </div>
 
         {laporanList.map((item, idx) => {
-          const editable = isEditable(item.status_review);
-          const badge    = item.status_review ? statusBadge[item.status_review] : null;
+          const editable = isEditable(item);
+          const ditolakStaf = item.approval_staf === "ditolak";
+          // ✅ FIX: badge cuma dicari untuk status yang benar-benar masih
+          // relevan di tab ini (lihat comment statusBadge di atas).
+          const badge = !ditolakStaf && item.status_review ? statusBadge[item.status_review] : null;
           return (
             <div key={item.id_boxing} className={`${idx > 0 ? "border-t-2 border-black" : ""}`}>
 
@@ -134,7 +148,11 @@ export default function DiscrepancyTable() {
                         })
                       : '-'}
                   </span>
-                  {badge && (
+                  {ditolakStaf ? (
+                    <span className="text-[9px] font-medium px-2 py-0.5 border rounded text-red-500 bg-red-50 border-red-200">
+                      ⚠ Ditolak Staf P4M — Perlu Revisi
+                    </span>
+                  ) : badge && (
                     <span className={`text-[9px] font-medium px-2 py-0.5 border rounded ${badge.cls}`}>{badge.label}</span>
                   )}
                 </div>
@@ -147,9 +165,12 @@ export default function DiscrepancyTable() {
                     🖼️ Lihat Gambar
                   </button>
                 )}
-                {item.status_review === "revisi" && item.catatan_review && (
+                {/* ✅ FIX: catatan revisi sekarang dari catatan_approval (Staf
+                    P4M), bukan status_review === "revisi" yang sudah tidak
+                    dipakai lagi sejak migrasi alur v2. */}
+                {ditolakStaf && item.catatan_approval && (
                   <div className="p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
-                    <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_review}
+                    <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}
                   </div>
                 )}
                 <div>
@@ -173,14 +194,11 @@ export default function DiscrepancyTable() {
                   />
                 </div>
                 <div className="flex justify-end">
-                  {item.status_review === "disetujui" ? (
-                    <div className="text-center">
-                      <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
-                      <span className="text-[10px] text-gray-400">Lihat di Tab Laporan Hasil</span>
-                    </div>
-                  ) : item.status_review === "menunggu_review" ? (
-                    <span className="text-blue-500 text-[10px]">⏳ Menunggu Review</span>
-                  ) : (
+                  {/* ✅ FIX: dulu cek "disetujui"/"menunggu_review" yang sudah
+                      tidak pernah muncul lagi → tombol Kirim selalu aktif
+                      keliru walau sedang menunggu Ka P4M. Sekarang pakai
+                      `editable` yang sama dengan status textarea. */}
+                  {editable ? (
                     <button
                       onClick={() => handleSend(item.id_boxing)}
                       disabled={sending[item.id_boxing]}
@@ -188,6 +206,8 @@ export default function DiscrepancyTable() {
                     >
                       {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
                     </button>
+                  ) : (
+                    <span className="text-blue-500 text-[10px]">⏳ Menunggu Keputusan Ka P4M</span>
                   )}
                 </div>
               </div>
@@ -209,12 +229,16 @@ export default function DiscrepancyTable() {
                       🖼️ Lihat Gambar
                     </button>
                   )}
-                  {badge && (
+                  {ditolakStaf ? (
+                    <div className="mt-3 px-2 py-1 border rounded text-[10px] font-medium text-red-500 bg-red-50 border-red-200">
+                      ⚠ Ditolak Staf P4M — Perlu Revisi
+                    </div>
+                  ) : badge && (
                     <div className={`mt-3 px-2 py-1 border rounded text-[10px] font-medium ${badge.cls}`}>{badge.label}</div>
                   )}
-                  {item.status_review === "revisi" && item.catatan_review && (
+                  {ditolakStaf && item.catatan_approval && (
                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
-                      <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_review}
+                      <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}
                     </div>
                   )}
                 </div>
@@ -258,14 +282,7 @@ export default function DiscrepancyTable() {
 
                 {/* Kolom 5: Aksi */}
                 <div className="flex-1 p-5 flex items-center justify-center">
-                  {item.status_review === "disetujui" ? (
-                    <div className="text-center">
-                      <span className="text-green-600 font-bold text-[11px] block">✓ DISETUJUI</span>
-                      <span className="text-[10px] text-gray-400">Lihat di Tab Laporan Hasil</span>
-                    </div>
-                  ) : item.status_review === "menunggu_review" ? (
-                    <span className="text-blue-500 text-[10px] text-center">Menunggu<br />Review</span>
-                  ) : (
+                  {editable ? (
                     <button
                       onClick={() => handleSend(item.id_boxing)}
                       disabled={sending[item.id_boxing]}
@@ -273,6 +290,8 @@ export default function DiscrepancyTable() {
                     >
                       {sending[item.id_boxing] ? "Mengirim..." : "Kirim"}
                     </button>
+                  ) : (
+                    <span className="text-blue-500 text-[10px] text-center">Menunggu<br />Keputusan Ka P4M</span>
                   )}
                 </div>
               </div>

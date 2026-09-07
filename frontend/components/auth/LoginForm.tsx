@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
-import { Eye, EyeOff, User, Lock } from "lucide-react";
+import { Eye, EyeOff, User, Lock, X } from "lucide-react";
 
 // Ke mana user diarahkan setelah login, berdasarkan role yang
 // dikembalikan backend — bukan dari path yang diakses.
@@ -17,10 +17,12 @@ const REDIRECT_BY_ROLE: Record<string, string> = {
 
 interface LoginFormProps {
   forgotPasswordPath?: string;
+  onClose?: () => void;
 }
 
 export default function LoginForm({
   forgotPasswordPath = "/forgot-password",
+  onClose,
 }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,10 +74,23 @@ export default function LoginForm({
       </div>
 
       {/* Lapisan transparan putih (50%) biar card keliatan jelas */}
-      <div className="absolute inset-0 z-0 bg-white/50" />
+      <div
+        className="absolute inset-0 z-0 bg-white/50"
+        onClick={onClose}
+      />
 
       {/* Card Login */}
       <div className="relative z-10 w-full max-w-md bg-[#7C93A7] p-6 sm:p-10 rounded-[20px] sm:rounded-[30px] shadow-2xl mx-4">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tutup"
+            className="absolute top-4 right-4 text-white/80 hover:text-white transition cursor-pointer"
+          >
+            <X size={22} />
+          </button>
+        )}
         <div className="flex flex-col items-center">
           {/* Logo */}
           <div className="mb-6">

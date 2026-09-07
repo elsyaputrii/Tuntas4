@@ -1,4 +1,3 @@
-
 "use client";
 
 interface HeroSectionProps {
@@ -67,14 +66,13 @@ export default function HeroSection({ onBuatLaporan, onCekStatus }: HeroSectionP
       {/* Jenis Laporan Cards */}
       <div className="max-w-6xl mx-auto px-4 py-10">
         <h2 className="text-center text-gray-700 font-semibold text-base mb-6">Jenis Laporan yang Dapat Disampaikan</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           {[
-            { icon: "🎓", title: "Akademik", desc: "KRS, nilai, ujian, wisuda, dll", color: "bg-blue-50 border-blue-200" },
             { icon: "🏫", title: "Fasilitas", desc: "Kelas, lab, perpustakaan, parkir, dll", color: "bg-green-50 border-green-200" },
             { icon: "⚙️", title: "Layanan", desc: "Administrasi, keuangan, kepegawaian, dll", color: "bg-orange-50 border-orange-200" },
             { icon: "💬", title: "Lainnya", desc: "Hal lain yang perlu kami ketahui", color: "bg-purple-50 border-purple-200" },
           ].map((item) => (
-            <div key={item.title} className={`border rounded-2xl p-5 text-center cursor-pointer hover:shadow-md transition-all ${item.color}`} onClick={onBuatLaporan}>
+            <div key={item.title} className={`border rounded-2xl p-5 text-center cursor-pointer hover:shadow-md transition-all w-full sm:w-56 ${item.color}`} onClick={onBuatLaporan}>
               <div className="text-3xl mb-2">{item.icon}</div>
               <p className="font-semibold text-gray-800 text-sm">{item.title}</p>
               <p className="text-xs text-gray-500 mt-1">{item.desc}</p>
@@ -105,7 +103,7 @@ export default function HeroSection({ onBuatLaporan, onCekStatus }: HeroSectionP
               </div>
               <p className="font-bold text-gray-700 mb-3 text-sm">FITUR UTAMA UNTUK CIVITAS</p>
               <ul className="space-y-2 text-sm text-gray-600">
-                {["Tanpa login, mudah digunakan", "Dapatkan nomor tiket unik", "Pantau perkembangan laporan secara real-time", "Notifikasi melalui email (opsional)"].map(f => (
+                {["Tanpa login, mudah digunakan", "Dapatkan nomor tiket unik", "Pantau perkembangan laporan secara real-time"].map(f => (
                   <li key={f} className="flex items-center gap-2"><span className="text-green-500">✅</span>{f}</li>
                 ))}
               </ul>
