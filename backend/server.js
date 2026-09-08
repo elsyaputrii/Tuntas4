@@ -13,29 +13,59 @@ const stafRoutes           = require("./routes/stafRoutes");
 const forgotPasswordRoutes = require("./routes/forgotPasswordRoutes");
 const kepalaUnitRoutes     = require("./routes/kepalaUnitRoutes");
 const kaP4MRoutes          = require("./routes/kaP4MRoutes");
-const userRoutes           = require("./routes/userRoutes");    // ← BARU
-const notifikasiRoutes     = require("./routes/notifikasiRoutes"); // ← BARU (lonceng notifikasi)
+const userRoutes           = require("./routes/userRoutes");
+const notifikasiRoutes     = require("./routes/notifikasiRoutes");
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
 // ✅ WAJIB kalau backend ini di belakang reverse proxy (Nginx) di produksi
-// (tuntas.polibatam.ac.id). Tanpa ini, Express baca req.ip sebagai IP
-// Nginx itu sendiri (127.0.0.1/IP internal), BUKAN IP pengunjung asli —
-// akibatnya rate limiter (lihat middleware/rateLimitMiddleware.js) salah
-// hitung karena mengira semua request datang dari satu IP yang sama.
-// "1" = percaya SATU hop di depan Express (Nginx) untuk baca header
-// X-Forwarded-For. Pastikan Nginx memang mengirim header itu, contoh
-// konfigurasi Nginx yang perlu ada di server block:
-//   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-//   proxy_set_header X-Real-IP $remote_addr;
 app.set("trust proxy", 1);
 
+// ==============================================
+// 🔧 FIX CORS - Support multiple origins
+// ==============================================
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://tuntas.polibatam.ac.id'
+];
+
 app.use(cors({
-  origin:         process.env.FRONTEND_URL || "http://localhost:3000",
-  methods:        ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
 }));
+
+// ==============================================
+// ATAU kalo mau pake .env (lebih flexible):
+// ==============================================
+/*
+const allowedOrigins = (process.env.FRONTEND_URLS || 'http://localhost:3000').split(',');
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
+*/
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -47,8 +77,8 @@ app.use("/api/auth",        forgotPasswordRoutes);
 app.use("/api/staf",        stafRoutes);
 app.use("/api/kepala-unit", kepalaUnitRoutes);
 app.use("/api/ka-p4m",      kaP4MRoutes);
-app.use("/api/users",       userRoutes);             // ← BARU
-app.use("/api/notifikasi",  notifikasiRoutes);       // ← BARU (lonceng notifikasi)
+app.use("/api/users",       userRoutes);
+app.use("/api/notifikasi",  notifikasiRoutes);
 
 app.get("/", (req, res) => {
   res.json({ success: true, message: "TUNTAS4 Backend API berjalan 🚀" });
