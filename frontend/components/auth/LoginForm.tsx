@@ -73,11 +73,8 @@ export default function LoginForm({
         />
       </div>
 
-      {/* Lapisan transparan putih (50%) biar card keliatan jelas */}
-      <div
-        className="absolute inset-0 z-0 bg-white/50"
-        onClick={onClose}
-      />
+      {/* HAPUS overlay putih transparan - sekarang background gambar terlihat jelas */}
+      {/* <div className="absolute inset-0 z-0 bg-white/10" onClick={onClose} /> */}
 
       {/* Card Login */}
       <div className="relative z-10 w-full max-w-md bg-[#7C93A7] p-6 sm:p-10 rounded-[20px] sm:rounded-[30px] shadow-2xl mx-4">

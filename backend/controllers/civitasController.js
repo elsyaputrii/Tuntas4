@@ -5,6 +5,7 @@ const { pool } = require("../config/db");
 const { notifikasiUntukRole } = require("../utils/notifikasi");
 const { generateUniqueKodeLaporan } = require("../utils/kodeLaporan");
 
+console.log("🔥 CIVITAS CONTROLLER VERSI BARU TERLOAD");
 // ============================================================
 // KIRIM LAPORAN — tanpa nama, tanpa login
 // Yang wajib diisi: status_pelapor, jenis_laporan, deskripsi
