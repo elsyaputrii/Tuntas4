@@ -1,10 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import HeroSection from "@/components/HeroSection";
 import SubmissionForm from "@/components/forms/SubmissionForm";
 import StatusChecker from "@/components/status/StatusChecker";
 import FAQSection from "@/components/FAQ";
-import LoginForm from "@/components/auth/LoginForm";
 
 function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -21,7 +21,8 @@ function Tooltip({ label, children }: { label: string; children: React.ReactNode
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"form" | "status" | null>(null);
   const [statusKode, setStatusKode] = useState("");
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const router = useRouter();
+
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -130,7 +131,7 @@ export default function HomePage() {
   {/* LOGIN */}
   <Tooltip label="Login hanya untuk staf & admin">
     <button
-    onClick={() => setShowLoginModal(true)}
+    onClick={() => router.push("/login")}
     className="ml-auto flex items-center gap-2 px-5 py-2 rounded-full bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 hover:scale-105 transition-all duration-300 shadow-md"
   >
     <span>🔐</span>
@@ -174,7 +175,7 @@ export default function HomePage() {
 
       {/* LOGIN */}
       <button
-        onClick={() => setShowLoginModal(true)}
+        onClick={() => router.push("/login")}
         className="px-4 py-2 rounded-xl text-sm font-semibold border border-blue-600 text-blue-600 transition-all duration-300"
       >
         🔐 Login
@@ -250,11 +251,6 @@ export default function HomePage() {
           <p className="text-gray-500 text-xs mt-2">©Polibatam. Semua hak dilindungi.</p>
         </div>
       </footer>
-
-      {/* Modal Login */}
-      {showLoginModal && (
-        <LoginForm onClose={() => setShowLoginModal(false)} />
-      )}
     </main>
   );
 }
