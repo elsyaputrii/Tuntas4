@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { Eye, EyeOff, User, Lock, X } from "lucide-react";
@@ -29,7 +30,24 @@ export default function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  // ✅ FIX: render lewat portal ke document.body supaya modal ini SELALU
+  // ada di lapisan paling atas DOM, gak peduli komponen lain di halaman
+  // (mis. framer-motion di FAQ.tsx) bikin stacking context sendiri lewat
+  // `transform`. Sebelumnya modal ini cuma "fixed inset-0" biasa tanpa
+  // z-index eksplisit, jadi kadang ketimpa render konten section lain
+  // (bocor keliatan tembus overlay-nya).
+  useEffect(() => {
+    setMounted(true);
+    // Kunci scroll body selama modal terbuka
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
 
   async function handleLogin() {
     if (!email || !password) {
@@ -60,8 +78,10 @@ export default function LoginForm({
     }
   }
 
-  return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
+  if (!mounted) return null;
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden">
       {/* Background gambar penuh (JELAS, tanpa blur) */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -73,8 +93,13 @@ export default function LoginForm({
         />
       </div>
 
-      {/* HAPUS overlay putih transparan - sekarang background gambar terlihat jelas */}
-      {/* <div className="absolute inset-0 z-0 bg-white/10" onClick={onClose} /> */}
+      {/* Lapisan transparan putih (50%) biar card keliatan jelas — sama
+          seperti tampilan awal. Anti-tembusnya sekarang ditangani oleh
+          portal + z-[100] di atas, bukan dari opacity overlay ini. */}
+      <div
+        className="absolute inset-0 z-0 bg-white/50"
+        onClick={onClose}
+      />
 
       {/* Card Login */}
       <div className="relative z-10 w-full max-w-md bg-[#7C93A7] p-6 sm:p-10 rounded-[20px] sm:rounded-[30px] shadow-2xl mx-4">
@@ -169,4 +194,6 @@ export default function LoginForm({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

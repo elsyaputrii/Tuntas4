@@ -92,6 +92,18 @@ export default function KaP4MHasilTable() {
       setError("Hasil tindak lanjut belum diisi Kepala Unit");
       return;
     }
+    // 🚫 FIX: backend (PATCH /ka-p4m/approval-hasil) cuma nerima approval
+    // kalau status_boxing sudah 'di_staff'. Sebelum fix ini, tombol ✓/✗
+    // selalu muncul asal hasil_tindakan sudah keisi — padahal row bisa aja
+    // "nyangkut" di status lain (mis. 'menunggu_pelaksanaan') karena alur
+    // lama, jadi baru ketauan gagalnya pas submit dengan pesan error yang
+    // membingungkan. Sekarang dicegah dari sini duluan.
+    if (item.status_boxing !== "di_staff") {
+      setError(
+        `Laporan ini belum bisa diputuskan — status saat ini masih "${item.status_boxing || "tidak diketahui"}", belum sampai tahap Staf P4M (di_staff). Kemungkinan data ini nyangkut dari alur lama; cek/​perbaiki status_boxing di database untuk id_boxing ${item.id_boxing}.`
+      );
+      return;
+    }
     setModal({ open: true, id_boxing: item.id_boxing, keputusan, catatan: "" });
     setError("");
   }
@@ -294,6 +306,17 @@ export default function KaP4MHasilTable() {
                       🕒 {formatTanggal(item.tanggal_keputusan_ka)}
                     </p>
                   </div>
+                ) : item.status_boxing !== "di_staff" ? (
+                  // ✅ FIX: row yang belum di_staff (mis. nyangkut di
+                  // 'menunggu_pelaksanaan' dari alur lama) ditampilkan
+                  // sebagai "menunggu", bukan tombol aktif yang ujung-
+                  // ujungnya gagal pas disubmit ke backend.
+                  <span
+                    className="text-[9px] text-gray-400 italic text-center"
+                    title={`Status saat ini: ${item.status_boxing || "-"}`}
+                  >
+                    Menunggu tahap Staf P4M
+                  </span>
                 ) : (
                   <div className="flex gap-3">
                     <button

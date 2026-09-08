@@ -1,22 +1,24 @@
 // FILE: backend/controllers/kepalaUnitController.js
 //
-// ── ALUR "DITOLAK STAF P4M" (baca ini sebelum ubah query di bawah) ──────
-// Kalau Staf P4M menolak hasil tindak lanjut unit (lihat
-// stafController.js → setApprovalStaf, approval='ditolak'), laporan itu
-// TIDAK langsung balik ke tab "Laporan Hasil" untuk isi ulang bukti
-// pelaksanaan saja. Sebaliknya, backend me-reset TOTAL rancangan
-// tindakannya:
+// ── ALUR "DIBUKA KEMBALI KE UNIT" (baca ini sebelum ubah query di bawah) ──
+// Keputusan akhir (terima/tolak hasil tindak lanjut) HANYA wewenang Ka P4M,
+// lewat PATCH /api/ka-p4m/approval-hasil (mount dari setApprovalStaf di
+// stafController.js — namanya dipertahankan supaya diff minimal, tapi
+// route-nya sudah dikunci role 'ka_p4m'). Kalau Ka P4M menolak hasil
+// tindak lanjut unit:
 //   - boxing_ketidaksesuaian.approval_staf → 'ditolak'
 //     (status_boxing TETAP 'di_staff', tidak diubah)
-//   - rancangan_tindakan.penyebab & deskripsi → NULL
 //   - rancangan_tindakan.status_review → 'menunggu_keputusan_ka'
-//   - pelaksanaan_tindakan lama → DIHAPUS
+//   - rancangan_tindakan.penyebab & deskripsi → TETAP DIPERTAHANKAN
+//     (TIDAK di-NULL-kan) supaya Kepala Unit tidak perlu mengetik ulang
+//     dari nol; kotaknya hanya dibuka lagi supaya bisa diedit.
+//   - pelaksanaan_tindakan lama → DIHAPUS (memang ini yang mau direvisi)
 //
 // Efeknya: laporan tersebut otomatis muncul LAGI di getLaporanMasuk
 // (tab "Ketidaksesuaian Masuk" Kepala Unit) — bukan di getLaporanHasil —
-// seolah-olah laporan baru, kosong, siap diisi ulang dari awal
-// (penyebab + rencana tindak lanjut), lalu harus lewat keputusan Ka P4M
-// lagi sebelum kepala unit bisa isi pelaksanaan baru di "Laporan Hasil".
+// dengan Penyebab & Rencana Tindak Lanjut SEBELUMNYA sudah terisi (siap
+// diedit ulang oleh Kepala Unit), lalu harus lewat keputusan Ka P4M lagi
+// sebelum Kepala Unit bisa isi pelaksanaan baru di "Laporan Hasil".
 //
 // Query getLaporanMasuk menangkap kasus ini lewat kondisi:
 //   r.status_review = 'menunggu_keputusan_ka' OR b.approval_staf = 'ditolak'
@@ -24,12 +26,12 @@
 // Sedangkan getLaporanHasil di bawah HANYA menampilkan laporan yang
 // status_review-nya 'ditindaklanjuti' DAN status_boxing-nya
 // 'menunggu_pelaksanaan' — kondisi ini otomatis TIDAK terpenuhi lagi
-// setelah reset di atas, jadi laporan yang baru saja ditolak Staf tidak
-// akan nyangkut/duplikat di tab "Laporan Hasil".
+// setelah reopen di atas, jadi laporan yang baru saja ditolak tidak akan
+// nyangkut/duplikat di tab "Laporan Hasil".
 //
 // Field approval_staf tetap disertakan di SELECT getLaporanHasil supaya
 // frontend (ResultReportTable.tsx) masih bisa menampilkan riwayat
-// "pernah ditolak Staf P4M" untuk laporan yang sudah lolos revisi.
+// "pernah ditolak, sudah direvisi" untuk laporan yang sudah lolos revisi.
 
 const { pool } = require("../config/db");
 const { notifikasiUntukRole } = require("../utils/notifikasi");
@@ -223,17 +225,30 @@ async function getLaporanHasil(req, res) {
   }
 }
 
-// ✅ FITUR BARU: "Riwayat" — rekap semua laporan yang PERNAH diisi hasil
-// tindak lanjutnya oleh Kepala Unit ini (punya baris di pelaksanaan_tindakan),
-// beda dengan getLaporanHasil yang cuma nampilin yang MASIH nunggu diisi.
+// ✅ FIX (Riwayat menampilkan Total=0/Selesai=0/Persentase=0% walau
+// laporan sudah pernah didistribusikan & ditangani Kepala Unit):
 //
-// Karena alur "ditolak Staf P4M" langsung MENGHAPUS baris pelaksanaan_tindakan
-// (lihat setApprovalStaf di stafController.js), JOIN di bawah otomatis hanya
-// menyisakan 2 kemungkinan status_boxing untuk tiap baris:
-//   - 'di_staff' (approval_staf='menunggu') → masih dipantau, menunggu keputusan Staf P4M
-//   - 'selesai'  (approval_staf='diterima') → sudah RAMPUNG, disetujui Staf P4M
-// (Laporan yang ditolak otomatis hilang dari riwayat ini karena hasilnya
-// dihapus — akan muncul lagi sebagai siklus baru begitu direvisi & dikirim ulang.)
+// SEBELUMNYA query ini pakai INNER JOIN ke rancangan_tindakan DAN
+// pelaksanaan_tindakan sekaligus. Akibatnya laporan yang sudah masuk ke
+// Kepala Unit dan sudah diisi Penyebab + Rencana, tapi BELUM sampai
+// tahap pelaksanaan (misal: masih 'menunggu_keputusan_ka' — nunggu
+// Ka P4M putuskan), belum punya baris di pelaksanaan_tindakan sama
+// sekali, sehingga ikut TERBUANG oleh INNER JOIN dan tidak pernah
+// muncul di Riwayat sama sekali. Kalau itu satu-satunya laporan yang
+// pernah ditangani unit tsb (contoh kasus LAP-00002), hasilnya Total
+// Laporan = 0, Selesai = 0, Persentase = 0% — padahal laporan itu sudah
+// pernah didistribusikan dan sudah ditangani (Penyebab & Rencana sudah
+// diisi Kepala Unit).
+//
+// FIX: "Riwayat" sekarang didefinisikan sesuai alur yang benar — SEMUA
+// laporan yang PERNAH didistribusikan/ditangani oleh Kepala Unit ini,
+// yaitu SEMUA baris boxing_ketidaksesuaian milik id_kepala ini, apa pun
+// tahapnya sekarang (masih di Kepala Unit, di Staf P4M, atau sudah
+// selesai). rancangan_tindakan & pelaksanaan_tindakan di-LEFT JOIN
+// supaya baris yang belum sampai tahap itu tetap muncul (kolom terkait
+// bernilai NULL, ditangani di frontend sebagai "—" / belum diisi).
+// Filter "Selesai" tetap murni status_boxing = 'selesai' (lihat
+// RiwayatTable.tsx) — laporan yang masih berjalan TIDAK dihitung selesai.
 async function getRiwayat(req, res) {
   try {
     const kepala = await getKepalaInfo(req);
@@ -246,7 +261,7 @@ async function getRiwayat(req, res) {
     const [rows] = await pool.query(
       `SELECT
         b.id_boxing, b.unit_tujuan AS nama_unit, b.status AS status_boxing,
-        b.approval_staf, b.catatan_approval,
+        b.approval_staf, b.catatan_approval, b.created_at AS tanggal_distribusi,
         l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         r.penyebab, r.deskripsi AS rencana_tindakan, r.status_review, r.aksi_masukan,
@@ -254,13 +269,27 @@ async function getRiwayat(req, res) {
         p.tanggal AS tanggal_pelaksanaan, p.created_at AS tanggal_kirim_hasil
       FROM boxing_ketidaksesuaian b
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
-      JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
-      JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
+      LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+      LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
-      ORDER BY p.tanggal DESC, p.id_pelaksanaan DESC`,
+      ORDER BY COALESCE(p.tanggal, b.created_at) DESC, b.id_boxing DESC`,
       [kepala.id_kepala],
     );
-    return res.status(200).json({ success: true, data: rows, unit: kepala.unit });
+
+    // ✅ Statistik dihitung di backend juga (sumber kebenaran tunggal),
+    // supaya frontend tidak perlu re-derive dan berisiko tidak sinkron.
+    // total   = semua laporan yang pernah didistribusikan/ditangani unit ini
+    // selesai = yang BENAR-BENAR sudah selesai (status_boxing = 'selesai')
+    const total = rows.length;
+    const selesai = rows.filter((d) => d.status_boxing === "selesai").length;
+    const persentase = total > 0 ? Math.round((selesai / total) * 100) : 0;
+
+    return res.status(200).json({
+      success: true,
+      data: rows,
+      unit: kepala.unit,
+      stats: { total, selesai, persentase },
+    });
   } catch (error) {
     console.error("Error getRiwayat:", error);
     return res.status(500).json({

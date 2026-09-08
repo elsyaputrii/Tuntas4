@@ -158,9 +158,13 @@ export const stafApi = {
   }) =>
     apiFetch("/staf/pemantauan", { method: "POST", body: JSON.stringify(body) }),
 
+  // ✅ FIX: "selesai" & "belum" dihapus dari tipe — itu KEPUTUSAN, dan
+  // Staf P4M tidak lagi punya wewenang mengambil keputusan (sekarang
+  // sepenuhnya milik Ka P4M via /ka-p4m/keputusan & /ka-p4m/approval-hasil).
+  // Endpoint ini di sisi Staf P4M sekarang murni fitur "Buka ke Unit".
   setKeputusanBoxing: (
     id_boxing: number,
-    keputusan: "selesai" | "belum" | "lanjut" | "ditindak_lanjut"
+    keputusan: "lanjut" | "ditindak_lanjut"
   ) =>
     apiFetch("/staf/keputusan-boxing", {
       method: "PATCH",
