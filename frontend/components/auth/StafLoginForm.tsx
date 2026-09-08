@@ -37,12 +37,9 @@ export default function StafLoginForm() {
     }
   }
 
-  // Tombol lupa password — tampilkan info kontak admin
-  function handleLupaPassword() {
-    alert(
-      "Lupa password?\n\nHubungi Admin P4M untuk reset password:\nEmail: admin@polibatam.ac.id",
-    );
-  }
+  // ✅ FIX no-unused-vars: fungsi placeholder ini sudah digantikan oleh alur
+  // forgot-password sungguhan (tombol di bawah sekarang router.push ke
+  // /staff-p4m/forgot-password), jadi dihapus — bukan fitur yang dipakai.
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">

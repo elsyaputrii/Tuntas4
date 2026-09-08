@@ -34,9 +34,9 @@ export default function StafDecisionTable() {
   // FORM REVISI RANCANGAN
   const [penyebab, setPenyebab] = useState<Record<number, string>>({});
   const [rencana, setRencana] = useState<Record<number, string>>({});
-  const [tanggal, setTanggal] = useState<Record<number, string>>({});
-  const [uraian, setUraian] = useState<Record<number, string>>({});
-  // ✅ HAPUS files dan setFiles karena tidak digunakan
+  // ✅ FIX no-unused-vars: `tanggal`/`uraian` diisi tapi tidak pernah dibaca
+  // di form (form revisi cuma pakai penyebab & rencana) — dihapus sama
+  // seperti `files`/`setFiles` di bawah ini yang sudah dihapus duluan.
   // const [files, setFiles] = useState<Record<number, File | null>>({});
 
   const fetchData = useCallback(async () => {
@@ -55,18 +55,12 @@ export default function StafDecisionTable() {
         setData(ditolakStaf);
         const initP: Record<number, string> = {};
         const initR: Record<number, string> = {};
-        const initT: Record<number, string> = {};
-        const initU: Record<number, string> = {};
         ditolakStaf.forEach((item: StafDecisionItem) => {
           initP[item.id_boxing] = item.penyebab || "";
           initR[item.id_boxing] = item.rencana_tindakan || "";
-          initT[item.id_boxing] = item.tanggal_pelaksanaan || "";
-          initU[item.id_boxing] = item.hasil_tindakan || "";
         });
         setPenyebab(initP);
         setRencana(initR);
-        setTanggal(initT);
-        setUraian(initU);
       } else {
         setErrMsg(result.message || "Gagal memuat data.");
       }

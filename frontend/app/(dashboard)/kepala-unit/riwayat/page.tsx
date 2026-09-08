@@ -9,13 +9,18 @@ export default function RiwayatPage() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('role');
     if (!token || role !== 'kepala_unit') {
       router.replace('/kepala-unit/login');
       return;
     }
-    setIsChecking(false);
+    // ✅ FIX ESLint react-hooks/set-state-in-effect
+    Promise.resolve().then(() => {
+      if (!cancelled) setIsChecking(false);
+    });
+    return () => { cancelled = true; };
   }, [router]);
 
   if (isChecking) {

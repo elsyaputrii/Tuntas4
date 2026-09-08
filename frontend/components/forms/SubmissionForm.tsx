@@ -12,7 +12,6 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
   const [step, setStep] = useState<Step>("form");
   const [status, setStatus] = useState("");
   const [jenis, setJenis] = useState("");
-  const [kategori, setKategori] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
   const [tanggal, setTanggal] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -73,7 +72,6 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
 
   const goNextMonth = () => {
     const today = getToday();
-    const currentMonthStart = new Date(calYear, calMonth, 1);
     const nextMonthStart = new Date(calYear, calMonth + 1, 1);
     const nextMonthEnd = new Date(calYear, calMonth + 2, 0);
     
@@ -195,7 +193,6 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
                 setKode("");
                 setStatus("");
                 setJenis("");
-                setKategori("");
                 setDeskripsi("");
                 setTanggal("");
                 setFile(null);

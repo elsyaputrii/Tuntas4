@@ -213,7 +213,7 @@ export default function KaP4MHasilTable() {
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Khusus status "Perbaikan Berkelanjutan", keputusan baru bisa diambil setelah Kepala Unit mengisi hasil tindak lanjut.
+          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Khusus status &ldquo;Perbaikan Berkelanjutan&rdquo;, keputusan baru bisa diambil setelah Kepala Unit mengisi hasil tindak lanjut.
         </p>
         {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
         {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}

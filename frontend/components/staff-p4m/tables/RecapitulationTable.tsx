@@ -800,7 +800,18 @@ export default function RecapitulationTable() {
             <MonthYearPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
           )}
           {filterMode === "tahunan" && (
-            <YearPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
+            <div className="flex items-center gap-2">
+              <YearPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
+              {/* ✅ FIX no-unused-vars: loadingArsip sebelumnya di-set tapi
+                  tidak pernah ditampilkan — sekarang dipakai buat indikator
+                  kecil saat data arsip tahun tsb lagi diambil. */}
+              {loadingArsip && (
+                <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <span className="w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                  Memuat arsip...
+                </span>
+              )}
+            </div>
           )}
           <MiniCalendar
             key={calendarResetKey}

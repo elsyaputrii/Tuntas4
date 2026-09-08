@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   FileText,
   CheckCircle2,
@@ -24,6 +24,13 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { stafApi } from "@/lib/api";
+
+// ✅ FIX react-hooks/exhaustive-deps: dipindah jadi konstanta statis di luar
+// komponen (bukan dibaca dari state `chartData`) supaya fetchData tidak
+// perlu "chartData" sebagai dependency — kalau dependency-nya chartData,
+// applying useCallback/useEffect dengan benar malah bikin infinite loop
+// (fetchData men-setChartData, yang balik memicu fetchData lagi).
+const MONTH_TEMPLATE = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
 export default function DashboardStaff() {
   
@@ -54,11 +61,7 @@ export default function DashboardStaff() {
     { name: "Selesai", value: 0, color: "#10b981" },
   ]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [masuk, proses] = await Promise.all([
@@ -117,11 +120,11 @@ export default function DashboardStaff() {
         }
       });
       
-      const newChartData = chartData.map(item => ({
-        ...item,
-        total: bulanMap[item.bulan]?.total || 0,
-        diproses: bulanMap[item.bulan]?.diproses || 0,
-        selesai: bulanMap[item.bulan]?.selesai || 0,
+      const newChartData = MONTH_TEMPLATE.map(bulan => ({
+        bulan,
+        total: bulanMap[bulan]?.total || 0,
+        diproses: bulanMap[bulan]?.diproses || 0,
+        selesai: bulanMap[bulan]?.selesai || 0,
       }));
       setChartData(newChartData);
       
@@ -148,7 +151,11 @@ export default function DashboardStaff() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const totalLaporan = dataLaporan.length;
   const prosesCount = dataLaporan.filter((item) => item.status !== "Close").length;
