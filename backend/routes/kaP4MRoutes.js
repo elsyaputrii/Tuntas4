@@ -14,6 +14,7 @@ router.get("/proses", async (req, res) => {
     const [rows] = await pool.query(
       `SELECT
         l.id_laporan,
+        l.kode_laporan,
         l.jenis_laporan,
         l.deskripsi AS isi_laporan,
         l.lampiran AS lampiran_laporan,
@@ -41,12 +42,7 @@ router.get("/proses", async (req, res) => {
       ORDER BY l.created_at DESC`
     );
 
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error kaP4M getProses:", error);
     return res.status(500).json({ success: false, message: "Gagal mengambil data." });
@@ -188,7 +184,7 @@ router.get("/kepala-unit/laporan-masuk", async (req, res) => {
       `SELECT
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
         b.created_at AS tanggal_distribusi,
-        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         l.lampiran AS lampiran_laporan, l.status AS status_laporan,
         l.created_at,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
@@ -199,12 +195,7 @@ router.get("/kepala-unit/laporan-masuk", async (req, res) => {
       ORDER BY b.created_at DESC`
     );
 
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error kaP4M getKepalaUnitLaporanMasuk:", error);
     return res.status(500).json({ success: false, message: "Gagal mengambil data laporan masuk kepala unit." });
@@ -218,7 +209,7 @@ router.get("/kepala-unit/laporan-hasil", async (req, res) => {
     const [rows] = await pool.query(
       `SELECT
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
-        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
@@ -231,12 +222,7 @@ router.get("/kepala-unit/laporan-hasil", async (req, res) => {
       ORDER BY b.created_at DESC`
     );
 
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error kaP4M getKepalaUnitLaporanHasil:", error);
     return res.status(500).json({ success: false, message: "Gagal mengambil data laporan hasil kepala unit." });

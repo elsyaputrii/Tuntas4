@@ -26,8 +26,10 @@ router.post("/rancangan", submitRancangan);   // POST /api/kepala-unit/rancangan
 router.get("/laporan-hasil", getLaporanHasil);                          // GET  /api/kepala-unit/laporan-hasil
 router.post("/pelaksanaan",  upload.single("lampiran"), submitPelaksanaan); // POST /api/kepala-unit/pelaksanaan
 
-// Tab Riwayat — rekap laporan yang sudah pernah diisi hasilnya (menunggu
-// approval Staf P4M ATAU sudah selesai), plus export PDF per laporan
+// Tab Riwayat — rekap SEMUA laporan yang pernah didistribusikan/ditangani
+// Kepala Unit ini (apa pun tahapnya sekarang: masih di Kepala Unit,
+// menunggu keputusan Ka P4M, di Staf P4M, atau sudah selesai), plus
+// export PDF per laporan. Lihat getRiwayat di kepalaUnitController.js.
 router.get("/riwayat", getRiwayat);                                     // GET  /api/kepala-unit/riwayat
 
 module.exports = router;

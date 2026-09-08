@@ -10,17 +10,24 @@ export default function ProsesPengaduanPage() {
   const [namaUser, setNamaUser] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
     if (!token || role !== "ka_p4m") {
       router.replace("/ka-p4m/login");
       return;
     }
-    try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      setNamaUser(user.nama || "");
-    } catch { /* ignore */ }
-    setIsChecking(false);
+    // ✅ FIX ESLint react-hooks/set-state-in-effect (lihat catatan yang sama
+    // di ka-p4m/hasil-tindak-lanjut/page.tsx)
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        setNamaUser(user.nama || "");
+      } catch { /* ignore */ }
+      setIsChecking(false);
+    });
+    return () => { cancelled = true; };
   }, [router]);
 
   if (isChecking) {

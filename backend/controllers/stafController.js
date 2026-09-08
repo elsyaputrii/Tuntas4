@@ -81,6 +81,7 @@ async function getLaporanMasuk(req, res) {
     const [rows] = await pool.query(
       `SELECT
         id_laporan,
+        kode_laporan,
         status_pelapor,
         jenis_laporan,
         deskripsi,
@@ -93,10 +94,7 @@ async function getLaporanMasuk(req, res) {
       ORDER BY created_at ASC`
     );
 
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
+    const data = rows;
 
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -283,6 +281,7 @@ async function getProsesMonitor(req, res) {
     const [rows] = await pool.query(
       `SELECT
         l.id_laporan,
+        l.kode_laporan,
         l.jenis_laporan,
         l.deskripsi           AS isi_laporan,
         l.lampiran            AS lampiran_laporan,
@@ -313,12 +312,7 @@ async function getProsesMonitor(req, res) {
       ORDER BY l.created_at DESC`
     );
 
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error getProsesMonitor:", error);
     return res.status(500).json({
@@ -581,6 +575,7 @@ async function getRekapitulasi(req, res) {
     const [rows] = await pool.query(
       `SELECT
         l.id_laporan,
+        l.kode_laporan,
         l.jenis_laporan,
         l.deskripsi           AS uraian_ketidaksesuaian,
         l.lampiran            AS lampiran_laporan,
@@ -615,10 +610,7 @@ async function getRekapitulasi(req, res) {
     // bagian rekapitulasi final; sisanya (di_staff/dst) tetap dihitung
     // sebagai "dipantau" oleh RecapitulationTable.tsx via getProsesMonitor.
 
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
+    const data = rows;
 
     return res.status(200).json({ success: true, data });
   } catch (error) {

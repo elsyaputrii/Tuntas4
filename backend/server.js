@@ -19,24 +19,22 @@ const notifikasiRoutes     = require("./routes/notifikasiRoutes"); // ← BARU (
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
-// FRONTEND_URL boleh diisi banyak origin dipisah koma, contoh:
-// FRONTEND_URL=https://tuntas.polibatam.ac.id,http://localhost:3000
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000")
-  .split(",")
-  .map((url) => url.trim());
+// ✅ WAJIB kalau backend ini di belakang reverse proxy (Nginx) di produksi
+// (tuntas.polibatam.ac.id). Tanpa ini, Express baca req.ip sebagai IP
+// Nginx itu sendiri (127.0.0.1/IP internal), BUKAN IP pengunjung asli —
+// akibatnya rate limiter (lihat middleware/rateLimitMiddleware.js) salah
+// hitung karena mengira semua request datang dari satu IP yang sama.
+// "1" = percaya SATU hop di depan Express (Nginx) untuk baca header
+// X-Forwarded-For. Pastikan Nginx memang mengirim header itu, contoh
+// konfigurasi Nginx yang perlu ada di server block:
+//   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+//   proxy_set_header X-Real-IP $remote_addr;
+app.set("trust proxy", 1);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // izinkan request tanpa origin (misal dari Postman/curl)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS: " + origin));
-    }
-  },
+  origin:         process.env.FRONTEND_URL || "http://localhost:3000",
   methods:        ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials:    true,
 }));
 
 app.use(express.json());

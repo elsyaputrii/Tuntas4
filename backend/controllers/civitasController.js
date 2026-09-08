@@ -3,6 +3,7 @@
 
 const { pool } = require("../config/db");
 const { notifikasiUntukRole } = require("../utils/notifikasi");
+const { generateUniqueKodeLaporan } = require("../utils/kodeLaporan");
 
 // ============================================================
 // KIRIM LAPORAN — tanpa nama, tanpa login
@@ -60,23 +61,27 @@ async function kirimLaporan(req, res) {
   const lampiran = req.file ? req.file.filename : null;
 
   try {
+    // ✅ Kode tiket acak (bukan sequential dari id_laporan) — lihat
+    // utils/kodeLaporan.js. Ini yang jadi "kata sandi" untuk cek status,
+    // jadi harus digenerate SEBELUM insert dan tidak boleh ditebak dari id.
+    const kode_laporan = await generateUniqueKodeLaporan();
+
     // Simpan ke DB
     // id_civitas  = NULL  → anonim, tidak perlu akun
     // nama_pelapor = 'Anonim' → karena laporan anonim
     const [result] = await pool.query(
       `INSERT INTO laporan_ketidaksesuaian
-        (id_civitas, nama_pelapor, status_pelapor, jenis_laporan, deskripsi, lampiran, status, tanggal_kejadian)
-       VALUES (NULL, 'Anonim', ?, ?, ?, ?, 'menunggu', ?)`,
-      [status_pelapor, jenis_laporan, deskripsi, lampiran, tanggal_kejadian]
+        (kode_laporan, id_civitas, nama_pelapor, status_pelapor, jenis_laporan, deskripsi, lampiran, status, tanggal_kejadian)
+       VALUES (?, NULL, 'Anonim', ?, ?, ?, ?, 'menunggu', ?)`,
+      [kode_laporan, status_pelapor, jenis_laporan, deskripsi, lampiran, tanggal_kejadian]
     );
 
     const id_laporan = result.insertId;
-    const kode_laporan_notif = `LAP-${String(id_laporan).padStart(5, "0")}`;
 
     // Kasih tau semua akun staf_p4m ada laporan baru masuk (in-app + email)
     notifikasiUntukRole("staf_p4m", {
       judul: "Laporan Baru Masuk",
-      pesan: `Ada laporan baru (${kode_laporan_notif}) dari ${status_pelapor} yang perlu diperiksa dan didistribusikan.`,
+      pesan: `Ada laporan baru (${kode_laporan}) dari ${status_pelapor} yang perlu diperiksa dan didistribusikan.`,
       jenis: "laporan_masuk",
       link: "/staff-p4m/laporan-masuk",
     });
@@ -86,8 +91,7 @@ async function kirimLaporan(req, res) {
       message: "Laporan berhasil dikirim! Simpan kode laporan untuk cek status.",
       data: {
         id_laporan,
-        // Format kode: LAP-00001, LAP-00002, dst
-        kode_laporan: `LAP-${String(id_laporan).padStart(5, "0")}`,
+        kode_laporan,
         status: "menunggu",
       },
     });
@@ -101,13 +105,17 @@ async function kirimLaporan(req, res) {
 }
 
 // ============================================================
-// CEK STATUS LAPORAN — berdasarkan nomor tiket LAP-00001
+// CEK STATUS LAPORAN — berdasarkan kode tiket acak (mis. LAP-8F2A93C1)
+// ✅ Kode disimpan sebagai kolom asli (kode_laporan), BUKAN diturunkan
+// dari id_laporan yang sequential — supaya tidak bisa dienumerasi
+// (dulu: LAP-00001, LAP-00002, dst tinggal di-loop).
 // ============================================================
-function parseKodeLaporan(kode) {
+function normalizeKodeLaporan(kode) {
   const normalized = String(kode).trim().toUpperCase();
-  const match = normalized.match(/^LAP-(\d+)$/);
-  if (!match) return null;
-  return parseInt(match[1], 10);
+  // Format kode acak: LAP- diikuti 6-12 karakter hex. Validasi bentuk saja,
+  // BUKAN mengekstrak angka id dari situ (tidak ada relasi kode → id lagi).
+  if (!/^LAP-[0-9A-F]{6,12}$/.test(normalized)) return null;
+  return normalized;
 }
 
 function labelStatusPelapor(v) {
@@ -225,39 +233,30 @@ function buildUpdateTerbaru(laporan, ringkasan) {
 }
 
 async function cekStatusLaporan(req, res) {
-  const { kode, id } = req.query;
+  const { kode } = req.query;
 
-  if (!kode && !id) {
+  if (!kode) {
     return res.status(400).json({
       success: false,
-      message: "Masukkan nomor tiket laporan (contoh: LAP-00001).",
+      message: "Masukkan nomor tiket laporan (contoh: LAP-8F2A93C1).",
     });
   }
 
   try {
-    let id_laporan;
-
-    if (kode) {
-      id_laporan = parseKodeLaporan(kode);
-      if (!id_laporan) {
-        return res.status(400).json({
-          success: false,
-          message: "Format nomor tiket tidak valid. Gunakan format LAP-00001.",
-        });
-      }
-    } else {
-      id_laporan = parseInt(id, 10);
-      if (isNaN(id_laporan)) {
-        return res.status(400).json({
-          success: false,
-          message: "ID laporan tidak valid.",
-        });
-      }
+    // ✅ Lookup langsung pakai kolom kode_laporan (bukan parse angka id dari
+    // format lama) — tidak ada lagi jalur "?id=" publik yang bisa dienumerasi.
+    const kodeNormalized = normalizeKodeLaporan(kode);
+    if (!kodeNormalized) {
+      return res.status(400).json({
+        success: false,
+        message: "Format nomor tiket tidak valid. Gunakan format LAP-8F2A93C1.",
+      });
     }
 
     const [laporanRows] = await pool.query(
       `SELECT
         id_laporan,
+        kode_laporan,
         status_pelapor,
         jenis_laporan,
         deskripsi,
@@ -266,18 +265,19 @@ async function cekStatusLaporan(req, res) {
         created_at,
         updated_at
       FROM laporan_ketidaksesuaian
-      WHERE id_laporan = ?`,
-      [id_laporan]
+      WHERE kode_laporan = ?`,
+      [kodeNormalized]
     );
 
     if (laporanRows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `Laporan dengan nomor tiket LAP-${String(id_laporan).padStart(5, "0")} tidak ditemukan.`,
+        message: `Laporan dengan nomor tiket ${kodeNormalized} tidak ditemukan.`,
       });
     }
 
     const laporan = laporanRows[0];
+    const id_laporan = laporan.id_laporan;
 
     const [ringkasanRows] = await pool.query(
       `SELECT
@@ -314,13 +314,11 @@ async function cekStatusLaporan(req, res) {
       status_rancangan: split(raw.review_raw)[0] || null,
     };
 
-    const kode_laporan = `LAP-${String(laporan.id_laporan).padStart(5, "0")}`;
-
     return res.status(200).json({
       success: true,
       data: {
         id_laporan: laporan.id_laporan,
-        kode_laporan,
+        kode_laporan: laporan.kode_laporan,
         status_pelapor: laporan.status_pelapor,
         status_pelapor_label: labelStatusPelapor(laporan.status_pelapor),
         jenis_laporan: laporan.jenis_laporan,
@@ -361,6 +359,7 @@ async function getRiwayatLaporan(req, res) {
     let query = `
       SELECT
         id_laporan,
+        kode_laporan,
         status_pelapor,
         jenis_laporan,
         deskripsi,
@@ -384,13 +383,7 @@ async function getRiwayatLaporan(req, res) {
 
     const [rows] = await pool.query(query, params);
 
-    // Tambahkan kode_laporan ke setiap baris hasil
-    const dataWithKode = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-
-    return res.status(200).json({ success: true, data: dataWithKode });
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error getRiwayatLaporan:", error);
     return res.status(500).json({

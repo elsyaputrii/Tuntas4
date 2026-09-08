@@ -66,7 +66,7 @@ async function getLaporanMasuk(req, res) {
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
         b.catatan_approval,
         b.created_at AS tanggal_distribusi,
-        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         l.lampiran AS lampiran_laporan, l.status AS status_laporan,
         l.created_at,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
@@ -84,11 +84,9 @@ async function getLaporanMasuk(req, res) {
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],
     );
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-    return res.status(200).json({ success: true, data });
+    // ✅ kode_laporan sekarang datang langsung dari kolom l.kode_laporan
+    // (token acak), bukan dihitung ulang dari id_laporan yang sequential.
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error getLaporanMasuk:", error);
     return res.status(500).json({
@@ -185,13 +183,6 @@ async function submitRancangan(req, res) {
 // ✅ FIX: query getLaporanHasil sekarang punya 2 kondisi (OR) — lihat
 // penjelasan di komentar atas file. Ditambahkan juga b.approval_staf ke
 // SELECT supaya frontend bisa kasih konteks "ditolak, perlu revisi".
-//
-// ✅ FIX 2: laporan dengan keputusan Ka P4M = "tidak_ditindaklanjuti" (Sesuai)
-// sekarang IKUT ditampilkan di sini juga — tapi sifatnya read-only (tidak
-// perlu isi bukti pelaksanaan, karena memang tidak ada tindak lanjut yang
-// perlu dikerjakan). Frontend (ResultReportTable.tsx) yang menentukan
-// apakah suatu baris perlu form isian atau cuma ditampilkan sebagai info,
-// berdasarkan field status_review yang ada di SELECT di bawah.
 async function getLaporanHasil(req, res) {
   try {
     const kepala = await getKepalaInfo(req);
@@ -205,7 +196,7 @@ async function getLaporanHasil(req, res) {
       `SELECT
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
         b.catatan_approval,
-        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
@@ -217,17 +208,12 @@ async function getLaporanHasil(req, res) {
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
         AND (
-          (r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan')
-          OR r.status_review = 'tidak_ditindaklanjuti'
+          r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan'
         )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],
     );
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error getLaporanHasil:", error);
     return res.status(500).json({
@@ -261,7 +247,7 @@ async function getRiwayat(req, res) {
       `SELECT
         b.id_boxing, b.unit_tujuan AS nama_unit, b.status AS status_boxing,
         b.approval_staf, b.catatan_approval,
-        l.id_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         r.penyebab, r.deskripsi AS rencana_tindakan, r.status_review, r.aksi_masukan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan, p.lampiran AS lampiran_hasil,
@@ -274,11 +260,7 @@ async function getRiwayat(req, res) {
       ORDER BY p.tanggal DESC, p.id_pelaksanaan DESC`,
       [kepala.id_kepala],
     );
-    const data = rows.map((row) => ({
-      ...row,
-      kode_laporan: `LAP-${String(row.id_laporan).padStart(5, "0")}`,
-    }));
-    return res.status(200).json({ success: true, data, unit: kepala.unit });
+    return res.status(200).json({ success: true, data: rows, unit: kepala.unit });
   } catch (error) {
     console.error("Error getRiwayat:", error);
     return res.status(500).json({

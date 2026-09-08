@@ -1,8 +1,8 @@
 // FILE: frontend/components/kepala-unit/RiwayatTable.tsx
-// Tab "Riwayat" — rekapitulasi laporan yang PERNAH diisi hasil tindak
-// lanjutnya oleh Kepala Unit ini, lengkap dengan penanda "✓ Selesai" dan
-// tombol export PDF (TTD QR code) per laporan, mirror dari fitur
-// "Proses & Pantau" milik Staf P4M.
+// Tab "Riwayat" — rekapitulasi SEMUA laporan yang pernah didistribusikan/
+// ditangani Kepala Unit ini (apa pun tahapnya sekarang), lengkap dengan
+// penanda status yang sebenarnya dan tombol export PDF (TTD QR code) per
+// laporan, mirror dari fitur "Proses & Pantau" milik Staf P4M.
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { kepalaUnitApi } from "@/lib/api";
@@ -32,7 +32,39 @@ interface RiwayatItem {
   kode_laporan: string;
 }
 
+interface RiwayatStats {
+  total: number;
+  selesai: number;
+  persentase: number;
+}
+
 type FilterMode = "semua" | "selesai";
+
+// ✅ FIX: sebelumnya SETIAP baris di tabel ini selalu ditandai "✓ Selesai"
+// secara hardcode — itu cocok SELAMA query backend cuma pernah
+// mengembalikan laporan yang benar-benar selesai (akibat INNER JOIN yang
+// jadi bug di getRiwayat). Sekarang backend mengembalikan SEMUA laporan
+// yang pernah ditangani unit ini (apa pun tahapnya), jadi badge status
+// per baris harus benar-benar mencerminkan tahap sebenarnya, bukan
+// selalu "Selesai".
+function statusBadge(item: RiwayatItem): { label: string; cls: string } {
+  if (item.status_boxing === "selesai") {
+    return { label: "✓ Selesai", cls: "bg-green-100 text-green-700" };
+  }
+  if (item.status_boxing === "di_staff") {
+    if (item.approval_staf === "ditolak") {
+      return { label: "✗ Ditolak — Revisi Unit", cls: "bg-red-100 text-red-700" };
+    }
+    return { label: "⏳ Menunggu Keputusan Ka P4M", cls: "bg-amber-100 text-amber-700" };
+  }
+  if (item.status_boxing === "menunggu_pelaksanaan") {
+    return { label: "🔧 Menunggu Pelaksanaan", cls: "bg-blue-100 text-blue-700" };
+  }
+  if (item.status_review === "menunggu_keputusan_ka") {
+    return { label: "⏳ Menunggu Ka P4M", cls: "bg-amber-100 text-amber-700" };
+  }
+  return { label: "🔄 Diproses", cls: "bg-blue-100 text-blue-700" };
+}
 
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
@@ -69,6 +101,12 @@ function fmtTglSingkat(iso: string | null): string {
 
 export default function RiwayatTable() {
   const [data, setData] = useState<RiwayatItem[]>([]);
+  // ✅ FIX: statistik sekarang diambil langsung dari backend (single
+  // source of truth — dihitung dari SEMUA laporan yang pernah
+  // didistribusikan/ditangani unit ini), bukan di-derive ulang di
+  // frontend dari `data` yang sebelumnya sudah salah/kepotong akibat
+  // bug INNER JOIN di getRiwayat.
+  const [stats, setStats] = useState<RiwayatStats>({ total: 0, selesai: 0, persentase: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
@@ -79,7 +117,16 @@ export default function RiwayatTable() {
     setLoading(true); setError("");
     try {
       const res = await kepalaUnitApi.getRiwayat();
-      setData(res.data ?? []);
+      const items: RiwayatItem[] = res.data ?? [];
+      setData(items);
+      // Fallback dihitung dari `items` kalau backend lama belum mengirim
+      // `stats` (mis. saat rolling deploy) — supaya tetap tampil benar.
+      const total = res.stats?.total ?? items.length;
+      const selesai =
+        res.stats?.selesai ?? items.filter((d) => d.status_boxing === "selesai").length;
+      const persentase =
+        res.stats?.persentase ?? (total > 0 ? Math.round((selesai / total) * 100) : 0);
+      setStats({ total, selesai, persentase });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Gagal memuat data riwayat.");
     } finally {
@@ -121,14 +168,13 @@ export default function RiwayatTable() {
     }
   }
 
-  const totalSemua = data.length;
-  const totalSelesai = useMemo(() => data.filter((d) => d.status_boxing === "selesai").length, [data]);
-  const persenSelesai = totalSemua > 0 ? Math.round((totalSelesai / totalSemua) * 100) : 0;
-
-  const filteredData = data.filter((d) => {
-    if (filterMode === "selesai") return d.status_boxing === "selesai";
-    return true;
-  });
+  // ✅ FIX: filter "Selesai" tetap murni status_boxing === 'selesai' —
+  // laporan yang masih berjalan (menunggu Ka P4M, di unit, dsb) TIDAK
+  // ikut dihitung/ditampilkan sebagai selesai.
+  const filteredData = useMemo(
+    () => data.filter((d) => (filterMode === "selesai" ? d.status_boxing === "selesai" : true)),
+    [data, filterMode]
+  );
 
   if (loading) return (
     <div className="w-full border-2 border-black bg-white p-12 text-center">
@@ -153,15 +199,15 @@ export default function RiwayatTable() {
         <div className="grid grid-cols-3 gap-3">
           <div className="border-2 border-black bg-white p-3 text-center">
             <p className="text-[9px] uppercase font-bold text-gray-400">Total Laporan</p>
-            <p className="text-xl font-black text-gray-800">{totalSemua}</p>
+            <p className="text-xl font-black text-gray-800">{stats.total}</p>
           </div>
           <div className="border-2 border-black bg-green-50 p-3 text-center">
             <p className="text-[9px] uppercase font-bold text-green-600">✓ Selesai</p>
-            <p className="text-xl font-black text-green-700">{totalSelesai}</p>
+            <p className="text-xl font-black text-green-700">{stats.selesai}</p>
           </div>
           <div className="border-2 border-black bg-blue-50 p-3 text-center">
             <p className="text-[9px] uppercase font-bold text-blue-600">Persentase Selesai</p>
-            <p className="text-xl font-black text-blue-700">{persenSelesai}%</p>
+            <p className="text-xl font-black text-blue-700">{stats.persentase}%</p>
           </div>
         </div>
 
@@ -191,10 +237,16 @@ export default function RiwayatTable() {
           </div>
           {filteredData.length === 0 ? (
             <div className="flex p-10 justify-center border-t-2 border-black">
-              <p className="text-gray-400 italic text-sm">Belum ada laporan yang selesai untuk unit ini.</p>
+              <p className="text-gray-400 italic text-sm">
+                {filterMode === "selesai"
+                  ? "Belum ada laporan yang selesai untuk unit ini."
+                  : "Belum ada laporan yang pernah ditangani unit ini."}
+              </p>
             </div>
           ) : (
-            filteredData.map((item) => (
+            filteredData.map((item) => {
+              const badge = statusBadge(item);
+              return (
               <div key={item.id_boxing} className="flex min-w-175 border-t-2 border-black text-[11px]">
                 <div className="w-24 border-r-2 border-black p-3 align-top">
                   <p className="font-bold text-[10px]">{item.kode_laporan}</p>
@@ -219,8 +271,8 @@ export default function RiwayatTable() {
                   )}
                 </div>
                 <div className="w-32 border-r-2 border-black p-3 flex items-center justify-center">
-                  <span className="text-[9px] font-bold text-center px-2 py-1 rounded leading-tight bg-green-100 text-green-700">
-                    ✓ Selesai
+                  <span className={`text-[9px] font-bold text-center px-2 py-1 rounded leading-tight ${badge.cls}`}>
+                    {badge.label}
                   </span>
                 </div>
                 <div className="w-24 p-2 flex items-center justify-center">
@@ -232,7 +284,8 @@ export default function RiwayatTable() {
                   </button>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -242,14 +295,20 @@ export default function RiwayatTable() {
             Daftar Riwayat · {filteredData.length} item
           </div>
           {filteredData.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 italic">Belum ada laporan yang selesai untuk unit ini.</div>
+            <div className="p-8 text-center text-gray-400 italic">
+              {filterMode === "selesai"
+                ? "Belum ada laporan yang selesai untuk unit ini."
+                : "Belum ada laporan yang pernah ditangani unit ini."}
+            </div>
           ) : (
-            filteredData.map((item) => (
+            filteredData.map((item) => {
+              const badge = statusBadge(item);
+              return (
               <div key={item.id_boxing} className="border-t-2 border-black p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-[10px] font-bold text-gray-600">{item.kode_laporan}</span>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-green-100 text-green-700">
-                    ✓ Selesai
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${badge.cls}`}>
+                    {badge.label}
                   </span>
                 </div>
                 <div className="border border-gray-300 p-2 text-[11px] bg-gray-50 rounded max-h-20 overflow-auto">
@@ -279,7 +338,8 @@ export default function RiwayatTable() {
                     : <>📄 Export PDF</>}
                 </button>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

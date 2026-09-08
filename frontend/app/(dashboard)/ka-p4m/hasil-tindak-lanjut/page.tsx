@@ -10,17 +10,25 @@ export default function HasilTindakLanjutPage() {
   const [namaUser, setNamaUser] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
     if (!token || role !== "ka_p4m") {
       router.replace("/ka-p4m/login");
       return;
     }
-    try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      setNamaUser(user.nama || "");
-    } catch { /* ignore */ }
-    setIsChecking(false);
+    // ✅ FIX ESLint react-hooks/set-state-in-effect: setState dijadwalkan
+    // lewat microtask (bukan dipanggil sinkron di badan effect), plus
+    // guard `cancelled` supaya tidak setState kalau komponen keburu unmount.
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        setNamaUser(user.nama || "");
+      } catch { /* ignore */ }
+      setIsChecking(false);
+    });
+    return () => { cancelled = true; };
   }, [router]);
 
   if (isChecking) {
