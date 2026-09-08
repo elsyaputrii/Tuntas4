@@ -71,6 +71,7 @@ async function getLaporanMasuk(req, res) {
         l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         l.lampiran AS lampiran_laporan, l.status AS status_laporan,
         l.created_at,
+        COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
         r.status_review, r.aksi_masukan, r.catatan AS catatan_review
       FROM boxing_ketidaksesuaian b

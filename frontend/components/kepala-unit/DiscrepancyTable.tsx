@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
+import { fmtTgl } from "@/lib/exportHelpers";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -20,6 +21,11 @@ interface LaporanItem {
   rencana_tindakan: string | null;
   status_review: string | null;
   created_at?: string | null;
+  // ✅ tanggal_laporan = tanggal KEJADIAN yang diisi civitas akademika
+  // saat lapor (fallback ke created_at kalau tanggal_kejadian kosong).
+  // Ini yang seharusnya tampil di kolom "Tanggal Masuk", bukan created_at
+  // mentah (yang cuma tanggal record disimpan ke DB).
+  tanggal_laporan?: string | null;
 }
 
 // ✅ Vocabulary status_review SUDAH DIPERBARUI mengikuti migrate_alur_v2.sql.
@@ -140,13 +146,7 @@ export default function DiscrepancyTable() {
                   <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.kode_laporan}</span>
                   <span className="text-[10px] text-gray-400 capitalize">{item.jenis_laporan}</span>
                   <span className="text-[10px] text-gray-500">
-                    📅 {item.created_at
-                      ? new Date(item.created_at).toLocaleDateString('id-ID', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                        })
-                      : '-'}
+                    📅 {fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}
                   </span>
                   {ditolakStaf ? (
                     <span className="text-[9px] font-medium px-2 py-0.5 border rounded text-red-500 bg-red-50 border-red-200">
@@ -246,13 +246,7 @@ export default function DiscrepancyTable() {
                 {/* Kolom 2: Tanggal Masuk */}
                 <div className="w-[15%] border-r-2 border-black p-5 flex items-center justify-center">
                   <span className="text-xs text-gray-700">
-                    {item.created_at
-                      ? new Date(item.created_at).toLocaleDateString('id-ID', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                        })
-                      : '-'}
+                    {fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}
                   </span>
                 </div>
 
