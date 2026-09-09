@@ -164,7 +164,12 @@ export default function ProcessMonitorTable() {
   // diterima/ditolak atas hasil tindak lanjut unit sekarang wewenang
   // Ka P4M (lihat KaP4MHasilTable.tsx / PATCH /ka-p4m/approval-hasil).
   function renderKeputusanStaf(item: ProsesItem) {
-    if (item.status_boxing !== "di_staff") {
+    // ✅ FIX: dulu fungsi ini cuma dianggap valid buat status_boxing
+    // "di_staff" (makanya di mobile cuma dipanggil kalau diStaff==true).
+    // Laporan yang sudah "selesai" tetap harus lolos ke bawah biar badge
+    // "✓ Disetujui — Selesai" beserta catatannya kelihatan, bukan malah
+    // ketiban pesan "Menunggu tahap sebelumnya".
+    if (item.status_boxing !== "di_staff" && item.status_boxing !== "selesai") {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
     }
     if (!item.hasil_tindakan) {
@@ -179,7 +184,7 @@ export default function ProcessMonitorTable() {
           <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
             apprVal === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
           }`}>
-            {apprVal === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
+            {apprVal === "diterima" ? "✓ Disetujui — Selesai" : "🔄 Perbaikan Berkelanjutan"}
           </span>
           {item.catatan_approval && (
             <p className="text-[9px] text-gray-500 italic text-center max-w-55">
@@ -300,7 +305,9 @@ export default function ProcessMonitorTable() {
             </div>
           )}
           {isSelesai && (
-            <span className="text-[10px] text-green-600 font-bold">✓ Selesai</span>
+            <div className="w-full flex justify-center">
+              {renderKeputusanStaf(item)}
+            </div>
           )}
           {!diStaff && !isSelesai && (
             <span className="text-[10px] text-gray-400 italic">Menunggu tahap sebelumnya</span>
@@ -391,10 +398,14 @@ export default function ProcessMonitorTable() {
                       <div style={{ display: "table-cell", width: "15%" }} className="border-r-2 border-black p-3 align-top">
                         {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
                         {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
-                        {item.approval_staf && item.approval_staf !== "menunggu" && item.catatan_approval && (
-                          <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">
-                            {item.catatan_approval} <span className="text-gray-400">(alasan dari Ka P4M)</span>
-                          </p>
+                        {/* ✅ FIX: status keputusan HASIL dari Ka P4M (Menunggu /
+                            Disetujui / Ditolak) + catatannya sebelumnya cuma
+                            dirender di versi mobile (renderKeputusanStaf), gak
+                            pernah kelihatan di tabel desktop. Sekarang ditambahin
+                            di sini, di bawah badge rencana, khusus kalau laporan
+                            udah sampai tahap Staf P4M (di_staff). */}
+                        {item.status_boxing === "di_staff" && item.hasil_tindakan && (
+                          <div className="mt-1.5">{renderKeputusanStaf(item)}</div>
                         )}
                       </div>
 
@@ -467,10 +478,8 @@ export default function ProcessMonitorTable() {
                           <div style={{ display: "table-cell", width: "15%" }} className="border-r-2 border-black p-3 align-top">
                             {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
                             {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
-                            {item.approval_staf && item.approval_staf !== "menunggu" && item.catatan_approval && (
-                              <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">
-                                {item.catatan_approval} <span className="text-gray-400">(alasan dari Ka P4M)</span>
-                              </p>
+                            {item.hasil_tindakan && (
+                              <div className="mt-1.5">{renderKeputusanStaf(item)}</div>
                             )}
                           </div>
 

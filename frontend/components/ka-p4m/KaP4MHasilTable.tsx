@@ -299,12 +299,20 @@ export default function KaP4MHasilTable() {
                           : "text-red-700 bg-red-50 border-red-300"
                       }`}
                     >
-                      {item.approval_staf === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
+                      {item.approval_staf === "diterima" ? "✓ Disetujui — Selesai" : "🔄 Perbaikan Berkelanjutan"}
                     </span>
                     {/* ✅ Bukti tanggal keputusan Ka P4M (dari boxing.updated_at) */}
                     <p className="text-[9px] text-gray-400 text-center leading-tight">
                       🕒 {formatTanggal(item.tanggal_keputusan_ka)}
                     </p>
+                    {/* ✅ FIX: catatan/alasan yang diisi Ka P4M pas klik ✓/✗
+                        sebelumnya cuma disimpan ke backend tapi gak pernah
+                        ditampilkan lagi di sini — sekarang ikut kelihatan. */}
+                    {item.catatan_approval && (
+                      <p className="text-[9px] text-gray-500 italic text-center leading-tight max-w-32 mt-0.5">
+                        &ldquo;{item.catatan_approval}&rdquo;
+                      </p>
+                    )}
                   </div>
                 ) : item.status_boxing !== "di_staff" ? (
                   // ✅ FIX: row yang belum di_staff (mis. nyangkut di

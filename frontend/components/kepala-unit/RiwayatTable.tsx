@@ -53,7 +53,7 @@ function statusBadge(item: RiwayatItem): { label: string; cls: string } {
   }
   if (item.status_boxing === "di_staff") {
     if (item.approval_staf === "ditolak") {
-      return { label: "✗ Ditolak — Revisi Unit", cls: "bg-red-100 text-red-700" };
+      return { label: "🔄 Perbaikan Berkelanjutan", cls: "bg-red-100 text-red-700" };
     }
     return { label: "⏳ Menunggu Keputusan Ka P4M", cls: "bg-amber-100 text-amber-700" };
   }
