@@ -432,16 +432,33 @@ async function deleteFotoProfil(req, res) {
 // ── DELETE /api/users/:id — hapus akun ───────────────────────────────
 async function deleteUser(req, res) {
   const { id } = req.params;
+  const conn = await pool.getConnection();
   try {
-    // ON DELETE CASCADE di staf_p4m/kepala_unit/ka_p4m otomatis ikut terhapus
-    const [result] = await pool.query("DELETE FROM pengguna WHERE id_pengguna = ?", [id]);
-    if (result.affectedRows === 0) {
+    const [existing] = await conn.query("SELECT role FROM pengguna WHERE id_pengguna = ?", [id]);
+    if (existing.length === 0) {
+      conn.release();
       return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
     }
+
+    await conn.beginTransaction();
+
+    // Tidak ada ON DELETE CASCADE di database — hapus manual dulu row
+    // terkait di tabel profil per-role, biar NIP/email-nya nggak nyangkut
+    // (nyangkut = bikin "Email atau NIP sudah dipakai" pas bikin akun baru).
+    await conn.query("DELETE FROM staf_p4m WHERE id_pengguna = ?", [id]);
+    await conn.query("DELETE FROM kepala_unit WHERE id_pengguna = ?", [id]);
+    await conn.query("DELETE FROM ka_p4m WHERE id_pengguna = ?", [id]);
+
+    await conn.query("DELETE FROM pengguna WHERE id_pengguna = ?", [id]);
+
+    await conn.commit();
     return res.status(200).json({ success: true, message: "Akun berhasil dihapus." });
   } catch (error) {
+    await conn.rollback();
     console.error("Error deleteUser:", error);
     return res.status(500).json({ success: false, message: "Gagal menghapus akun." });
+  } finally {
+    conn.release();
   }
 }
 

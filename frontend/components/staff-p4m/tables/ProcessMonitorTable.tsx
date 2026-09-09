@@ -58,12 +58,28 @@ interface ProsesItem {
   created_at?: string | null;
 }
 
-// ✅ STATUS KEPUTUSAN KA
+// ✅ STATUS KEPUTUSAN KA — dipakai buat kolom "Keputusan Ka" di
+// Proses & Pantau. Ini murni soal keputusan Ka P4M atas RENCANA
+// (rancangan_tindakan.status_review), bukan soal keputusan akhir atas
+// HASIL (approval_staf, itu beda kolom/tahap).
 const reviewBadge: Record<string, { label: string; cls: string }> = {
-  menunggu_keputusan_ka: { label: "⏳ Ke Ka P4M", cls: "text-blue-600 bg-blue-50" },
+  menunggu_keputusan_ka: { label: "⏳ Menunggu Review", cls: "text-blue-600 bg-blue-50 border-blue-200" },
   ditindaklanjuti:       { label: "🔄 Perbaikan Berkelanjutan", cls: "text-red-600 bg-red-50 border-red-200" },
   tidak_ditindaklanjuti: { label: "✅ Sesuai", cls: "text-green-600 bg-green-50 border-green-200" },
 };
+
+// ✅ FIX: sebelumnya kalau status_review masih NULL (laporan baru
+// terdistribusi, Kepala Unit belum isi rencana sama sekali), badge ini
+// gak muncul apa-apa alias kolom "Keputusan Ka" keliatan kosong —
+// padahal statusnya jelas: Ka P4M memang belum ada apa-apa buat
+// direview. Sekarang selalu fallback ke "⏳ Menunggu Review" biar
+// kolomnya gak pernah blank.
+function getKeputusanKaBadge(item: ProsesItem): { label: string; cls: string } {
+  if (item.status_review && reviewBadge[item.status_review]) {
+    return reviewBadge[item.status_review];
+  }
+  return reviewBadge.menunggu_keputusan_ka;
+}
 
 const boxingLabel: Record<string, string> = {
   terdistribusi: "Terdistribusi",
@@ -214,7 +230,7 @@ export default function ProcessMonitorTable() {
   const selesai = filteredData.filter((d) => d.status_boxing === "selesai");
 
   function renderCard(item: ProsesItem) {
-    const rev = item.status_review ? reviewBadge[item.status_review] : null;
+    const rev = getKeputusanKaBadge(item);
     const diStaff = item.status_boxing === "di_staff";
     const isSelesai = item.status_boxing === "selesai";
 
@@ -343,7 +359,7 @@ export default function ProcessMonitorTable() {
           ) : (
             <>
               {aktif.map((item) => {
-                const rev = item.status_review ? reviewBadge[item.status_review] : null;
+                const rev = getKeputusanKaBadge(item);
                 return (
                   <div
                     key={`${item.id_laporan}-${item.id_boxing}`}
@@ -420,7 +436,7 @@ export default function ProcessMonitorTable() {
                     Sudah selesai — gunakan tab Rekapitulasi untuk membuka kembali
                   </div>
                   {selesai.map((item) => {
-                    const rev = item.status_review ? reviewBadge[item.status_review] : null;
+                    const rev = getKeputusanKaBadge(item);
                     return (
                       <div
                         key={`${item.id_laporan}-${item.id_boxing}`}

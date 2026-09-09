@@ -124,10 +124,11 @@ export default function DiscrepancyTable() {
       <div className="w-full border-2 border-black bg-white overflow-hidden text-sm">
         {/* ===== HEADER DESKTOP ===== */}
         <div className="hidden sm:flex font-semibold uppercase bg-gray-50 border-b-2 border-black text-center">
-          <div className="w-[30%] border-r-2 border-black p-3 text-[11px]">Kritik atau Pengaduan Terkait Polibatam</div>
-          <div className="w-[15%] border-r-2 border-black p-3 text-[11px]">Tanggal Masuk</div>
-          <div className="w-[20%] border-r-2 border-black p-3 text-[11px]">Penyebab</div>
-          <div className="w-[20%] border-r-2 border-black p-3 text-[11px]">Rencana Tindak Lanjut</div>
+          <div className="w-[26%] border-r-2 border-black p-3 text-[11px]">Kritik atau Pengaduan Terkait Polibatam</div>
+          <div className="w-[12%] border-r-2 border-black p-3 text-[11px]">Tanggal Masuk</div>
+          <div className="w-[12%] border-r-2 border-black p-3 text-[11px]">Tanggal Kejadian</div>
+          <div className="w-[18%] border-r-2 border-black p-3 text-[11px]">Penyebab</div>
+          <div className="w-[18%] border-r-2 border-black p-3 text-[11px]">Rencana Tindak Lanjut</div>
           <div className="flex-1 p-3 text-[11px]">Aksi</div>
         </div>
 
@@ -146,7 +147,10 @@ export default function DiscrepancyTable() {
                   <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.kode_laporan}</span>
                   <span className="text-[10px] text-gray-400 capitalize">{item.jenis_laporan}</span>
                   <span className="text-[10px] text-gray-500">
-                    📅 {fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}
+                    📥 Masuk: {fmtTgl(item.created_at ?? null)}
+                  </span>
+                  <span className="text-[10px] text-gray-500">
+                    📅 Kejadian: {fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}
                   </span>
                   {ditolakStaf ? (
                     <span className="text-[9px] font-medium px-2 py-0.5 border rounded text-red-500 bg-red-50 border-red-200">
@@ -215,7 +219,7 @@ export default function DiscrepancyTable() {
               {/* ===== DESKTOP ROW ===== */}
               <div className="hidden sm:flex min-h-40">
                 {/* Kolom 1: Laporan */}
-                <div className="w-[30%] border-r-2 border-black p-5">
+                <div className="w-[26%] border-r-2 border-black p-5">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.kode_laporan}</span>
                     <span className="text-[10px] text-gray-400 capitalize">{item.jenis_laporan}</span>
@@ -243,15 +247,22 @@ export default function DiscrepancyTable() {
                   )}
                 </div>
 
-                {/* Kolom 2: Tanggal Masuk */}
-                <div className="w-[15%] border-r-2 border-black p-5 flex items-center justify-center">
+                {/* Kolom 2: Tanggal Masuk (tanggal laporan diterima/dibuat di sistem) */}
+                <div className="w-[12%] border-r-2 border-black p-5 flex items-center justify-center">
+                  <span className="text-xs text-gray-700">
+                    {fmtTgl(item.created_at ?? null)}
+                  </span>
+                </div>
+
+                {/* Kolom 3: Tanggal Kejadian (tanggal kejadian yang diisi pelapor saat lapor) */}
+                <div className="w-[12%] border-r-2 border-black p-5 flex items-center justify-center">
                   <span className="text-xs text-gray-700">
                     {fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}
                   </span>
                 </div>
 
-                {/* Kolom 3: Penyebab */}
-                <div className="w-[20%] border-r-2 border-black p-5 flex items-center justify-center">
+                {/* Kolom 4: Penyebab */}
+                <div className="w-[18%] border-r-2 border-black p-5 flex items-center justify-center">
                   <textarea
                     className="w-full min-h-30 h-30 border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed overflow-y-auto"
                     placeholder={editable ? "Ketik penyebab di sini..." : "—"}
@@ -262,8 +273,8 @@ export default function DiscrepancyTable() {
                   />
                 </div>
 
-                {/* Kolom 4: Rencana */}
-                <div className="w-[20%] border-r-2 border-black p-5 flex items-center justify-center">
+                {/* Kolom 5: Rencana */}
+                <div className="w-[18%] border-r-2 border-black p-5 flex items-center justify-center">
                   <textarea
                     className="w-full min-h-30 h-30 border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed overflow-y-auto"
                     placeholder={editable ? "Ketik rencana di sini..." : "—"}
@@ -274,7 +285,7 @@ export default function DiscrepancyTable() {
                   />
                 </div>
 
-                {/* Kolom 5: Aksi */}
+                {/* Kolom 6: Aksi */}
                 <div className="flex-1 p-5 flex items-center justify-center">
                   {editable ? (
                     <button
