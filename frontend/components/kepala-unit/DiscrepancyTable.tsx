@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
 import { fmtTgl } from "@/lib/exportHelpers";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -21,6 +23,11 @@ interface LaporanItem {
   rencana_tindakan: string | null;
   status_review: string | null;
   created_at?: string | null;
+  // ✅ Fitur sinkronisasi (poin #6): true kalau Penyebab & Rencana di
+  // bawah ini berasal dari draft yang diisi Kepala Unit lain (unit ini
+  // sendiri belum pernah mengirim rancangan untuk laporan ini).
+  dari_sinkronisasi?: boolean | number;
+  sinkron_dari_unit?: string | null;
   // ✅ tanggal_laporan = tanggal KEJADIAN yang diisi civitas akademika
   // saat lapor (fallback ke created_at kalau tanggal_kejadian kosong).
   // Ini yang seharusnya tampil di kolom "Tanggal Masuk", bukan created_at
@@ -46,6 +53,10 @@ export default function DiscrepancyTable() {
   const [loading,     setLoading]     = useState(true);
   const [errMsg,      setErrMsg]      = useState("");
   const [modalSrc,    setModalSrc]    = useState<string | null>(null);  // ✅ UNTUK IMAGE MODAL
+  // ✅ Konfirmasi sebelum kirim (poin #3): simpan id_boxing yang mau
+  // dikirim di sini dulu, baru benar-benar dikirim kalau user menekan
+  // tombol "Kirim" di modal konfirmasi.
+  const [confirmId,   setConfirmId]   = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setErrMsg("");
@@ -68,11 +79,21 @@ export default function DiscrepancyTable() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleSend = async (id_boxing: number) => {
+  // ✅ FIX (poin #3): klik "Kirim" TIDAK langsung mengirim ke server.
+  // Cuma validasi isian dulu, lalu buka modal konfirmasi "Yakin ingin
+  // mengirim ini?". Data baru benar-benar dikirim kalau user menekan
+  // tombol "Kirim" di modal (lihat handleConfirmSend di bawah).
+  const handleSend = (id_boxing: number) => {
     if (!penyebab[id_boxing]?.trim() || !rencana[id_boxing]?.trim()) {
       alert("Penyebab dan rencana tindak lanjut harus diisi.");
       return;
     }
+    setConfirmId(id_boxing);
+  };
+
+  const handleConfirmSend = async () => {
+    if (confirmId === null) return;
+    const id_boxing = confirmId;
     setSending((prev) => ({ ...prev, [id_boxing]: true }));
     try {
       const result = await kepalaUnitApi.submitRancangan({
@@ -83,7 +104,10 @@ export default function DiscrepancyTable() {
       if (result.success) { alert("Laporan berhasil dikirim!"); fetchData(); }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Gagal mengirim. Coba lagi.");
-    } finally { setSending((prev) => ({ ...prev, [id_boxing]: false })); }
+    } finally {
+      setSending((prev) => ({ ...prev, [id_boxing]: false }));
+      setConfirmId(null);
+    }
   };
 
   // ✅ FIX: Kolom bisa diisi kalau (a) belum pernah dikirim sama sekali
@@ -120,6 +144,18 @@ export default function DiscrepancyTable() {
     <>
       {/* ===== IMAGE MODAL ===== */}
       {modalSrc && <ImageModal src={modalSrc} onClose={() => setModalSrc(null)} />}
+
+      {/* ===== KONFIRMASI KIRIM (poin #3) ===== */}
+      <ConfirmDialog
+        open={confirmId !== null}
+        title="Konfirmasi Kirim"
+        message="Yakin ingin mengirim ini? Setelah dikirim, Penyebab dan Rencana Tindak Lanjut akan diteruskan ke Ka P4M dan tidak bisa diubah lagi sampai ada keputusan."
+        confirmLabel="Kirim"
+        cancelLabel="Batal"
+        loading={confirmId !== null && !!sending[confirmId]}
+        onConfirm={handleConfirmSend}
+        onCancel={() => setConfirmId(null)}
+      />
 
       <div className="w-full border-2 border-black bg-white overflow-hidden text-sm">
         {/* ===== HEADER DESKTOP ===== */}
@@ -177,10 +213,16 @@ export default function DiscrepancyTable() {
                     <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}
                   </div>
                 )}
+                {item.dari_sinkronisasi ? (
+                  <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    🔄 Sudah diisi Kepala Unit {item.sinkron_dari_unit || "lain"} untuk laporan ini — silakan cek/edit sebelum mengirim.
+                  </p>
+                ) : null}
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
-                  <textarea
-                    className="w-full h-20 border border-black p-2 text-xs outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
+                  <AutoResizeTextarea
+                    minHeight={80}
+                    className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
                     placeholder={editable ? "Ketik penyebab di sini..." : "—"}
                     value={penyebab[item.id_boxing] || ""}
                     onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
@@ -189,8 +231,9 @@ export default function DiscrepancyTable() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Tindak Lanjut</p>
-                  <textarea
-                    className="w-full h-20 border border-black p-2 text-xs outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
+                  <AutoResizeTextarea
+                    minHeight={80}
+                    className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
                     placeholder={editable ? "Ketik rencana di sini..." : "—"}
                     value={rencana[item.id_boxing] || ""}
                     onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
@@ -245,6 +288,11 @@ export default function DiscrepancyTable() {
                       <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}
                     </div>
                   )}
+                  {item.dari_sinkronisasi ? (
+                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700">
+                      🔄 Penyebab &amp; Rencana sudah diisi Kepala Unit {item.sinkron_dari_unit || "lain"} — silakan cek/edit sebelum mengirim.
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Kolom 2: Tanggal Masuk (tanggal laporan diterima/dibuat di sistem) */}
@@ -261,10 +309,16 @@ export default function DiscrepancyTable() {
                   </span>
                 </div>
 
-                {/* Kolom 4: Penyebab */}
-                <div className="w-[18%] border-r-2 border-black p-5 flex items-center justify-center">
-                  <textarea
-                    className="w-full min-h-30 h-30 border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed overflow-y-auto"
+                {/* Kolom 4: Penyebab — ✅ FIX (poin #2): dulu kotak tinggi
+                    tetap (h-30) + scroll, teks panjang jadi terlihat
+                    menciut/terpotong. Sekarang pakai AutoResizeTextarea
+                    supaya kotaknya memanjang ke bawah mengikuti isi teks,
+                    sama seperti perilaku kolom "Kritik atau Pengaduan
+                    Terkait Polibatam" di sebelah kiri. */}
+                <div className="w-[18%] border-r-2 border-black p-5">
+                  <AutoResizeTextarea
+                    minHeight={112}
+                    className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder={editable ? "Ketik penyebab di sini..." : "—"}
                     value={penyebab[item.id_boxing] || ""}
                     onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
@@ -273,10 +327,11 @@ export default function DiscrepancyTable() {
                   />
                 </div>
 
-                {/* Kolom 5: Rencana */}
-                <div className="w-[18%] border-r-2 border-black p-5 flex items-center justify-center">
-                  <textarea
-                    className="w-full min-h-30 h-30 border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam resize-none disabled:bg-gray-50 disabled:cursor-not-allowed overflow-y-auto"
+                {/* Kolom 5: Rencana Tindak Lanjut — sama seperti Kolom 4 */}
+                <div className="w-[18%] border-r-2 border-black p-5">
+                  <AutoResizeTextarea
+                    minHeight={112}
+                    className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder={editable ? "Ketik rencana di sini..." : "—"}
                     value={rencana[item.id_boxing] || ""}
                     onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}

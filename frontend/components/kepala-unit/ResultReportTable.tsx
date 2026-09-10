@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { kepalaUnitApi } from "@/lib/api";
+import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
 
 interface LaporanHasilItem {
   id_boxing: number; id_laporan: number; kode_laporan: string;
@@ -106,7 +107,7 @@ export default function ResultReportTable() {
       <div className="flex font-semibold uppercase bg-gray-50 border-b-2 border-black text-center">
         <div className="w-[25%] border-r-2 border-black p-3 text-[10px]">Kritik atau Pengaduan</div>
         <div className="w-[15%] border-r-2 border-black p-3 text-[10px]">Penyebab</div>
-        <div className="w-[15%] border-r-2 border-black p-3 text-[10px]">Rencana</div>
+        <div className="w-[15%] border-r-2 border-black p-3 text-[10px]">Rencana Tindak Lanjut</div>
         <div className="w-[10%] border-r-2 border-black p-3 text-[10px]">Status</div>
         <div className="flex-1 p-3 text-[10px]">Laporan Hasil Tindak Lanjut</div>
       </div>
@@ -123,10 +124,10 @@ export default function ResultReportTable() {
               <p className="text-[11px] text-black leading-relaxed">{item.isi_laporan}</p>
             </div>
             <div className="w-[15%] border-r-2 border-black p-4 bg-gray-50">
-              <p className="text-[11px] text-gray-700">{item.penyebab}</p>
+              <p className="text-[11px] text-gray-700 whitespace-pre-wrap wrap-break-words">{item.penyebab}</p>
             </div>
             <div className="w-[15%] border-r-2 border-black p-4 bg-gray-50">
-              <p className="text-[11px] text-gray-700">{item.rencana_tindakan}</p>
+              <p className="text-[11px] text-gray-700 whitespace-pre-wrap wrap-break-words">{item.rencana_tindakan}</p>
             </div>
             <div className="w-[10%] border-r-2 border-black p-4 flex items-center justify-center">
               <span className={`font-bold text-center text-[10px] ${
@@ -183,8 +184,9 @@ export default function ResultReportTable() {
                         : undefined}
                     onChange={(e) => setTanggal((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
                   />
-                  <textarea
-                    className="w-full h-24 border border-black p-3 text-[11px] text-black outline-none focus:border-blue-polibatam resize-none"
+                  <AutoResizeTextarea
+                    minHeight={96}
+                    className="w-full border border-black p-3 text-[11px] text-black outline-none focus:border-blue-polibatam"
                     placeholder="Tambahkan Uraian Hasil Tindak Lanjut..."
                     value={uraian[item.id_boxing] || ""}
                     onChange={(e) => setUraian((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}

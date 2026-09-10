@@ -215,7 +215,7 @@ export default function StafDecisionTable() {
                 ❌ Ditolak
               </span>
               {item.catatan_approval && (
-                <p className="text-[9px] text-gray-500 italic text-center mt-1 max-w-full break-words">
+                <p className="text-[9px] text-gray-500 italic text-center mt-1 max-w-full wrap-break-words">
                   📝 {item.catatan_approval}
                 </p>
               )}

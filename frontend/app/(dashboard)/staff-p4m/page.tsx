@@ -267,6 +267,7 @@ export default function DashboardStaff() {
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="bulan" />
+              
               <YAxis />
               <Tooltip />
               <Legend />

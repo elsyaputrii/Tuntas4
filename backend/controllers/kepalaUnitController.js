@@ -72,11 +72,23 @@ async function getLaporanMasuk(req, res) {
         l.lampiran AS lampiran_laporan, l.status AS status_laporan,
         l.created_at,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
-        r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
-        r.status_review, r.aksi_masukan, r.catatan AS catatan_review
+        r.id_rancangan,
+        -- ✅ FITUR SINKRONISASI (poin #6): kalau unit ini BELUM pernah
+        -- mengirim rancangan sendiri (r.penyebab masih NULL), pakai draft
+        -- bersama (d.penyebab/d.rencana) yang mungkin sudah diisi Kepala
+        -- Unit LAIN untuk laporan yang sama. Begitu unit ini sendiri
+        -- sudah pernah mengirim, nilai miliknya sendiri (r.*) yang selalu
+        -- dipakai — draft dari unit lain tidak akan menimpa data yang
+        -- sudah dikirim ke Ka P4M.
+        COALESCE(r.penyebab, d.penyebab)                AS penyebab,
+        COALESCE(r.deskripsi, d.rencana)                 AS rencana_tindakan,
+        r.status_review, r.aksi_masukan, r.catatan AS catatan_review,
+        (d.id_laporan IS NOT NULL AND r.id_rancangan IS NULL) AS dari_sinkronisasi,
+        d.terakhir_diisi_unit AS sinkron_dari_unit
       FROM boxing_ketidaksesuaian b
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+      LEFT JOIN laporan_draft_tindakan d ON d.id_laporan = l.id_laporan
       WHERE b.id_kepala = ?
         AND b.status NOT IN ('selesai')
         AND (
@@ -119,7 +131,7 @@ async function submitRancangan(req, res) {
     }
 
     const [boxingRows] = await pool.query(
-      `SELECT id_boxing, status FROM boxing_ketidaksesuaian
+      `SELECT id_boxing, id_laporan, status FROM boxing_ketidaksesuaian
        WHERE id_boxing = ? AND id_kepala = ?`,
       [id_boxing, kepala.id_kepala],
     );
@@ -129,6 +141,7 @@ async function submitRancangan(req, res) {
         message: "Laporan ini tidak ditujukan ke unit Anda.",
       });
     }
+    const id_laporan = boxingRows[0].id_laporan;
 
     const [existing] = await pool.query(
       `SELECT id_rancangan, status_review FROM rancangan_tindakan WHERE id_boxing = ?`,
@@ -160,6 +173,25 @@ async function submitRancangan(req, res) {
     await pool.query(
       `UPDATE boxing_ketidaksesuaian SET status = 'diproses' WHERE id_boxing = ?`,
       [id_boxing],
+    );
+
+    // ✅ FITUR SINKRONISASI (poin #6): simpan/perbarui draft bersama untuk
+    // id_laporan ini, supaya Kepala Unit LAIN yang juga jadi tujuan
+    // laporan yang sama (dan belum mengirim rancangan miliknya sendiri)
+    // otomatis melihat Penyebab & Rencana Tindak Lanjut ini sebagai nilai
+    // awal saat mereka membuka laporan tsb — tetap bisa mereka edit, dan
+    // kalau mereka ubah lalu kirim, draft ini ikut ter-update lagi supaya
+    // unit lain yang belum kirim ikut melihat versi terbaru.
+    // Tidak menyentuh/mengunci rancangan_tindakan milik unit lain sama
+    // sekali — cuma dipakai sebagai bahan isian awal (lihat getLaporanMasuk).
+    await pool.query(
+      `INSERT INTO laporan_draft_tindakan (id_laporan, penyebab, rencana, terakhir_diisi_unit)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         penyebab = VALUES(penyebab),
+         rencana = VALUES(rencana),
+         terakhir_diisi_unit = VALUES(terakhir_diisi_unit)`,
+      [id_laporan, penyebab, rencana_tindakan, kepala.unit],
     );
 
     // Kasih tau Ka P4M ada rancangan tindakan yang perlu diputuskan

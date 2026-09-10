@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { kaP4MApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
+import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
 import { Pencil, Eye } from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -266,8 +267,9 @@ export default function KaP4MReviewTable() {
                   <label className="text-[11px] font-bold uppercase block mb-1">
                     Aksi / Masukan ke Kepala Unit (wajib) :
                   </label>
-                  <textarea
-                    className="w-full border border-black p-2 text-xs h-24 outline-none resize-none"
+                  <AutoResizeTextarea
+                    minHeight={96}
+                    className="w-full border border-black p-2 text-xs outline-none"
                     placeholder="Instruksi tindak lanjut untuk kepala unit..."
                     value={aksiMasukan}
                     onChange={(e) => setAksiMasukan(e.target.value)}
@@ -378,7 +380,9 @@ export default function KaP4MReviewTable() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Laporan Civitas</p>
-                    <div className="border border-gray-300 p-2 text-[11px] rounded">{item.isi_laporan}</div>
+                    {/* ✅ FIX (poin #4): tanpa tinggi tetap/scroll, teks
+                        panjang memanjang ke bawah secara alami. */}
+                    <div className="border border-gray-300 p-2 text-[11px] rounded whitespace-pre-wrap break-words">{item.isi_laporan}</div>
                     <p className="text-[10px] text-gray-500 mt-1">
                       📅 Tanggal Masuk: {item.created_at
                         ? new Date(item.created_at).toLocaleDateString('id-ID', {
@@ -403,13 +407,13 @@ export default function KaP4MReviewTable() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
-                      <div className="border border-gray-300 p-2 text-[10px] rounded min-h-[60px]">
+                      <div className="border border-gray-300 p-2 text-[10px] rounded min-h-[60px] whitespace-pre-wrap break-words">
                         {item.penyebab || "—"}
                       </div>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Unit</p>
-                      <div className="border border-gray-300 p-2 text-[10px] rounded min-h-[60px]">
+                      <div className="border border-gray-300 p-2 text-[10px] rounded min-h-[60px] whitespace-pre-wrap break-words">
                         {item.rencana_tindakan || "—"}
                       </div>
                     </div>
@@ -449,12 +453,15 @@ export default function KaP4MReviewTable() {
 
                 {/* DESKTOP ROW */}
                 <div className="hidden sm:flex min-h-[160px]">
-                  {/* Kolom 1: Laporan Civitas */}
+                  {/* Kolom 1: Laporan Civitas — ✅ FIX (poin #4): dulu tinggi
+                      tetap (h-24) + scroll bikin teks panjang terlihat
+                      menciut/terpotong. Sekarang kotak memanjang ke bawah
+                      mengikuti isi teks (tanpa scroll). */}
                   <div className="flex-1 border-r-2 border-black p-4">
                     <p className="text-[10px] text-gray-400 mb-1">
                       {item.kode_laporan} · {item.nama_unit}
                     </p>
-                    <div className="border border-gray-300 p-2 h-24 text-[11px] overflow-auto">
+                    <div className="border border-gray-300 p-2 min-h-24 text-[11px] whitespace-pre-wrap break-words">
                       {item.isi_laporan}
                     </div>
                     {item.lampiran_laporan && (
@@ -483,16 +490,17 @@ export default function KaP4MReviewTable() {
                     </span>
                   </div>
 
-                  {/* Kolom 3: Penyebab */}
+                  {/* Kolom 3: Penyebab — ✅ FIX (poin #4): sama seperti
+                      Kolom 1, kotak sekarang memanjang mengikuti teks. */}
                   <div className="w-[16%] border-r-2 border-black p-4">
-                    <div className="border border-gray-300 p-2 h-20 text-[10px] overflow-auto">
+                    <div className="border border-gray-300 p-2 min-h-20 text-[10px] whitespace-pre-wrap break-words">
                       {item.penyebab || "—"}
                     </div>
                   </div>
 
                   {/* Kolom 4: Rencana Unit */}
                   <div className="w-[20%] border-r-2 border-black p-4">
-                    <div className="border border-gray-300 p-2 h-20 text-[10px] overflow-auto">
+                    <div className="border border-gray-300 p-2 min-h-20 text-[10px] whitespace-pre-wrap break-words">
                       {item.rencana_tindakan || "—"}
                     </div>
                   </div>

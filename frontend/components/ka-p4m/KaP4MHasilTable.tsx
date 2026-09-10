@@ -9,9 +9,11 @@
 // di sisi Ka P4M, lewat PATCH /ka-p4m/approval-hasil. Staf P4M cuma bisa
 // lihat & pantau prosesnya (read-only) di tab "Proses & Pantau" miliknya.
 // ============================================================
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { kaP4MApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
+import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
+import { toLocalDate, fmtTgl as fmtTglShared } from "@/lib/exportHelpers";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -44,6 +46,8 @@ export default function KaP4MHasilTable() {
   const [msgOk, setMsgOk] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
+  const [filterMode, setFilterMode] = useState<FilterMode>("semua");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const [modal, setModal] = useState<{
     open: boolean;
@@ -57,15 +61,14 @@ export default function KaP4MHasilTable() {
     setError("");
     try {
       const res = await kaP4MApi.getProsesMonitor();
-      // ✅ Semua laporan yang belum 'selesai' ditampilkan di tabel ini apa pun
-      // tahapnya, supaya Ka P4M bisa memantau progresnya. Tapi tombol
-      // keputusan (✓/✗) baru muncul kalau `hasil_tindakan` sudah diisi
-      // Kepala Unit — sebelum itu, hanya ditampilkan tapi tidak bisa
-      // diputuskan (lihat render kolom "Keputusan Ka P4M" di bawah).
-      const filtered = (res.data as HasilItem[]).filter(
-        (item) => item.status_boxing !== "selesai"
-      );
-      setData(filtered);
+      // ✅ SEMUA laporan ditampilkan di tabel ini, apa pun tahapnya — termasuk
+      // yang sudah 'selesai' — supaya Ka P4M bisa memantau riwayat lengkapnya
+      // dan Staf P4M (yang cuma bisa pantau, gak bisa memutuskan) juga punya
+      // gambaran utuh. Difilter berdasarkan periode tanggal lewat
+      // PeriodFilterBar, bukan lagi dibuang berdasarkan status. Tombol
+      // keputusan (✓/✗) tetap cuma muncul kalau tahapnya sudah sampai
+      // 'di_staff' (lihat render kolom "Keputusan Ka P4M" di bawah).
+      setData(res.data as HasilItem[]);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Gagal memuat data.");
     } finally {
@@ -74,6 +77,56 @@ export default function KaP4MHasilTable() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Filter periode (Harian/Mingguan/Bulanan/Tahunan/Semua) berdasarkan
+  // tanggal laporan masuk (created_at) — sama seperti Laporan Masuk & Proses & Pantau.
+  const filteredData = useMemo(() => {
+    return data.filter((item) =>
+      isInPeriodFilter(filterMode, selectedDate, toLocalDate, item.created_at ?? null)
+    );
+  }, [data, filterMode, selectedDate]);
+
+  const highlightedDates = useMemo(() => {
+    return new Set(
+      data
+        .map((item) => item.created_at)
+        .filter((v): v is string => !!v)
+        .map((v) => {
+          const d = toLocalDate(v);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        })
+    );
+  }, [data]);
+
+  // Label & warna untuk tahap-tahap SEBELUM laporan sampai ke keputusan
+  // Ka P4M (kolom paling kanan). Sebelumnya semua kondisi ini disamaratakan
+  // jadi satu teks "Menunggu tahap Staf P4M" yang salah/menyesatkan — padahal
+  // Staf P4M sama sekali tidak punya wewenang keputusan di alur ini (cuma
+  // pantau). Sekarang tiap tahap dikasih label yang sesuai kenyataannya.
+  function getStageInfo(item: HasilItem): { label: string; cls: string } {
+    switch (item.status_boxing) {
+      case "terdistribusi":
+        return {
+          label: "🕓 Menunggu Kepala Unit isi Penyebab & Rencana",
+          cls: "text-gray-500 bg-gray-50 border-gray-300",
+        };
+      case "diproses":
+        return {
+          label: "🕓 Menunggu keputusan Anda (Proses Pengaduan)",
+          cls: "text-blue-600 bg-blue-50 border-blue-300",
+        };
+      case "menunggu_pelaksanaan":
+        return {
+          label: "🕓 Menunggu Kepala Unit isi Hasil Tindak Lanjut",
+          cls: "text-amber-600 bg-amber-50 border-amber-300",
+        };
+      default:
+        return {
+          label: "🕓 Menunggu diproses",
+          cls: "text-gray-500 bg-gray-50 border-gray-300",
+        };
+    }
+  }
 
   function getImageUrl(lampiran: string | null): string {
     if (!lampiran) return "";
@@ -223,9 +276,24 @@ export default function KaP4MHasilTable() {
         </div>
       )}
 
+      {/* FILTER PERIODE */}
+      <div className="mb-3">
+        <PeriodFilterBar
+          filterMode={filterMode}
+          onFilterModeChange={setFilterMode}
+          selectedDate={selectedDate}
+          onSelectedDateChange={setSelectedDate}
+          highlightedDates={highlightedDates}
+          showCalendar={false}
+        />
+        <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase">
+          {filteredData.length} laporan · {labelPeriodFilter(filterMode, selectedDate, fmtTglShared)}
+        </p>
+      </div>
+
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Khusus status &ldquo;Perbaikan Berkelanjutan&rdquo;, keputusan baru bisa diambil setelah Kepala Unit mengisi hasil tindak lanjut.
+          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Staf P4M hanya bisa memantau, semua keputusan ada di tangan Ka P4M.
         </p>
         {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
         {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
@@ -237,13 +305,13 @@ export default function KaP4MHasilTable() {
           <div className="w-[16%] p-3">Keputusan Ka P4M</div>
         </div>
 
-        {data.length === 0 ? (
+        {filteredData.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-gray-400 italic text-sm">Belum ada laporan yang perlu diputuskan.</p>
-            <p className="text-gray-300 text-xs mt-1">(Semua laporan aktif sudah tampil di sini, apa pun tahapnya)</p>
+            <p className="text-gray-400 italic text-sm">Tidak ada laporan pada periode ini.</p>
+            <p className="text-gray-300 text-xs mt-1">(Semua laporan, apa pun tahap dan statusnya, tampil di sini — coba ganti filter periode)</p>
           </div>
         ) : (
-          data.map((item) => (
+          filteredData.map((item) => (
             <div key={item.id_boxing} className="flex border-t-2 border-black">
               <div className="flex-1 border-r-2 border-black p-3">
                 <p className="text-[9px] text-gray-400 mb-1 leading-tight">
@@ -299,31 +367,23 @@ export default function KaP4MHasilTable() {
                           : "text-red-700 bg-red-50 border-red-300"
                       }`}
                     >
-                      {item.approval_staf === "diterima" ? "✓ Disetujui — Selesai" : "🔄 Perbaikan Berkelanjutan"}
+                      {item.approval_staf === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
                     </span>
                     {/* ✅ Bukti tanggal keputusan Ka P4M (dari boxing.updated_at) */}
                     <p className="text-[9px] text-gray-400 text-center leading-tight">
                       🕒 {formatTanggal(item.tanggal_keputusan_ka)}
                     </p>
-                    {/* ✅ FIX: catatan/alasan yang diisi Ka P4M pas klik ✓/✗
-                        sebelumnya cuma disimpan ke backend tapi gak pernah
-                        ditampilkan lagi di sini — sekarang ikut kelihatan. */}
-                    {item.catatan_approval && (
-                      <p className="text-[9px] text-gray-500 italic text-center leading-tight max-w-32 mt-0.5">
-                        &ldquo;{item.catatan_approval}&rdquo;
-                      </p>
-                    )}
                   </div>
                 ) : item.status_boxing !== "di_staff" ? (
-                  // ✅ FIX: row yang belum di_staff (mis. nyangkut di
-                  // 'menunggu_pelaksanaan' dari alur lama) ditampilkan
-                  // sebagai "menunggu", bukan tombol aktif yang ujung-
-                  // ujungnya gagal pas disubmit ke backend.
+                  // ✅ Row yang belum sampai 'di_staff' ditampilkan dengan
+                  // label sesuai tahap sebenarnya (lihat getStageInfo) —
+                  // bukan lagi generic "Menunggu tahap Staf P4M" yang salah,
+                  // karena Staf P4M sama sekali tidak punya wewenang di sini.
                   <span
-                    className="text-[9px] text-gray-400 italic text-center"
+                    className={`text-[9px] font-bold px-2 py-1 rounded border text-center leading-relaxed ${getStageInfo(item).cls}`}
                     title={`Status saat ini: ${item.status_boxing || "-"}`}
                   >
-                    Menunggu tahap Staf P4M
+                    {getStageInfo(item).label}
                   </span>
                 ) : (
                   <div className="flex gap-3">

@@ -9,13 +9,14 @@ export default function HeroSection({ onBuatLaporan, onCekStatus }: HeroSectionP
   return (
     <div>
       {/* Hero Banner */}
-      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white">
+      <div className="bg-linear-to-br from-blue-600 via-blue-700 to-blue-800 text-white">
         <div className="max-w-6xl mx-auto px-4 py-12 md:py-20">
           <div className="flex flex-col md:flex-row items-center gap-8">
             <div className="flex-1 text-center md:text-left">
               <h1 className="text-2xl md:text-4xl font-bold leading-tight mb-4">
-                Sampaikan Laporan<br />
-                Ketidaksesuaian dengan Mudah
+                Sampaikan Masukan Kritik<br />
+                dan Pengaduan dengan Mudah
+                
               </h1>
               <p className="text-blue-100 text-sm md:text-base mb-8">
                 Bantu kami meningkatkan kualitas layanan<br className="hidden md:block" />
@@ -43,7 +44,7 @@ export default function HeroSection({ onBuatLaporan, onCekStatus }: HeroSectionP
               </div>
             </div>
             {/* Ilustrasi */}
-            <div className="flex-shrink-0 hidden md:block">
+            <div className="shrink-0 hidden md:block">
               <div className="w-52 h-52 bg-blue-500 bg-opacity-40 rounded-3xl flex items-center justify-center">
                 <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
                   <rect x="20" y="15" width="65" height="85" rx="6" fill="white" opacity="0.9"/>
@@ -109,7 +110,7 @@ export default function HeroSection({ onBuatLaporan, onCekStatus }: HeroSectionP
               </ul>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-2xl p-6 flex items-center gap-4 max-w-xs">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">🔒</div>
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl shrink-0">🔒</div>
               <div>
                 <p className="font-bold text-gray-800 text-sm">Data Anda Aman</p>
                 <p className="text-xs text-gray-500 mt-1">Laporan bersifat anonim. Kami tidak meminta data pribadi Anda.</p>
