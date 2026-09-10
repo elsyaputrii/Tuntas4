@@ -110,15 +110,16 @@ export default function DiscrepancyTable() {
     }
   };
 
-  // ✅ FIX: Kolom bisa diisi kalau (a) belum pernah dikirim sama sekali
-  // (status_review masih null), ATAU (b) baru saja ditolak Staf P4M
-  // (approval_staf === "ditolak") — sesuai reset di setApprovalStaf
-  // (stafController.js) yang mengembalikan status_review ke
-  // "menunggu_keputusan_ka" supaya laporan bisa direvisi ulang.
-  // Selama menunggu keputusan Ka P4M (status_review sudah terisi TAPI
-  // belum ditolak Staf), kolom sengaja dikunci.
-  const isEditable = (item: LaporanItem) =>
-    !item.status_review || item.approval_staf === "ditolak";
+  // ✅ FIX (permintaan user): Penyebab & Rencana Tindak Lanjut yang sudah
+  // diisi Kepala Unit TETAP bisa diedit — termasuk saat masih menunggu
+  // keputusan Ka P4M (status_review = "menunggu_keputusan_ka"). Kalau
+  // datanya sudah sesuai, Kepala Unit tidak wajib mengubahnya; kalau mau
+  // direvisi, tinggal edit & kirim ulang (backend submitRancangan
+  // mengizinkan update selama masih "menunggu_keputusan_ka"). Kolom
+  // hanya benar-benar terkunci setelah Ka P4M mengambil keputusan — tapi
+  // saat itu laporan sudah tidak lagi tampil di tab ini (lihat query
+  // getLaporanMasuk), jadi textarea & tombol Kirim di bawah sengaja
+  // tidak lagi punya kondisi "disabled"/"non-editable" apa pun.
 
   if (loading) return (
     <div className="w-full border-2 border-black bg-white p-12 text-center">
@@ -149,7 +150,7 @@ export default function DiscrepancyTable() {
       <ConfirmDialog
         open={confirmId !== null}
         title="Konfirmasi Kirim"
-        message="Yakin ingin mengirim ini? Setelah dikirim, Penyebab dan Rencana Tindak Lanjut akan diteruskan ke Ka P4M dan tidak bisa diubah lagi sampai ada keputusan."
+        message="Yakin ingin mengirim ini? Penyebab dan Rencana Tindak Lanjut akan diteruskan ke Ka P4M. Anda tetap bisa mengedit & mengirim ulang selama Ka P4M belum mengambil keputusan."
         confirmLabel="Kirim"
         cancelLabel="Batal"
         loading={confirmId !== null && !!sending[confirmId]}
@@ -169,7 +170,6 @@ export default function DiscrepancyTable() {
         </div>
 
         {laporanList.map((item, idx) => {
-          const editable = isEditable(item);
           const ditolakStaf = item.approval_staf === "ditolak";
           // ✅ FIX: badge cuma dicari untuk status yang benar-benar masih
           // relevan di tab ini (lihat comment statusBadge di atas).
@@ -223,10 +223,9 @@ export default function DiscrepancyTable() {
                   <AutoResizeTextarea
                     minHeight={80}
                     className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
-                    placeholder={editable ? "Ketik penyebab di sini..." : "—"}
+                    placeholder="Ketik penyebab di sini..."
                     value={penyebab[item.id_boxing] || ""}
                     onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                    disabled={!editable}
                   />
                 </div>
                 <div>
@@ -234,28 +233,24 @@ export default function DiscrepancyTable() {
                   <AutoResizeTextarea
                     minHeight={80}
                     className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
-                    placeholder={editable ? "Ketik rencana di sini..." : "—"}
+                    placeholder="Ketik rencana di sini..."
                     value={rencana[item.id_boxing] || ""}
                     onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                    disabled={!editable}
                   />
                 </div>
                 <div className="flex justify-end">
-                  {/* ✅ FIX: dulu cek "disetujui"/"menunggu_review" yang sudah
-                      tidak pernah muncul lagi → tombol Kirim selalu aktif
-                      keliru walau sedang menunggu Ka P4M. Sekarang pakai
-                      `editable` yang sama dengan status textarea. */}
-                  {editable ? (
-                    <button
-                      onClick={() => handleSend(item.id_boxing)}
-                      disabled={sending[item.id_boxing]}
-                      className="w-full bg-blue-polibatam text-white py-2.5 rounded font-bold uppercase text-[11px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
-                    >
-                      {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
-                    </button>
-                  ) : (
-                    <span className="text-blue-500 text-[10px]">⏳ Menunggu Keputusan Ka P4M</span>
-                  )}
+                  {/* ✅ FIX: kolom Penyebab & Rencana Tindak Lanjut sekarang
+                      selalu bisa diedit, jadi tombol Kirim juga selalu
+                      aktif — termasuk saat masih menunggu keputusan Ka
+                      P4M, supaya Kepala Unit bisa kirim ulang revisi
+                      tanpa harus menunggu ditolak dulu. */}
+                  <button
+                    onClick={() => handleSend(item.id_boxing)}
+                    disabled={sending[item.id_boxing]}
+                    className="w-full bg-blue-polibatam text-white py-2.5 rounded font-bold uppercase text-[11px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
+                  >
+                    {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
+                  </button>
                 </div>
               </div>
 
@@ -319,10 +314,9 @@ export default function DiscrepancyTable() {
                   <AutoResizeTextarea
                     minHeight={112}
                     className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    placeholder={editable ? "Ketik penyebab di sini..." : "—"}
+                    placeholder="Ketik penyebab di sini..."
                     value={penyebab[item.id_boxing] || ""}
                     onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                    disabled={!editable}
                     spellCheck={false}
                   />
                 </div>
@@ -332,27 +326,22 @@ export default function DiscrepancyTable() {
                   <AutoResizeTextarea
                     minHeight={112}
                     className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    placeholder={editable ? "Ketik rencana di sini..." : "—"}
+                    placeholder="Ketik rencana di sini..."
                     value={rencana[item.id_boxing] || ""}
                     onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                    disabled={!editable}
                     spellCheck={false}
                   />
                 </div>
 
                 {/* Kolom 6: Aksi */}
                 <div className="flex-1 p-5 flex items-center justify-center">
-                  {editable ? (
-                    <button
-                      onClick={() => handleSend(item.id_boxing)}
-                      disabled={sending[item.id_boxing]}
-                      className="bg-blue-polibatam text-white px-8 py-2 rounded font-bold uppercase text-[10px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
-                    >
-                      {sending[item.id_boxing] ? "Mengirim..." : "Kirim"}
-                    </button>
-                  ) : (
-                    <span className="text-blue-500 text-[10px] text-center">Menunggu<br />Keputusan Ka P4M</span>
-                  )}
+                  <button
+                    onClick={() => handleSend(item.id_boxing)}
+                    disabled={sending[item.id_boxing]}
+                    className="bg-blue-polibatam text-white px-8 py-2 rounded font-bold uppercase text-[10px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
+                  >
+                    {sending[item.id_boxing] ? "Mengirim..." : "Kirim"}
+                  </button>
                 </div>
               </div>
             </div>

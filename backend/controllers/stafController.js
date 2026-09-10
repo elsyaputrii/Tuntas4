@@ -10,13 +10,13 @@
 //   5. setKeputusanBoxing   → Staf P4M "Buka ke Unit" (reopen) saja
 //   6. inputHasilPemantauan → Staf P4M input hasil pemantauan lapangan
 //   7. getRekapitulasi      → ringkasan semua laporan dari awal sampai selesai
-//   8. setApprovalStaf      → setujui/tolak hasil tindak lanjut unit.
-//                              ✅ Sekarang di-mount di /api/ka-p4m/approval-hasil
-//                              (kaP4MRoutes.js), BUKAN lagi di route staf.
-//                              Nama fungsi dibiarkan "setApprovalStaf" supaya
-//                              histori/diff minimal, tapi pemilik keputusannya
-//                              sekarang Ka P4M. Staf P4M hanya read-only lewat
-//                              getProsesMonitor.
+//   8. setApprovalStaf      → keputusan "Siap" (✅) / "Belum Siap" (❌) atas
+//                              hasil tindak lanjut unit. Sempat dipindah ke
+//                              /api/ka-p4m/approval-hasil, tapi sekarang
+//                              DIKEMBALIKAN lagi ke /api/staf/approval-hasil
+//                              (stafRoutes.js) — Staf P4M kembali menjadi
+//                              satu-satunya pemegang keputusan ini. Ka P4M
+//                              sekarang hanya read-only lewat GET /ka-p4m/proses.
 //
 // ════════════════════════════════════════════════════════════════════════
 // CATATAN PERBAIKAN (sesi ini) — alur "approve → selesai" & "reopen penuh"
@@ -862,8 +862,9 @@ async function deleteArsipRekap(req, res) {
 }
 
 // ============================================================
-// 8. APPROVAL STAF — PATCH /api/staf/approval-boxing
-//    Staf P4M menentukan: diterima atau ditolak setelah lihat hasil unit
+// 8. APPROVAL STAF — PATCH /api/staf/approval-hasil
+//    Staf P4M menentukan: Siap (diterima) atau Belum Siap (ditolak)
+//    setelah lihat hasil unit
 //    Body: { id_boxing, approval }  → approval: "diterima" | "ditolak"
 //
 //    ✅ FIX BUG #1: "diterima" SEKARANG otomatis menyelesaikan laporan

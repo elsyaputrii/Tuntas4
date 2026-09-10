@@ -7,7 +7,7 @@ import { exportExcel } from "@/lib/exportExcel";
 import { exportPDFRekap, type PdfKategori } from "@/lib/exportPdf";
 import {
   fmtTgl, toLocalDate, sameDay, sameWeekOfMonth, getWeekOfMonth,
-  getMonthWeeks, getReopenAction, labelStatusLengkap,
+  getMonthWeeks, labelStatusLengkap,
 } from "@/lib/exportHelpers";
 import type { RekapItem, ProsesItem, ArsipItem } from "@/lib/exportTypes";
 
@@ -556,13 +556,11 @@ export default function RecapitulationTable() {
   const [prosesData, setProsesData] = useState<ProsesItem[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState("");
-  const [msg,        setMsg]        = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarResetKey, setCalendarResetKey] = useState(0);
   const [filterMode,   setFilterMode]   = useState<FilterMode>("semua");
   const [exportingExcelLoading, setExportingExcelLoading] = useState(false);
   const [exportingPDF, setExportingPDF] = useState<PdfKategori|null>(null);
-  const [pendingReopen, setPendingReopen] = useState<Set<number>>(new Set());
   const [showPicker, setShowPicker] = useState(false);
   const [kaP4M, setKaP4M] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
 
@@ -592,7 +590,6 @@ export default function RecapitulationTable() {
       ]);
       setRekapData(rekapRes.data ?? []);
       setProsesData(prosesRes.data ?? []);
-      setPendingReopen(new Set());
     } catch { setError("Gagal memuat data rekapitulasi."); }
     finally  { setLoading(false); }
   }, []);
@@ -715,42 +712,24 @@ export default function RecapitulationTable() {
     tahunan:`Tahun ${selectedDate.getFullYear()}`,
   };
 
-  async function bukaLagi(id_boxing:number, aksi: "ditindak_lanjut" | "lanjut"){
-    const ok=confirm("Laporan akan dibuka kembali dari awal ke Kepala Unit. Lanjutkan?");
-    if(!ok) return;
-    setPendingReopen(prev => new Set(prev).add(id_boxing));
-    try{
-      const res=await stafApi.setKeputusanBoxing(id_boxing, aksi);
-      setMsg(res.message); setTimeout(()=>setMsg(""),5000);
-      fetchData();
-    }catch(err:unknown){
-      setPendingReopen(prev => { const n = new Set(prev); n.delete(id_boxing); return n; });
-      setError(err instanceof Error?err.message:"Gagal."); setTimeout(()=>setError(""),4000);
-    }
-  }
-
   // ✅ Warna & label status di tabel disamakan dengan kategori "Rekap
   // Status Tindak Lanjut" (statistik atas) dan Excel: Hijau = Ditindak-
   // lanjuti (laporan yang boxing-nya sudah "selesai" — sama seperti sheet
   // "Laporan Selesai"), Kuning = Menunggu / Proses (sisanya — sama
   // seperti sheet "Laporan Masih Dipantau"). `butuhAksiStaf` tetap
-  // diambil dari labelStatusLengkap supaya tombol aksi di kolom
-  // "Tindakan" tidak berubah perilakunya.
+  // diambil dari labelStatusLengkap untuk info status di kolom
+  // "Status Proses".
   function statusFor(item: DisplayItem) {
-    const isReopenPending = pendingReopen.has(item.id_boxing);
-    const reopenAction = getReopenAction(item.statusBoxing, item.statusReview);
     const { butuhAksiStaf } = labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
 
     let label: string, cls: string;
-    if (isReopenPending) {
-      label = "⏳ Dipantau";               cls = "bg-yellow-100 text-yellow-700";
-    } else if (item.isSelesai) {
+    if (item.isSelesai) {
       label = "✅ Ditindaklanjuti";         cls = "bg-green-100 text-green-700";
     } else {
       label = "⏳ Menunggu / Proses";       cls = "bg-yellow-100 text-yellow-700";
     }
     const statusInfo = { label, cls, butuhAksiStaf };
-    return { isReopenPending, reopenAction, statusInfo };
+    return { statusInfo };
   }
 
   if(loading) return(
@@ -761,7 +740,6 @@ export default function RecapitulationTable() {
 
   return(
     <div className="w-full space-y-4">
-      {msg   &&<p className="text-green-700 text-xs font-bold px-3 py-2 bg-green-50 border border-green-200 rounded">{msg}</p>}
       {error &&<p className="text-red-500 text-xs font-bold px-3 py-2 bg-red-50 border border-red-200 rounded">❌ {error}</p>}
 
       {/* Filter pill — scroll horizontal di HP */}
@@ -909,11 +887,11 @@ export default function RecapitulationTable() {
         <div className="flex min-w-175 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
           <div className="w-10 border-r-2 border-black p-2">No</div>
           <div className="flex-1 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
-          <div className="w-36 border-r-2 border-black p-2">Penyebab</div>
-          <div className="w-36 border-r-2 border-black p-2">Rencana</div>
+          <div className="w-40 border-r-2 border-black p-2">Penyebab</div>
+          <div className="w-40 border-r-2 border-black p-2">Rencana</div>
           <div className="w-28 border-r-2 border-black p-2">Status</div>
           <div className="flex-1 border-r-2 border-black p-2">Hasil Tindak Lanjut</div>
-          <div className="w-32 p-2">Tindakan</div>
+          <div className="w-24 p-2">Status Proses</div>
         </div>
         {filteredItems.length===0?(
           <div className="flex p-8 justify-center border-t-2 border-black">
@@ -921,7 +899,7 @@ export default function RecapitulationTable() {
           </div>
         ):(
           filteredItems.map((item,index)=>{
-            const { isReopenPending, reopenAction, statusInfo } = statusFor(item);
+            const { statusInfo } = statusFor(item);
             return (
               <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-175 border-t-2 border-black text-[11px]">
                 <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
@@ -931,10 +909,10 @@ export default function RecapitulationTable() {
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
                   <div className="border border-gray-400 p-2 h-20 font-bold text-[10px] overflow-auto uppercase">{item.uraian}</div>
                 </div>
-                <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
+                <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
                   <span className="italic text-gray-500 text-center text-[10px]">{item.penyebab}</span>
                 </div>
-                <div className="w-36 border-r-2 border-black p-3 flex items-center justify-center">
+                <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
                   <span className="italic text-gray-500 text-center text-[10px]">{item.rencana}</span>
                 </div>
                 <div className="w-28 border-r-2 border-black p-3 flex items-center justify-center">
@@ -946,16 +924,9 @@ export default function RecapitulationTable() {
                     {item.hasil}
                   </div>
                 </div>
-                <div className="w-32 p-3 flex flex-col justify-center gap-1.5">
-                  {isReopenPending ? (
-                    <span className="text-[9px] text-orange-600 font-bold text-center italic">⏳ Sedang ditindak ulang</span>
-                  ) : statusInfo.butuhAksiStaf ? (
-                    <span className="text-[9px] text-blue-600 italic text-center font-semibold">⏳ Menunggu keputusan Ka P4M</span>
-                  ) : reopenAction ? (
-                    <button onClick={()=>bukaLagi(item.id_boxing,reopenAction)}
-                      className={`w-full border-2 text-[9px] font-bold py-1.5 leading-tight transition-all ${reopenAction==="ditindak_lanjut"?"border-orange-500 bg-orange-50 text-orange-800 hover:bg-orange-100":"border-gray-400 text-gray-600 hover:bg-gray-50"}`}>
-                      {reopenAction==="ditindak_lanjut"?"↻ Tindak ulang":"↻ Buka ke Unit"}
-                    </button>
+                <div className="w-24 p-3 flex flex-col justify-center gap-1.5">
+                  {statusInfo.butuhAksiStaf ? (
+                    <span className="text-[9px] text-blue-600 italic text-center font-semibold">⏳ Menunggu Keputusan Staff</span>
                   ) : (
                     <span className="text-[9px] text-gray-400 italic text-center">Menunggu proses</span>
                   )}
@@ -975,7 +946,7 @@ export default function RecapitulationTable() {
           <div className="p-8 text-center text-gray-400 italic">Tidak ada data untuk periode ini.</div>
         ) : (
           filteredItems.map((item,index)=>{
-            const { isReopenPending, reopenAction, statusInfo } = statusFor(item);
+            const { statusInfo } = statusFor(item);
             return (
               <div key={`m-${item.id_boxing}-${index}`} className="border-t-2 border-black p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1006,15 +977,8 @@ export default function RecapitulationTable() {
                   </div>
                 </div>
                 <div>
-                  {isReopenPending ? (
-                    <span className="text-[10px] text-orange-600 font-bold italic">⏳ Sedang ditindak ulang</span>
-                  ) : statusInfo.butuhAksiStaf ? (
-                    <span className="text-[10px] text-blue-600 italic font-semibold">⏳ Menunggu keputusan Ka P4M</span>
-                  ) : reopenAction ? (
-                    <button onClick={()=>bukaLagi(item.id_boxing,reopenAction)}
-                      className={`w-full border-2 text-xs font-bold py-2 rounded transition-all ${reopenAction==="ditindak_lanjut"?"border-orange-500 bg-orange-50 text-orange-800":"border-gray-400 text-gray-600"}`}>
-                      {reopenAction==="ditindak_lanjut"?"↻ Tindak ulang":"↻ Buka ke Unit"}
-                    </button>
+                  {statusInfo.butuhAksiStaf ? (
+                    <span className="text-[10px] text-blue-600 italic font-semibold">⏳ Menunggu Keputusan Staff</span>
                   ) : (
                     <span className="text-[10px] text-gray-400 italic">Menunggu proses</span>
                   )}

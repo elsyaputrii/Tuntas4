@@ -160,43 +160,13 @@ export function labelStatusBoxing(sb: string | null | undefined): string {
 }
 
 /**
- * ✅ getReopenAction — cek apakah boxing ini boleh "dibuka kembali" (reopen)
- * ke unit. Disinkronkan 1:1 dengan validasi backend di stafController.js
- * (fungsi setKeputusanBoxing, opsi "lanjut" / "ditindak_lanjut").
- *
- *   - "ditindak_lanjut" → hanya valid jika boxing SELESAI dan
- *     review-nya "ditindaklanjuti" (kasus: mau tindak lanjut ulang).
- *   - "lanjut" → hanya valid jika:
- *       a) boxing sudah SELESAI (mau dibuka lagi apa pun alasannya), ATAU
- *       b) boxing ada di STAF (di_staff) dan ditolak Ka P4M
- *          (tidak_ditindaklanjuti).
- *
- * Backend pesan errornya: "Opsi 'lanjut' hanya untuk laporan selesai
- * atau yang ditolak Ka P4M."
- *
- * Catatan: sekarang KEDUA aksi ini ("lanjut" dan "ditindak_lanjut") di
- * backend melakukan hal yang SAMA — reset penuh ke 'terdistribusi' +
- * reset rancangan_tindakan + hapus pelaksanaan_tindakan lama — supaya
- * laporan benar-benar mulai dari awal lagi di tab "Ketidaksesuaian
- * Masuk" Kepala Unit. Label tombolnya tetap dibedakan di UI agar jelas
- * konteksnya bagi Staf P4M, tapi efeknya di backend identik.
+ * ✅ FITUR "Buka lagi ke unit" DIHAPUS (2026): fungsi getReopenAction
+ * dulunya dipakai RecapitulationTable.tsx untuk tombol "↻ Buka ke
+ * Unit" / "↻ Tindak ulang". Fitur ini sudah tidak diperlukan lagi dan
+ * sudah dicabut dari UI — fungsinya dihapus di sini juga. Endpoint
+ * backend PATCH /staf/keputusan-boxing (setKeputusanBoxing) masih ada
+ * tapi sudah tidak dipanggil dari frontend.
  */
-export function getReopenAction(
-  statusBoxing: string | null | undefined,
-  statusReview: string | null | undefined
-): "ditindak_lanjut" | "lanjut" | null {
-  const isSelesai = statusBoxing === "selesai";
-  const isDiStaffDitolak =
-    statusBoxing === "di_staff" && statusReview === "tidak_ditindaklanjuti";
-
-  if (isSelesai && statusReview === "ditindaklanjuti") {
-    return "ditindak_lanjut";
-  }
-  if (isSelesai || isDiStaffDitolak) {
-    return "lanjut";
-  }
-  return null; // tidak boleh dibuka kembali — backend akan menolak
-}
 
 /**
  * ✅ label status yang LEBIH AKURAT daripada cuma "Dipantau" generik.
@@ -204,25 +174,26 @@ export function getReopenAction(
  * Sebelumnya RecapitulationTable.tsx menandai SEMUA laporan yang belum
  * status_boxing='selesai' dengan label "⏳ Dipantau" yang sama, tanpa
  * membedakan kondisi sebenarnya. Akibatnya laporan yang SEBENARNYA sudah
- * berada di tahap "menunggu keputusan Ka P4M" (sudah dikerjakan Kepala
- * Unit, tinggal diputuskan Ka P4M — Staf P4M cuma memantau, TIDAK ikut
- * memutuskan) terlihat sama persis dengan laporan yang masih di tahap
- * awal/macet — sehingga membingungkan.
+ * berada di tahap "menunggu Keputusan Staff" (sudah dikerjakan Kepala
+ * Unit, tinggal diputuskan Staf P4M sendiri lewat tab "Proses & Pantau")
+ * terlihat sama persis dengan laporan yang masih di tahap awal/macet —
+ * sehingga membingungkan.
  *
  * Fungsi ini memetakan kombinasi (status_boxing, status_review,
  * approval_staf) ke label + warna yang mencerminkan tahap SEBENARNYA:
  *
- *   di_staff + approval='menunggu'   → "Menunggu Keputusan Ka P4M" (kuning, info saja — bukan aksi Staf)
- *   di_staff + approval='ditolak'    → "Ditolak — Revisi Unit"     (merah)
- *   menunggu_pelaksanaan             → "Diproses Kepala Unit"      (biru, masih di unit)
- *   diproses/terdistribusi           → "Diproses Kepala Unit"      (biru)
- *   review='menunggu_keputusan_ka'   → "Menunggu Ka P4M"           (kuning)
- *   default (fallback)               → "Dipantau"                  (kuning)
+ *   di_staff + approval='menunggu'   → "Menunggu Keputusan Staf P4M" (kuning, info saja — aksinya ada di tab Proses & Pantau)
+ *   di_staff + approval='ditolak'    → "Belum Siap — Revisi Unit"    (merah)
+ *   menunggu_pelaksanaan             → "Diproses Kepala Unit"        (biru, masih di unit)
+ *   diproses/terdistribusi           → "Diproses Kepala Unit"        (biru)
+ *   review='menunggu_keputusan_ka'   → "Menunggu Ka P4M"             (kuning)
+ *   default (fallback)               → "Dipantau"                    (kuning)
  *
  * ✅ Ditegaskan: fungsi ini TIDAK PERNAH menghasilkan status yang berarti
- * "Staf P4M harus klik approve/tolak" — sesuai aturan bahwa keputusan
- * (terima/tolak hasil tindak lanjut, ditindaklanjuti/tidak) 100% wewenang
- * Ka P4M. approval_staf='diterima' juga TIDAK akan pernah sampai ke
+ * "Staf P4M harus klik approve/tolak" DI SINI (Rekapitulasi) — keputusan
+ * ✅ Siap / ❌ Belum Siap tetap harus lewat tab "Proses & Pantau"
+ * (ProcessMonitorTable.tsx), Rekapitulasi murni menampilkan status apa
+ * adanya. approval_staf='diterima' juga TIDAK akan pernah sampai ke
  * fungsi ini lagi — 'diterima' langsung membuat status_boxing='selesai',
  * yang ditangani terpisah sebagai "✓ Selesai" oleh pemanggil (lihat
  * RecapitulationTable.tsx).
@@ -230,9 +201,11 @@ export function getReopenAction(
 export interface StatusLengkap {
   label: string;
   cls: string; // className tailwind untuk badge
-  // Catatan penamaan: TIDAK berarti staf boleh/harus approve-tolak (itu
-  // wewenang Ka P4M). Field ini cuma dipakai pemanggil untuk menampilkan
-  // teks info "menunggu keputusan Ka P4M" alih-alih tombol aksi apa pun.
+  // ✅ FITUR DIKEMBALIKAN: field ini menandakan laporan sedang menunggu
+  // Keputusan Staff (✅ Siap / ❌ Belum Siap) di tab "Proses & Pantau"
+  // milik Staf P4M sendiri (bukan lagi wewenang Ka P4M). Dipakai
+  // pemanggil (mis. RecapitulationTable.tsx) untuk menampilkan teks
+  // info "menunggu Keputusan Staff" alih-alih tombol aksi apa pun.
   butuhAksiStaf: boolean;
 }
 
@@ -243,13 +216,12 @@ export function labelStatusLengkap(
 ): StatusLengkap {
   if (statusBoxing === "di_staff") {
     if (approvalStaf === "ditolak") {
-      return { label: "✗ Ditolak — Revisi Unit", cls: "bg-red-100 text-red-700", butuhAksiStaf: false };
+      return { label: "❌ Belum Siap — Revisi Unit", cls: "bg-red-100 text-red-700", butuhAksiStaf: false };
     }
     // ✅ FIX LABEL: approvalStaf null/"menunggu"/undefined → laporan
-    // sudah dikerjakan unit, sedang menunggu KEPUTUSAN Ka P4M (BUKAN
-    // "approval Staf" — Staf P4M tidak lagi punya wewenang menyetujui/
-    // menolak, itu murni wewenang Ka P4M lewat /ka-p4m/approval-hasil).
-    return { label: "⏳ Menunggu Keputusan Ka P4M", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: true };
+    // sudah dikerjakan unit, sedang menunggu Keputusan Staff (✅ Siap /
+    // ❌ Belum Siap) dari Staf P4M sendiri lewat tab "Proses & Pantau".
+    return { label: "⏳ Menunggu Keputusan Staf P4M", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: true };
   }
 
   if (statusBoxing === "menunggu_pelaksanaan" || statusBoxing === "diproses" || statusBoxing === "terdistribusi") {

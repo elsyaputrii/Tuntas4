@@ -1,13 +1,13 @@
 "use client";
 // FILE: frontend/components/ka-p4m/KaP4MHasilTable.tsx
 // ============================================================
-// ✅ FITUR PINDAH KEWENANGAN: keputusan "diterima" (→ laporan otomatis
-// Selesai) atau "ditolak" (→ balik ke Kepala Unit untuk revisi hasil)
-// atas hasil tindak lanjut unit dulunya milik Staf P4M
-// (ProcessMonitorTable.tsx / RecapitulationTable.tsx, endpoint
-// PATCH /staf/approval-boxing). Sekarang wewenang itu HANYA ada di sini,
-// di sisi Ka P4M, lewat PATCH /ka-p4m/approval-hasil. Staf P4M cuma bisa
-// lihat & pantau prosesnya (read-only) di tab "Proses & Pantau" miliknya.
+// ✅ FITUR DIKEMBALIKAN KE STAF P4M: keputusan "✅ Siap" (→ laporan
+// otomatis Selesai) atau "❌ Belum Siap" (→ balik ke Kepala Unit untuk
+// revisi hasil) atas hasil tindak lanjut unit sempat dipindah ke sini
+// (Ka P4M), tapi sekarang dikembalikan lagi jadi wewenang Staf P4M
+// sepenuhnya (lihat ProcessMonitorTable.tsx, bagian "KEPUTUSAN STAFF" —
+// endpoint PATCH /staf/approval-hasil). Ka P4M sekarang HANYA memantau
+// (read-only) di sini — tidak ada lagi tombol centang/silang.
 // ============================================================
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { kaP4MApi } from "@/lib/api";
@@ -43,18 +43,9 @@ export default function KaP4MHasilTable() {
   const [data, setData] = useState<HasilItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [msgOk, setMsgOk] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-
-  const [modal, setModal] = useState<{
-    open: boolean;
-    id_boxing: number | null;
-    keputusan: "diterima" | "ditolak" | null;
-    catatan: string;
-  }>({ open: false, id_boxing: null, keputusan: null, catatan: "" });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -62,12 +53,11 @@ export default function KaP4MHasilTable() {
     try {
       const res = await kaP4MApi.getProsesMonitor();
       // ✅ SEMUA laporan ditampilkan di tabel ini, apa pun tahapnya — termasuk
-      // yang sudah 'selesai' — supaya Ka P4M bisa memantau riwayat lengkapnya
-      // dan Staf P4M (yang cuma bisa pantau, gak bisa memutuskan) juga punya
-      // gambaran utuh. Difilter berdasarkan periode tanggal lewat
-      // PeriodFilterBar, bukan lagi dibuang berdasarkan status. Tombol
-      // keputusan (✓/✗) tetap cuma muncul kalau tahapnya sudah sampai
-      // 'di_staff' (lihat render kolom "Keputusan Ka P4M" di bawah).
+      // yang sudah 'selesai' — supaya Ka P4M bisa memantau riwayat lengkapnya.
+      // Difilter berdasarkan periode tanggal lewat PeriodFilterBar, bukan
+      // lagi dibuang berdasarkan status. Keputusan ✅ Siap / ❌ Belum Siap
+      // sekarang murni informatif di sini — wewenangnya ada di Staf P4M
+      // (lihat kolom "Status Keputusan Staff" di bawah).
       setData(res.data as HasilItem[]);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Gagal memuat data.");
@@ -120,6 +110,14 @@ export default function KaP4MHasilTable() {
           label: "🕓 Menunggu Kepala Unit isi Hasil Tindak Lanjut",
           cls: "text-amber-600 bg-amber-50 border-amber-300",
         };
+      case "di_staff":
+        // ✅ Hasil sudah diisi Kepala Unit, tinggal menunggu Keputusan
+        // Staff (✅ Siap / ❌ Belum Siap) dari Staf P4M sendiri — bukan
+        // lagi wewenang Ka P4M.
+        return {
+          label: "⏳ Menunggu Keputusan Staf P4M",
+          cls: "text-blue-600 bg-blue-50 border-blue-300",
+        };
       default:
         return {
           label: "🕓 Menunggu diproses",
@@ -133,54 +131,6 @@ export default function KaP4MHasilTable() {
     if (lampiran.startsWith("http")) return lampiran;
     if (lampiran.startsWith("uploads/")) return `${BASE_URL}/${lampiran}`;
     return `${BASE_URL}/uploads/${lampiran}`;
-  }
-
-  function openModal(item: HasilItem, keputusan: "diterima" | "ditolak") {
-    // 🚫 Kalau status_review dari Proses Pengaduan masih "Perbaikan
-    // Berkelanjutan" (ditindaklanjuti), Ka P4M belum boleh memutuskan
-    // apa pun sebelum Kepala Unit mengisi hasil tindak lanjutnya.
-    // Kalau statusnya "Sesuai"/selesai (tidak_ditindaklanjuti) atau field
-    // lainnya, gak ada yang perlu ditunggu dari Kepala Unit → langsung bisa.
-    if (item.status_review === "ditindaklanjuti" && !item.hasil_tindakan) {
-      setError("Hasil tindak lanjut belum diisi Kepala Unit");
-      return;
-    }
-    // 🚫 FIX: backend (PATCH /ka-p4m/approval-hasil) cuma nerima approval
-    // kalau status_boxing sudah 'di_staff'. Sebelum fix ini, tombol ✓/✗
-    // selalu muncul asal hasil_tindakan sudah keisi — padahal row bisa aja
-    // "nyangkut" di status lain (mis. 'menunggu_pelaksanaan') karena alur
-    // lama, jadi baru ketauan gagalnya pas submit dengan pesan error yang
-    // membingungkan. Sekarang dicegah dari sini duluan.
-    if (item.status_boxing !== "di_staff") {
-      setError(
-        `Laporan ini belum bisa diputuskan — status saat ini masih "${item.status_boxing || "tidak diketahui"}", belum sampai tahap Staf P4M (di_staff). Kemungkinan data ini nyangkut dari alur lama; cek/​perbaiki status_boxing di database untuk id_boxing ${item.id_boxing}.`
-      );
-      return;
-    }
-    setModal({ open: true, id_boxing: item.id_boxing, keputusan, catatan: "" });
-    setError("");
-  }
-
-  async function handleSubmit() {
-    const { id_boxing, keputusan, catatan } = modal;
-    if (!id_boxing || !keputusan) return;
-    if (!catatan.trim()) {
-      setError("Catatan / alasan wajib diisi!");
-      return;
-    }
-    setSubmittingId(id_boxing);
-    setError("");
-    try {
-      const res = await kaP4MApi.setApprovalHasil(id_boxing, keputusan, catatan.trim());
-      setMsgOk(res.message);
-      setTimeout(() => setMsgOk(""), 4000);
-      setModal({ open: false, id_boxing: null, keputusan: null, catatan: "" });
-      fetchData();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Gagal menyimpan keputusan.");
-    } finally {
-      setSubmittingId(null);
-    }
   }
 
   function formatTanggal(dateStr: string | null | undefined) {
@@ -205,76 +155,9 @@ export default function KaP4MHasilTable() {
     <>
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
 
-      {/* ── MODAL KEPUTUSAN ── */}
-      {modal.open && modal.id_boxing && modal.keputusan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white border-2 border-black w-full max-w-md p-6 shadow-2xl">
-            <h3 className="font-bold text-sm uppercase border-b-2 border-black pb-2 mb-3">
-              {modal.keputusan === "diterima" ? "✅ Terima Hasil" : "✗ Tolak Hasil"} — Konfirmasi
-            </h3>
-            <p className="text-[11px] text-gray-500 mb-3">
-              ID Boxing: <strong>{modal.id_boxing}</strong>
-            </p>
-
-            {/* ⚠️ Banner peringatan supaya gak salah pencet — beda teks
-                untuk "diterima" vs "ditolak" karena efeknya beda jauh */}
-            <div
-              className={`mb-4 p-3 border-2 text-[11px] font-bold leading-relaxed ${
-                modal.keputusan === "diterima"
-                  ? "border-green-500 bg-green-50 text-green-800"
-                  : "border-red-500 bg-red-50 text-red-800"
-              }`}
-            >
-              {modal.keputusan === "diterima" ? (
-                <>⚠️ Yakin mau TERIMA? Laporan ini akan langsung ditandai <u>SELESAI</u> dan masuk Rekapitulasi. Tindakan ini tidak bisa dibatalkan setelah dikirim.</>
-              ) : (
-                <>⚠️ Yakin mau TOLAK? Laporan ini akan dikembalikan ke Kepala Unit untuk direvisi (hasil pelaksanaan lama akan dihapus).</>
-              )}
-            </div>
-
-            <div className="mb-4">
-              <label className="text-[11px] font-bold uppercase block mb-1">
-                Catatan / Alasan <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                className="w-full border border-black p-2 text-xs h-24 outline-none resize-none"
-                placeholder={
-                  modal.keputusan === "diterima"
-                    ? "Tuliskan alasan menerima hasil ini..."
-                    : "Tuliskan alasan menolak hasil ini (wajib untuk revisi)..."
-                }
-                value={modal.catatan}
-                onChange={(e) => setModal((prev) => ({ ...prev, catatan: e.target.value }))}
-              />
-              <p className="text-[9px] text-gray-400 mt-1">* Wajib diisi</p>
-              {error && <p className="text-red-500 text-[10px] font-bold mt-2">❌ {error}</p>}
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setModal({ open: false, id_boxing: null, keputusan: null, catatan: "" })}
-                className="px-4 py-2 border border-black text-[11px]"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submittingId === modal.id_boxing}
-                className={`px-6 py-2 text-white text-[11px] font-bold disabled:opacity-50 ${
-                  modal.keputusan === "diterima" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
-                }`}
-              >
-                {submittingId === modal.id_boxing
-                  ? "Menyimpan..."
-                  : modal.keputusan === "diterima"
-                  ? "Ya, Terima & Selesaikan"
-                  : "Ya, Tolak & Kirim ke Unit"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ✅ Modal keputusan Siap/Belum Siap sudah dipindah ke
+          ProcessMonitorTable.tsx (Staf P4M). Ka P4M di sini read-only,
+          jadi tidak ada modal konfirmasi lagi di sisi ini. */}
 
       {/* FILTER PERIODE */}
       <div className="mb-3">
@@ -293,16 +176,15 @@ export default function KaP4MHasilTable() {
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Ka P4M: ✓ terima (laporan otomatis Selesai) · ✗ tolak (balik ke Kepala Unit untuk revisi hasil). Staf P4M hanya bisa memantau, semua keputusan ada di tangan Ka P4M.
+          Ka P4M: mode pantau. Keputusan ✅ Siap / ❌ Belum Siap atas hasil tindak lanjut unit sekarang wewenang Staf P4M (tab &ldquo;Proses &amp; Pantau&rdquo;).
         </p>
-        {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
-        {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
+        {error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
 
         <div className="flex font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
           <div className="flex-1 border-r-2 border-black p-3">Laporan</div>
           <div className="w-[20%] border-r-2 border-black p-3">Rencana / Aksi Masukan</div>
           <div className="w-[24%] border-r-2 border-black p-3">Hasil Tindak Lanjut Unit</div>
-          <div className="w-[16%] p-3">Keputusan Ka P4M</div>
+          <div className="w-[16%] p-3">Status Keputusan Staff</div>
         </div>
 
         {filteredData.length === 0 ? (
@@ -367,43 +249,31 @@ export default function KaP4MHasilTable() {
                           : "text-red-700 bg-red-50 border-red-300"
                       }`}
                     >
-                      {item.approval_staf === "diterima" ? "✓ Disetujui — Selesai" : "✗ Ditolak — Revisi Unit"}
+                      {item.approval_staf === "diterima" ? "✅ Siap — Selesai" : "❌ Belum Siap"}
                     </span>
-                    {/* ✅ Bukti tanggal keputusan Ka P4M (dari boxing.updated_at) */}
+                    {/* ✅ Bukti tanggal keputusan Staf P4M (dari boxing.updated_at) */}
                     <p className="text-[9px] text-gray-400 text-center leading-tight">
                       🕒 {formatTanggal(item.tanggal_keputusan_ka)}
                     </p>
+                    {item.catatan_approval && (
+                      <p className="text-[9px] text-gray-500 italic text-center leading-tight max-w-32 mt-0.5">
+                        &ldquo;{item.catatan_approval}&rdquo;
+                      </p>
+                    )}
                   </div>
-                ) : item.status_boxing !== "di_staff" ? (
-                  // ✅ Row yang belum sampai 'di_staff' ditampilkan dengan
-                  // label sesuai tahap sebenarnya (lihat getStageInfo) —
-                  // bukan lagi generic "Menunggu tahap Staf P4M" yang salah,
-                  // karena Staf P4M sama sekali tidak punya wewenang di sini.
+                ) : (
+                  // ✅ Ka P4M tidak lagi bisa memutuskan di sini — tombol
+                  // centang/silang sudah dicabut. Setiap tahap (termasuk
+                  // "di_staff, belum diputuskan") ditampilkan dengan label
+                  // yang sesuai lewat getStageInfo — keputusan ✅ Siap / ❌
+                  // Belum Siap hanya bisa diambil Staf P4M lewat tab
+                  // "Proses & Pantau" miliknya.
                   <span
                     className={`text-[9px] font-bold px-2 py-1 rounded border text-center leading-relaxed ${getStageInfo(item).cls}`}
                     title={`Status saat ini: ${item.status_boxing || "-"}`}
                   >
                     {getStageInfo(item).label}
                   </span>
-                ) : (
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openModal(item, "diterima")}
-                      title="Terima hasil — laporan otomatis Selesai"
-                      className="w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 text-white text-lg font-bold flex items-center justify-center shadow"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openModal(item, "ditolak")}
-                      title="Tolak — kembalikan ke unit untuk revisi hasil"
-                      className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-lg font-bold flex items-center justify-center shadow"
-                    >
-                      ✗
-                    </button>
-                  </div>
                 )}
               </div>
             </div>

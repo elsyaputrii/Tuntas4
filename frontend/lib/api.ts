@@ -146,7 +146,7 @@ export const stafApi = {
   distribusiLaporan: (body: { id_laporan: number; unit_tujuan: string[] }) =>
     apiFetch("/staf/boxing", { method: "POST", body: JSON.stringify(body) }),
 
-  // Tab Proses & Pantau (pantau saja — tutup laporan hanya Ka P4M)
+  // Tab Proses & Pantau (pantau + Keputusan Staff atas hasil tindak lanjut)
   getProsesMonitor: () =>
     apiFetch("/staf/proses"),
 
@@ -158,10 +158,7 @@ export const stafApi = {
   }) =>
     apiFetch("/staf/pemantauan", { method: "POST", body: JSON.stringify(body) }),
 
-  // ✅ FIX: "selesai" & "belum" dihapus dari tipe — itu KEPUTUSAN, dan
-  // Staf P4M tidak lagi punya wewenang mengambil keputusan (sekarang
-  // sepenuhnya milik Ka P4M via /ka-p4m/keputusan & /ka-p4m/approval-hasil).
-  // Endpoint ini di sisi Staf P4M sekarang murni fitur "Buka ke Unit".
+  // Reopen laporan ("Buka ke Unit" / "Tindak ulang") lewat Rekapitulasi.
   setKeputusanBoxing: (
     id_boxing: number,
     keputusan: "lanjut" | "ditindak_lanjut"
@@ -169,6 +166,20 @@ export const stafApi = {
     apiFetch("/staf/keputusan-boxing", {
       method: "PATCH",
       body: JSON.stringify({ id_boxing, keputusan }),
+    }),
+
+  // ✅ KEPUTUSAN STAFF: ✅ Siap ("diterima" → laporan otomatis Selesai)
+  // atau ❌ Belum Siap ("ditolak" → balik ke Kepala Unit untuk revisi
+  // hasil). Dikembalikan lagi jadi wewenang Staf P4M (sempat dipindah
+  // ke kaP4MApi.setApprovalHasil — sudah dihapus dari sana).
+  setApprovalHasil: (
+    id_boxing: number,
+    approval: "diterima" | "ditolak",
+    catatan: string
+  ) =>
+    apiFetch("/staf/approval-hasil", {
+      method: "PATCH",
+      body: JSON.stringify({ id_boxing, approval, catatan }),
     }),
 
   getRekapitulasi: () =>
@@ -199,15 +210,10 @@ export const kaP4MApi = {
   getKepalaUnitLaporanMasuk: () => apiFetch("/ka-p4m/kepala-unit/laporan-masuk"),
   getKepalaUnitLaporanHasil: () => apiFetch("/ka-p4m/kepala-unit/laporan-hasil"),
 
-  setApprovalHasil: (
-    id_boxing: number,
-    approval: "diterima" | "ditolak",
-    catatan: string
-  ) =>
-    apiFetch("/ka-p4m/approval-hasil", {
-      method: "PATCH",
-      body: JSON.stringify({ id_boxing, approval, catatan }),
-    }),
+  // ✅ setApprovalHasil DIHAPUS dari sini: keputusan Siap/Belum Siap atas
+  // hasil tindak lanjut unit sekarang kembali jadi wewenang Staf P4M
+  // (lihat stafApi.setApprovalHasil). Ka P4M sekarang hanya memantau
+  // lewat getProsesMonitor (read-only, lihat KaP4MHasilTable.tsx).
 };
 
 // ─────────────────────────────────────────────

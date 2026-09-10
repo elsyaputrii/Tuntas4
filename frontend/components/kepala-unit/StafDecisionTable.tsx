@@ -161,7 +161,7 @@ export default function StafDecisionTable() {
           <div className="w-[18%] border-r-2 border-black p-3 text-[10px]">Kritik atau Pengaduan</div>
           <div className="w-[10%] border-r-2 border-black p-3 text-[10px]">Tanggal Masuk</div>
           <div className="w-[14%] border-r-2 border-black p-3 text-[10px]">Penyebab</div>
-          <div className="w-[14%] border-r-2 border-black p-3 text-[10px]">Rencana</div>
+          <div className="w-[14%] border-r-2 border-black p-3 text-[10px]">Rencana Tindak Lanjut</div>
           <div className="w-[10%] border-r-2 border-black p-3 text-[10px]">Status Staf</div>
           <div className="flex-1 p-3 text-[10px]">Revisi Rancangan (Kirim ke Ka P4M)</div>
         </div>

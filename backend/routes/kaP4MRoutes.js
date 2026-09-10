@@ -3,7 +3,6 @@ const express = require("express");
 const router = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const { pool } = require("../config/db");
-const { setApprovalStaf } = require("../controllers/stafController");
 const { notifikasiUntukPengguna } = require("../utils/notifikasi");
 
 router.use(authMiddleware);
@@ -230,14 +229,14 @@ router.get("/kepala-unit/laporan-hasil", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// FITUR PINDAH: Ka P4M memutuskan hasil tindak lanjut Kepala Unit
-// (diterima → laporan otomatis Selesai | ditolak → balik ke Kepala
-// Unit untuk revisi hasil). Ini KEPUTUSAN "ulang atau tidak" yang
-// sebelumnya dipegang Staf P4M (PATCH /staf/approval-boxing) — sekarang
-// hanya Ka P4M yang boleh. Staf P4M tetap bisa LIHAT hasilnya lewat
-// GET /staf/proses, tapi tombol keputusannya sudah dicabut dari sisi
-// Staf (lihat stafRoutes.js & ProcessMonitorTable.tsx / RecapitulationTable.tsx).
-// Logic setApprovalStaf sendiri TIDAK diubah — cuma dipindah "pemiliknya".
-router.patch("/approval-hasil", setApprovalStaf);
+// ✅ FITUR DIKEMBALIKAN KE STAF P4M: keputusan atas hasil tindak lanjut
+// Kepala Unit (✅ Siap → laporan otomatis Selesai | ❌ Belum Siap → balik
+// ke Kepala Unit untuk revisi hasil) sempat dipindah ke sini (Ka P4M),
+// tapi sekarang dikembalikan lagi jadi wewenang Staf P4M sepenuhnya
+// (lihat PATCH /api/staf/approval-hasil di stafRoutes.js). Ka P4M di
+// sisi ini sekarang HANYA read-only monitor lewat GET /ka-p4m/proses
+// (lihat KaP4MHasilTable.tsx — tombol centang/silangnya sudah dicabut).
+// Route PATCH approval-hasil di bawah ini SENGAJA dihapus supaya Ka P4M
+// tidak lagi punya jalur backend untuk mengambil keputusan ini.
 
 module.exports = router;

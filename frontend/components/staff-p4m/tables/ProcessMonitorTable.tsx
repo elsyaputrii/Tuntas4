@@ -93,11 +93,23 @@ export default function ProcessMonitorTable() {
   const [data, setData] = useState<ProsesItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [msgOk, setMsgOk] = useState("");
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [meSignature, setMeSignature] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  // ✅ KEPUTUSAN STAFF: state modal konfirmasi ✅ Siap / ❌ Belum Siap.
+  // Keputusan ini dikembalikan jadi wewenang Staf P4M (bukan lagi Ka
+  // P4M / Kepala Unit) — lihat stafApi.setApprovalHasil di lib/api.ts.
+  const [modal, setModal] = useState<{
+    open: boolean;
+    id_boxing: number | null;
+    keputusan: "diterima" | "ditolak" | null;
+    catatan: string;
+  }>({ open: false, id_boxing: null, keputusan: null, catatan: "" });
+  const [submittingId, setSubmittingId] = useState<number | null>(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -160,15 +172,48 @@ export default function ProcessMonitorTable() {
     setExportingId(null);
   }
 
-  // ℹ️ READ-ONLY: Staf P4M cuma memantau status di sini. Keputusan
-  // diterima/ditolak atas hasil tindak lanjut unit sekarang wewenang
-  // Ka P4M (lihat KaP4MHasilTable.tsx / PATCH /ka-p4m/approval-hasil).
+  // ✅ KEPUTUSAN STAFF: Staf P4M yang memutuskan ✅ Siap / ❌ Belum Siap
+  // atas hasil tindak lanjut unit (dulu wewenang ini dipindah ke Ka
+  // P4M, sekarang dikembalikan lagi ke sini). Kalau sudah diputuskan,
+  // tampilkan badge status; kalau belum, tampilkan tombol keputusan.
+  function openModal(item: ProsesItem, keputusan: "diterima" | "ditolak") {
+    if (item.status_boxing !== "di_staff") {
+      setError(
+        `Laporan ini belum bisa diputuskan — status saat ini masih "${item.status_boxing || "tidak diketahui"}", belum sampai tahap Staf P4M (di_staff).`
+      );
+      return;
+    }
+    if (!item.hasil_tindakan) {
+      setError("Hasil tindak lanjut belum diisi Kepala Unit.");
+      return;
+    }
+    setModal({ open: true, id_boxing: item.id_boxing, keputusan, catatan: "" });
+    setError("");
+  }
+
+  async function handleSubmitKeputusan() {
+    const { id_boxing, keputusan, catatan } = modal;
+    if (!id_boxing || !keputusan) return;
+    if (!catatan.trim()) {
+      setError("Catatan / alasan wajib diisi!");
+      return;
+    }
+    setSubmittingId(id_boxing);
+    setError("");
+    try {
+      const res = await stafApi.setApprovalHasil(id_boxing, keputusan, catatan.trim());
+      setMsgOk(res.message);
+      setTimeout(() => setMsgOk(""), 4000);
+      setModal({ open: false, id_boxing: null, keputusan: null, catatan: "" });
+      fetchData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan keputusan.");
+    } finally {
+      setSubmittingId(null);
+    }
+  }
+
   function renderKeputusanStaf(item: ProsesItem) {
-    // ✅ FIX: dulu fungsi ini cuma dianggap valid buat status_boxing
-    // "di_staff" (makanya di mobile cuma dipanggil kalau diStaff==true).
-    // Laporan yang sudah "selesai" tetap harus lolos ke bawah biar badge
-    // "✓ Disetujui — Selesai" beserta catatannya kelihatan, bukan malah
-    // ketiban pesan "Menunggu tahap sebelumnya".
     if (item.status_boxing !== "di_staff" && item.status_boxing !== "selesai") {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
     }
@@ -184,21 +229,42 @@ export default function ProcessMonitorTable() {
           <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
             apprVal === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
           }`}>
-            {apprVal === "diterima" ? "✓ Disetujui — Selesai" : "🔄 Perbaikan Berkelanjutan"}
+            {apprVal === "diterima" ? "✅ Siap — Selesai" : "❌ Belum Siap"}
           </span>
           {item.catatan_approval && (
             <p className="text-[9px] text-gray-500 italic text-center max-w-55">
-              {item.catatan_approval} <span className="text-gray-400">(alasan dari Ka P4M)</span>
+              {item.catatan_approval}
             </p>
           )}
         </div>
       );
     }
 
+    // Belum diputuskan — hanya bisa diputuskan kalau status_boxing
+    // sudah 'di_staff' (item 'selesai' mestinya sudah punya apprVal).
+    if (item.status_boxing !== "di_staff") {
+      return <span className="text-[9px] text-gray-400 italic text-center">—</span>;
+    }
+
     return (
-      <span className="text-[9px] text-blue-600 italic text-center font-semibold">
-        ⏳ Menunggu keputusan Ka P4M
-      </span>
+      <div className="flex gap-3 justify-center">
+        <button
+          type="button"
+          onClick={() => openModal(item, "diterima")}
+          title="Siap — laporan otomatis Selesai"
+          className="w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow"
+        >
+          ✅
+        </button>
+        <button
+          type="button"
+          onClick={() => openModal(item, "ditolak")}
+          title="Belum Siap — kembalikan ke unit untuk revisi hasil"
+          className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow"
+        >
+          ❌
+        </button>
+      </div>
     );
   }
 
@@ -283,7 +349,7 @@ export default function ProcessMonitorTable() {
         {item.hasil_tindakan && (
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Hasil Unit:</p>
-            <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-16 overflow-auto">{item.hasil_tindakan}</div>
+            <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-14 overflow-auto">{item.hasil_tindakan}</div>
             {item.tanggal_pelaksanaan && (
               <p className="text-[9px] text-gray-400 mt-1">
                 📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
@@ -298,20 +364,17 @@ export default function ProcessMonitorTable() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          {diStaff && (
-            <div className="w-full flex justify-center">
-              {renderKeputusanStaf(item)}
-            </div>
-          )}
-          {isSelesai && (
-            <div className="w-full flex justify-center">
-              {renderKeputusanStaf(item)}
-            </div>
-          )}
-          {!diStaff && !isSelesai && (
-            <span className="text-[10px] text-gray-400 italic">Menunggu tahap sebelumnya</span>
-          )}
+        <div>
+          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Keputusan Staff:</p>
+          <div className="flex flex-wrap gap-2">
+            {diStaff || isSelesai ? (
+              <div className="w-full flex justify-center">
+                {renderKeputusanStaf(item)}
+              </div>
+            ) : (
+              <span className="text-[10px] text-gray-400 italic">Menunggu tahap sebelumnya</span>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -325,6 +388,74 @@ export default function ProcessMonitorTable() {
     <>
       {/* ── IMAGE MODAL ── */}
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
+
+      {/* ── MODAL KEPUTUSAN STAFF (✅ Siap / ❌ Belum Siap) ── */}
+      {modal.open && modal.id_boxing && modal.keputusan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white border-2 border-black w-full max-w-md p-6 shadow-2xl">
+            <h3 className="font-bold text-sm uppercase border-b-2 border-black pb-2 mb-3">
+              {modal.keputusan === "diterima" ? "✅ selesai" : "❌ ditindak lanjutin"} — Konfirmasi
+            </h3>
+            <p className="text-[11px] text-gray-500 mb-3">
+              ID Boxing: <strong>{modal.id_boxing}</strong>
+            </p>
+            <div
+              className={`mb-4 p-3 border-2 text-[11px] font-bold leading-relaxed ${
+                modal.keputusan === "diterima"
+                  ? "border-green-500 bg-green-50 text-green-800"
+                  : "border-red-500 bg-red-50 text-red-800"
+              }`}
+            >
+              {modal.keputusan === "diterima" ? (
+                <>⚠️ Yakin mau tandai SIAP? Laporan ini akan langsung ditandai <u>SELESAI</u> dan masuk Rekapitulasi. Tindakan ini tidak bisa dibatalkan setelah dikirim.</>
+              ) : (
+                <>⚠️ Yakin mau tandai BELUM SIAP? Laporan ini akan dikembalikan ke Kepala Unit untuk direvisi (hasil pelaksanaan lama akan dihapus).</>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className="text-[11px] font-bold uppercase block mb-1">
+                Catatan / Alasan <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                className="w-full border border-black p-2 text-xs h-24 outline-none resize-none"
+                placeholder={
+                  modal.keputusan === "diterima"
+                    ? "Tuliskan alasan menyatakan hasil ini siap..."
+                    : "Tuliskan alasan menyatakan hasil ini belum siap (wajib untuk revisi)..."
+                }
+                value={modal.catatan}
+                onChange={(e) => setModal((prev) => ({ ...prev, catatan: e.target.value }))}
+              />
+              <p className="text-[9px] text-gray-400 mt-1">* Wajib diisi</p>
+              {error && <p className="text-red-500 text-[10px] font-bold mt-2">❌ {error}</p>}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setModal({ open: false, id_boxing: null, keputusan: null, catatan: "" })}
+                className="px-4 py-2 border border-black text-[11px]"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitKeputusan}
+                disabled={submittingId === modal.id_boxing}
+                className={`px-6 py-2 text-white text-[11px] font-bold disabled:opacity-50 ${
+                  modal.keputusan === "diterima" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {submittingId === modal.id_boxing
+                  ? "Menyimpan..."
+                  : modal.keputusan === "diterima"
+                  ? "Ya, Tandai Siap & Selesaikan"
+                  : "Ya, Tandai Belum Siap & Kirim ke Unit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── FILTER PERIODE ── */}
       <div className="mb-3">
@@ -343,9 +474,10 @@ export default function ProcessMonitorTable() {
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Staf P4M: mode pantau. Keputusan diterima/ditolak atas hasil tindak lanjut unit sekarang wewenang Ka P4M. Klik 📄 untuk export PDF.
+          Staf P4M: pantau proses &amp; berikan Keputusan Staff — ✅ Siap (laporan otomatis Selesai) atau ❌ Belum Siap (balik ke Kepala Unit untuk revisi hasil). Klik 📄 untuk export PDF.
         </p>
-        {error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
+        {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
+        {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
 
         {/* ── DESKTOP ── */}
         <div className="hidden lg:block">
@@ -354,9 +486,10 @@ export default function ProcessMonitorTable() {
             style={{ display: "table", tableLayout: "fixed", width: "100%" }}
           >
             <div style={{ display: "table-row" }}>
-              <div style={{ display: "table-cell", width: "45%" }} className="border-r-2 border-black p-3 align-middle">Laporan</div>
-              <div style={{ display: "table-cell", width: "15%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Ka</div>
-              <div style={{ display: "table-cell", width: "32%" }} className="border-r-2 border-black p-3 align-middle">Hasil Unit</div>
+              <div style={{ display: "table-cell", width: "40%" }} className="border-r-2 border-black p-3 align-middle">Laporan</div>
+              <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Ka</div>
+              <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Hasil Unit</div>
+              <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Staff</div>
               <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">Dokumen</div>
             </div>
           </div>
@@ -375,7 +508,7 @@ export default function ProcessMonitorTable() {
                   >
                     <div style={{ display: "table-row" }}>
                       {/* Kolom Laporan + Tanggal + Gambar */}
-                      <div style={{ display: "table-cell", width: "45%" }} className="border-r-2 border-black p-3 align-top">
+                      <div style={{ display: "table-cell", width: "40%" }} className="border-r-2 border-black p-3 align-top">
                         <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                           <span className="font-bold">{item.kode_laporan}</span><br />
                           {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}</span>
@@ -395,21 +528,12 @@ export default function ProcessMonitorTable() {
                         )}
                       </div>
 
-                      <div style={{ display: "table-cell", width: "15%" }} className="border-r-2 border-black p-3 align-top">
+                      <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-top">
                         {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
                         {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
-                        {/* ✅ FIX: status keputusan HASIL dari Ka P4M (Menunggu /
-                            Disetujui / Ditolak) + catatannya sebelumnya cuma
-                            dirender di versi mobile (renderKeputusanStaf), gak
-                            pernah kelihatan di tabel desktop. Sekarang ditambahin
-                            di sini, di bawah badge rencana, khusus kalau laporan
-                            udah sampai tahap Staf P4M (di_staff). */}
-                        {item.status_boxing === "di_staff" && item.hasil_tindakan && (
-                          <div className="mt-1.5">{renderKeputusanStaf(item)}</div>
-                        )}
                       </div>
 
-                      <div style={{ display: "table-cell", width: "32%" }} className="border-r-2 border-black p-3 align-top">
+                      <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
                         <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
                           {item.hasil_tindakan || (item.status_review === "tidak_ditindaklanjuti" ? "— (tidak ditindaklanjuti)" : "Belum ada hasil")}
                         </div>
@@ -424,6 +548,14 @@ export default function ProcessMonitorTable() {
                             🖼️ Lihat Gambar
                           </button>
                         )}
+                      </div>
+
+                      {/* ✅ KEPUTUSAN STAFF: ✅ Siap / ❌ Belum Siap — wewenang
+                          Staf P4M (bukan lagi Ka P4M / Kepala Unit). */}
+                      <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
+                        <div className="flex items-center justify-center h-full">
+                          {renderKeputusanStaf(item)}
+                        </div>
                       </div>
 
                       <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">
@@ -444,7 +576,7 @@ export default function ProcessMonitorTable() {
               {selesai.length > 0 && (
                 <>
                   <div className="bg-gray-100 px-3 py-1 text-[10px] font-bold uppercase border-t-2 border-black min-w-215">
-                    Sudah selesai — gunakan tab Rekapitulasi untuk membuka kembali
+                    Sudah selesai
                   </div>
                   {selesai.map((item) => {
                     const rev = getKeputusanKaBadge(item);
@@ -455,7 +587,7 @@ export default function ProcessMonitorTable() {
                         style={{ display: "table", tableLayout: "fixed", width: "100%" }}
                       >
                         <div style={{ display: "table-row" }}>
-                          <div style={{ display: "table-cell", width: "45%" }} className="border-r-2 border-black p-3 align-top">
+                          <div style={{ display: "table-cell", width: "40%" }} className="border-r-2 border-black p-3 align-top">
                             <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                               <span className="font-bold">{item.kode_laporan}</span><br />
                               {item.nama_unit} · <span className="italic">Selesai</span>
@@ -475,15 +607,12 @@ export default function ProcessMonitorTable() {
                             )}
                           </div>
 
-                          <div style={{ display: "table-cell", width: "15%" }} className="border-r-2 border-black p-3 align-top">
+                          <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-top">
                             {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
                             {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
-                            {item.hasil_tindakan && (
-                              <div className="mt-1.5">{renderKeputusanStaf(item)}</div>
-                            )}
                           </div>
 
-                          <div style={{ display: "table-cell", width: "32%" }} className="border-r-2 border-black p-3 align-top">
+                          <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
                             <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
                               {item.hasil_tindakan || "— (tidak ditindaklanjuti)"}
                             </div>
@@ -498,6 +627,12 @@ export default function ProcessMonitorTable() {
                                 🖼️ Lihat Gambar
                               </button>
                             )}
+                          </div>
+
+                          <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
+                            <div className="flex items-center justify-center h-full">
+                              {renderKeputusanStaf(item)}
+                            </div>
                           </div>
 
                           <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">
