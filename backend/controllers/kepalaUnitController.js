@@ -1,12 +1,12 @@
 // FILE: backend/controllers/kepalaUnitController.js
 //
-// ── ALUR "DIBUKA KEMBALI KE UNIT" (baca ini sebelum ubah query di bawah) ──
-// Keputusan akhir (terima/tolak hasil tindak lanjut) HANYA wewenang Ka P4M,
-// lewat PATCH /api/ka-p4m/approval-hasil (mount dari setApprovalStaf di
-// stafController.js — namanya dipertahankan supaya diff minimal, tapi
-// route-nya sudah dikunci role 'ka_p4m'). Kalau Ka P4M menolak hasil
-// tindak lanjut unit:
-//   - boxing_ketidaksesuaian.approval_staf → 'ditolak'
+// // ── ALUR "DIBUKA KEMBALI KE UNIT" (baca ini sebelum ubah query di bawah) ──
+// Keputusan akhir (Siap/Belum Siap atas hasil tindak lanjut) HANYA wewenang
+// Staf P4M, lewat PATCH /api/staf/approval-hasil (fungsi setApprovalStaf di
+// stafController.js). Sempat dipindah ke Ka P4M (PATCH /api/ka-p4m/approval-hasil),
+// tapi route itu sudah DICABUT — sekarang Ka P4M cuma read-only monitor lewat
+// GET /api/ka-p4m/proses (lihat KaP4MHasilTable.tsx di frontend). Kalau Staf
+// P4M menolak ("Belum Siap") hasil tindak lanjut unit:
 //     (status_boxing TETAP 'di_staff', tidak diubah)
 //   - rancangan_tindakan.status_review → 'menunggu_keputusan_ka'
 //   - rancangan_tindakan.penyebab & deskripsi → TETAP DIPERTAHANKAN
