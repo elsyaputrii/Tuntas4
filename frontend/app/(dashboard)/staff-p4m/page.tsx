@@ -266,8 +266,12 @@ export default function DashboardStaff() {
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
+<<<<<<< HEAD
               <XAxis dataKey="bulan" />
               
+=======
+              <XAxis dataKey="bulan" interval={0}/>
+>>>>>>> bd2b46210bc0a62771baa237fa8c1205c723f7b4
               <YAxis />
               <Tooltip />
               <Legend />
