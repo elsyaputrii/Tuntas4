@@ -33,7 +33,7 @@ import { stafApi } from "@/lib/api";
 const MONTH_TEMPLATE = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
 export default function DashboardStaff() {
-  
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dataLaporan, setDataLaporan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,7 +119,7 @@ export default function DashboardStaff() {
           bulanMap[bulan].diproses++;
         }
       });
-      
+
       const newChartData = MONTH_TEMPLATE.map(bulan => ({
         bulan,
         total: bulanMap[bulan]?.total || 0,
@@ -127,7 +127,7 @@ export default function DashboardStaff() {
         selesai: bulanMap[bulan]?.selesai || 0,
       }));
       setChartData(newChartData);
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const diterima = data.filter((d: any) => d.status === "Diterima").length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,7 +145,7 @@ export default function DashboardStaff() {
         { name: "Review Ka-P4M", value: review, color: "#6366f1" },
         { name: "Selesai", value: selesai, color: "#10b981" },
       ]);
-      
+
     } catch (error) {
       console.error('Gagal ambil data:', error);
     } finally {
@@ -266,12 +266,7 @@ export default function DashboardStaff() {
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-<<<<<<< HEAD
-              <XAxis dataKey="bulan" />
-              
-=======
-              <XAxis dataKey="bulan" interval={0}/>
->>>>>>> bd2b46210bc0a62771baa237fa8c1205c723f7b4
+              <XAxis dataKey="bulan" interval={0} />
               <YAxis />
               <Tooltip />
               <Legend />
