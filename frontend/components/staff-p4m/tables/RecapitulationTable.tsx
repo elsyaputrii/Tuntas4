@@ -540,6 +540,9 @@ interface DisplayItem {
   rencana: string;
   hasil: string;
   tglPelaksanaan: string;
+  /** ✅ BARU (permintaan user): tanggal Penyebab & Rencana Tindak Lanjut
+   *  diisi Kepala Unit ("tanggal perencanaan"), dilengkapi di Rekap Staf. */
+  tglRencana: string;
   statusReview: string;
   statusBoxing: string;
   approvalStaf: string | null;
@@ -636,6 +639,7 @@ export default function RecapitulationTable() {
       uraian:d.uraian_ketidaksesuaian??"—", unit:d.nama_unit??"—",
       penyebab:d.penyebab??"—", rencana:d.rencana_tindakan??"—",
       hasil:d.hasil_tindakan??"—", tglPelaksanaan:fmtTgl(d.tanggal_pelaksanaan),
+      tglRencana: formatTglAman(d.tanggal_perencanaan ?? null),
       statusReview:d.status_review??"", statusBoxing:d.status_boxing??"selesai",
       approvalStaf: null as string | null,
       tglMasuk:d.created_at??null, isSelesai:d.status_boxing==="selesai",
@@ -645,6 +649,7 @@ export default function RecapitulationTable() {
       uraian:p.isi_laporan??"—", unit:p.nama_unit??"—",
       penyebab:p.penyebab??"—", rencana:p.rencana_tindakan??"—",
       hasil:p.hasil_tindakan??"—", tglPelaksanaan:fmtTgl(p.tanggal_pelaksanaan),
+      tglRencana: formatTglAman(p.tanggal_perencanaan ?? null),
       statusReview:p.status_review??"", statusBoxing:p.status_boxing??"",
       approvalStaf: p.approval_staf ?? null,
       tglMasuk:p.created_at??null, isSelesai:false,
@@ -666,6 +671,8 @@ export default function RecapitulationTable() {
       penyebab:a.penyebab??"—", rencana:a.rencana_tindakan??"—",
       hasil:a.hasil_tindakan??"—",
       tglPelaksanaan:formatTglAman(a.tgl_pelaksanaan),
+      // Data arsip lama tidak punya tanggal perencanaan tersendiri.
+      tglRencana: "—",
       statusReview:a.status_review??"", statusBoxing:a.status_boxing??"selesai",
       approvalStaf: null as string | null,
       tglMasuk:`${a.tahun}-06-15`, // tanggal sintetis, cuma dipakai buat filter tahun
@@ -913,7 +920,12 @@ export default function RecapitulationTable() {
                   <span className="italic text-gray-500 text-center text-[10px]">{item.penyebab}</span>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
-                  <span className="italic text-gray-500 text-center text-[10px]">{item.rencana}</span>
+                  <span className="italic text-gray-500 text-center text-[10px]">
+                    {item.rencana}
+                    {item.tglRencana !== "—" && (
+                      <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 Direncanakan: {item.tglRencana}</span>
+                    )}
+                  </span>
                 </div>
                 <div className="w-28 border-r-2 border-black p-3 flex items-center justify-center">
                   <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>{statusInfo.label}</span>
@@ -966,7 +978,12 @@ export default function RecapitulationTable() {
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana</p>
-                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">{item.rencana}</p>
+                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">
+                      {item.rencana}
+                      {item.tglRencana !== "—" && (
+                        <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 {item.tglRencana}</span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div>

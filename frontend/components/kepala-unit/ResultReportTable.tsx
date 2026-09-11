@@ -13,6 +13,12 @@ interface LaporanHasilItem {
   tanggal_pelaksanaan: string | null;
   tanggal_laporan: string | null;
   tanggal_ditindaklanjuti: string | null;
+  /** ✅ BARU: dipakai untuk mendeteksi & menampilkan konteks "ditolak
+   *  Staf P4M, perlu revisi hasil" — approval_staf & catatan_approval
+   *  sudah dikirim backend (getLaporanHasil) tapi sebelumnya belum ada
+   *  di tipe ini sama sekali. */
+  approval_staf: string | null;
+  catatan_approval: string | null;
 }
 
 export default function ResultReportTable() {
@@ -47,22 +53,17 @@ export default function ResultReportTable() {
 
   const handleSubmit = async (id_boxing: number) => {
     if (!tanggal[id_boxing]) { alert("Tanggal pelaksanaan harus diisi."); return; }
-    const item = laporanList.find(l => l.id_boxing === id_boxing);
-    if (item) {
-      const tanggalInput = new Date(tanggal[id_boxing]);
-      tanggalInput.setHours(0, 0, 0, 0);
-      const refDate = item.tanggal_ditindaklanjuti
-        ? new Date(item.tanggal_ditindaklanjuti)
-        : item.tanggal_laporan
-          ? new Date(item.tanggal_laporan)
-          : null;
-      if (refDate) {
-        refDate.setHours(0, 0, 0, 0);
-        if (tanggalInput < refDate) {
-          alert("Tanggal pelaksanaan tidak boleh lebih awal dari tanggal Ka P4M menindaklanjuti laporan.");
-          return;
-        }
-      }
+    // ✅ FIX (permintaan user): pembatasan "tidak boleh lebih awal dari
+    // tanggal Ka P4M menindaklanjuti laporan" DIHAPUS — Kepala Unit
+    // sekarang bebas memilih tanggal pelaksanaan kapan pun (termasuk
+    // sebelum tanggal keputusan Ka P4M), selama bukan tanggal masa depan.
+    const tanggalInput = new Date(tanggal[id_boxing]);
+    tanggalInput.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (tanggalInput > today) {
+      alert("Tanggal pelaksanaan tidak boleh di masa depan.");
+      return;
     }
     if (!uraian[id_boxing]?.trim()) { alert("Uraian hasil harus diisi."); return; }
     if (!files[id_boxing]) { alert("Gambar bukti wajib diunggah."); return; }
@@ -108,7 +109,7 @@ export default function ResultReportTable() {
         <div className="w-[25%] border-r-2 border-black p-3 text-[10px]">Kritik atau Pengaduan</div>
         <div className="w-[15%] border-r-2 border-black p-3 text-[10px]">Penyebab</div>
         <div className="w-[15%] border-r-2 border-black p-3 text-[10px]">Rencana Tindak Lanjut</div>
-        <div className="w-[10%] border-r-2 border-black p-3 text-[10px]">Status</div>
+        <div className="w-[10%] border-r-2 border-black p-3 text-[10px]" title="Tahap laporan hasil tindak lanjut: Perlu Diisi / Perlu Revisi / Terkirim / Sesuai (tidak perlu tindak lanjut)">Status</div>
         <div className="flex-1 p-3 text-[10px]">Laporan Hasil Tindak Lanjut</div>
       </div>
 
@@ -117,6 +118,13 @@ export default function ResultReportTable() {
         const sudahTerkirim =
           !!item.id_pelaksanaan && item.status_boxing !== "menunggu_pelaksanaan";
         const showForm = !sudahTerkirim && !sesuaiTanpaTindakLanjut;
+        // ✅ BARU (permintaan user): kondisi "perlu revisi" — laporan ini
+        // SEBELUMNYA pernah dikirim tapi DITOLAK ("Belum Siap") oleh Staf
+        // P4M (approval_staf === "ditolak"), dan sekarang muncul lagi di
+        // sini SUDAH LANGSUNG siap diisi ulang bagian Laporan Hasil-nya
+        // saja (Penyebab & Rencana Tindak Lanjut TIDAK perlu diisi ulang
+        // dari awal — lihat setApprovalStaf di stafController.js).
+        const perluRevisi = showForm && item.approval_staf === "ditolak";
         return (
           <div key={item.id_boxing} className={`flex min-h-50 ${idx > 0 ? "border-t-2 border-black" : ""}`}>
             <div className="w-[25%] border-r-2 border-black p-4">
@@ -129,17 +137,49 @@ export default function ResultReportTable() {
             <div className="w-[15%] border-r-2 border-black p-4 bg-gray-50">
               <p className="text-[11px] text-gray-700 whitespace-pre-wrap wrap-break-words">{item.rencana_tindakan}</p>
             </div>
+            {/*
+              ✅ FIX (permintaan user, "bagian status untuk apa?"): kolom
+              ini menandakan TAHAP laporan hasil tindak lanjut unit ini:
+                - "✅ Sesuai"      → Ka P4M menilai TIDAK perlu tindak
+                                     lanjut sama sekali, unit tidak perlu
+                                     mengisi apa pun di kolom kanan.
+                - "🔁 Perlu Revisi" → SUDAH pernah dikirim tapi DITOLAK
+                                     ("Belum Siap") oleh Staf P4M — unit
+                                     tinggal isi ULANG kolom kanan (lihat
+                                     alasan penolakan di bawah).
+                - "📝 Perlu Diisi"  → BELUM pernah dikirim sama sekali,
+                                     unit wajib isi kolom kanan.
+                - "✅ Terkirim"     → SUDAH dikirim dan sedang menunggu
+                                     keputusan Staf P4M, tidak bisa diedit
+                                     lagi dari sini.
+              Label lama "Input hasil" diganti "📝 Perlu Diisi" /
+              "🔁 Perlu Revisi" supaya lebih jelas bedanya.
+            */}
             <div className="w-[10%] border-r-2 border-black p-4 flex items-center justify-center">
               <span className={`font-bold text-center text-[10px] ${
-                sesuaiTanpaTindakLanjut ? "text-emerald-600" : sudahTerkirim ? "text-green-600" : "text-blue-600"
+                sesuaiTanpaTindakLanjut ? "text-emerald-600"
+                  : sudahTerkirim ? "text-green-600"
+                  : perluRevisi ? "text-red-600"
+                  : "text-blue-600"
               }`}>
-                {sesuaiTanpaTindakLanjut ? "✅ Sesuai" : sudahTerkirim ? "Terkirim" : "Input hasil"}
+                {sesuaiTanpaTindakLanjut ? "✅ Sesuai"
+                  : sudahTerkirim ? "✅ Terkirim"
+                  : perluRevisi ? "🔁 Perlu Revisi"
+                  : "📝 Perlu Diisi"}
               </span>
             </div>
             <div className="flex-1 p-5">
               {item.aksi_masukan && showForm && (
                 <div className="mb-3 p-2 bg-blue-50 border border-blue-200 text-[11px]">
                   <span className="font-bold text-blue-800">Masukan Ka P4M:</span> {item.aksi_masukan}
+                </div>
+              )}
+              {perluRevisi && item.catatan_approval && (
+                <div className="mb-3 p-2 bg-red-50 border border-red-200 text-[11px]">
+                  <span className="font-bold text-red-800">Alasan Ditolak Staf P4M:</span> {item.catatan_approval}
+                  <p className="text-[10px] text-red-600 mt-1 italic">
+                    Penyebab &amp; Rencana Tindak Lanjut tidak perlu diisi ulang — cukup perbaiki bagian Laporan Hasil di bawah ini.
+                  </p>
                 </div>
               )}
               {sesuaiTanpaTindakLanjut ? (
@@ -177,11 +217,7 @@ export default function ResultReportTable() {
                   <input type="date"
                     className="w-full border border-black p-2 text-[11px] outline-none focus:border-blue-polibatam"
                     value={tanggal[item.id_boxing] || ""}
-                    min={item.tanggal_ditindaklanjuti
-                      ? new Date(item.tanggal_ditindaklanjuti).toISOString().split('T')[0]
-                      : item.tanggal_laporan
-                        ? new Date(item.tanggal_laporan).toISOString().split('T')[0]
-                        : undefined}
+                    max={new Date().toISOString().split('T')[0]}
                     onChange={(e) => setTanggal((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
                   />
                   <AutoResizeTextarea

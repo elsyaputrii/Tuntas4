@@ -91,7 +91,17 @@ async function getLaporanMasuk(req, res) {
         AND (
           r.id_rancangan IS NULL
           OR r.status_review = 'menunggu_keputusan_ka'
-          OR b.approval_staf = 'ditolak'
+          -- ✅ FIX (permintaan user): "ditolak" oleh Staf P4M sekarang
+          -- mengembalikan laporan LANGSUNG ke tab "Laporan Hasil"
+          -- (status_boxing = 'menunggu_pelaksanaan', lihat setApprovalStaf
+          -- di stafController.js) — BUKAN lagi ke "Ketidaksesuaian Masuk".
+          -- Kondisi approval_staf='ditolak' di sini karena itu HANYA
+          -- dipakai untuk skenario lama (kalau suatu saat status boxing
+          -- masih 'di_staff' dengan approval 'ditolak'); dibatasi supaya
+          -- TIDAK ikut menangkap laporan yang sudah dipindah ke
+          -- 'menunggu_pelaksanaan' oleh alur revisi baru, yang harusnya
+          -- HANYA muncul di "Laporan Hasil", bukan di "Masuk" lagi.
+          OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
         )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],
@@ -370,23 +380,30 @@ async function submitPelaksanaan(req, res) {
     }
 
     const id_laporan = boxingRows[0].id_laporan;
-    const tanggalLaporan = new Date(boxingRows[0].tanggal_laporan);
-    tanggalLaporan.setHours(0, 0, 0, 0);
-    const tanggalDitindaklanjuti = boxingRows[0].tanggal_ditindaklanjuti
-      ? new Date(boxingRows[0].tanggal_ditindaklanjuti)
-      : tanggalLaporan;
-    tanggalDitindaklanjuti.setHours(0, 0, 0, 0);
-    const minTanggal =
-      tanggalDitindaklanjuti >= tanggalLaporan
-        ? tanggalDitindaklanjuti
-        : tanggalLaporan;
+    // ✅ FIX (permintaan user): sebelumnya tanggal pelaksanaan TIDAK BOLEH
+    // lebih awal dari tanggal laporan/tanggal Ka P4M menindaklanjuti —
+    // di lapangan ini menyulitkan Kepala Unit karena pekerjaan/perbaikan
+    // fisiknya kadang sudah dilakukan lebih dulu sebelum pencatatan resmi
+    // di sistem selesai (mis. instruksi lisan lebih dulu). Sekarang
+    // Kepala Unit bebas memilih tanggal pelaksanaan kapan pun, TERMASUK
+    // tanggal sebelum tanggal laporan/keputusan Ka P4M — satu-satunya
+    // batasan yang tersisa adalah tidak boleh tanggal di MASA DEPAN
+    // (lebih besar dari hari ini), supaya tetap masuk akal sebagai
+    // catatan pelaksanaan yang sudah benar-benar terjadi.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const tanggalInput = new Date(tanggal);
     tanggalInput.setHours(0, 0, 0, 0);
-    if (tanggalInput < minTanggal) {
+    if (isNaN(tanggalInput.getTime())) {
       return res.status(400).json({
         success: false,
-        message:
-          "Tanggal pelaksanaan tidak boleh lebih awal dari tanggal Ka P4M menindaklanjuti laporan.",
+        message: "Tanggal pelaksanaan tidak valid.",
+      });
+    }
+    if (tanggalInput > today) {
+      return res.status(400).json({
+        success: false,
+        message: "Tanggal pelaksanaan tidak boleh di masa depan.",
       });
     }
 

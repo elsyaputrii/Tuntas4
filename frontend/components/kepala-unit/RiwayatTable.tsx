@@ -47,6 +47,16 @@ type FilterMode = "semua" | "selesai";
 // yang pernah ditangani unit ini (apa pun tahapnya), jadi badge status
 // per baris harus benar-benar mencerminkan tahap sebenarnya, bukan
 // selalu "Selesai".
+//
+// ✅ FIX (permintaan user): label untuk status_boxing === "di_staff"
+// (artinya: Kepala Unit SUDAH selesai mengisi Laporan Hasil, dan
+// laporan sedang menunggu keputusan akhir dari STAF P4M — bukan Ka
+// P4M) SEBELUMNYA salah tertulis "Menunggu Keputusan Ka P4M". Diganti
+// jadi "Menunggu Keputusan Akhir Staf" supaya sesuai alur yang benar
+// (keputusan Siap/Belum Siap atas hasil tindak lanjut adalah wewenang
+// Staf P4M, lihat setApprovalStaf di stafController.js), dan konsisten
+// dengan label yang sama di RecapitulationTable.tsx (labelStatusLengkap
+// di exportHelpers.ts).
 function statusBadge(item: RiwayatItem): { label: string; cls: string } {
   if (item.status_boxing === "selesai") {
     return { label: "✓ Selesai", cls: "bg-green-100 text-green-700" };
@@ -55,7 +65,7 @@ function statusBadge(item: RiwayatItem): { label: string; cls: string } {
     if (item.approval_staf === "ditolak") {
       return { label: "🔄 Perbaikan Berkelanjutan", cls: "bg-red-100 text-red-700" };
     }
-    return { label: "⏳ Menunggu Keputusan Ka P4M", cls: "bg-amber-100 text-amber-700" };
+    return { label: "⏳ Menunggu Keputusan Akhir Staf", cls: "bg-amber-100 text-amber-700" };
   }
   if (item.status_boxing === "menunggu_pelaksanaan") {
     return { label: "🔧 Menunggu Pelaksanaan", cls: "bg-blue-100 text-blue-700" };
@@ -64,6 +74,21 @@ function statusBadge(item: RiwayatItem): { label: string; cls: string } {
     return { label: "⏳ Menunggu Ka P4M", cls: "bg-amber-100 text-amber-700" };
   }
   return { label: "🔄 Diproses", cls: "bg-blue-100 text-blue-700" };
+}
+
+// ✅ FIX (permintaan user): kolom "Hasil Tindak Lanjut" sebelumnya
+// menampilkan "—" polos kalau hasil_tindakan kosong — termasuk untuk
+// laporan yang statusnya SUDAH "selesai" (mis. kasus "Sesuai, tidak
+// perlu tindak lanjut" yang memang tidak pernah diisi pelaksanaannya).
+// Supaya tidak membingungkan / tidak muncul kesan "belum ada hasil"
+// padahal laporannya sudah tuntas, laporan yang sudah "selesai" tapi
+// tidak punya hasil_tindakan sekarang ditampilkan sebagai
+// "Sudah Terselesaikan" (dipakai juga oleh exportPDFRiwayatKepalaUnit
+// di exportPdf.ts supaya konsisten saat dicetak PDF).
+function hasilTindakLanjutText(item: RiwayatItem): string {
+  if (item.hasil_tindakan) return item.hasil_tindakan;
+  if (item.status_boxing === "selesai") return "Sudah Terselesaikan";
+  return "—";
 }
 
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
@@ -260,7 +285,7 @@ export default function RiwayatTable() {
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
                   <div className="border border-gray-300 p-2 h-16 overflow-auto">
-                    {item.hasil_tindakan ?? "—"}
+                    {hasilTindakLanjutText(item)}
                   </div>
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
                   {item.lampiran_hasil && (
@@ -321,7 +346,7 @@ export default function RiwayatTable() {
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
                   <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16 overflow-auto">
-                    {item.hasil_tindakan ?? "—"}
+                    {hasilTindakLanjutText(item)}
                   </div>
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
                   {item.lampiran_hasil && (
