@@ -312,7 +312,7 @@ useEffect(() => {
                             setShowProfile(false);
                             router.push('/ka-p4m/profil');
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                          className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                         >
                           Profil Saya
                         </button>
@@ -321,7 +321,7 @@ useEffect(() => {
                             setShowProfile(false);
                             router.push('/ka-p4m/pengaturan');
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                          className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                         >
                           Pengaturan
                         </button>
@@ -459,7 +459,7 @@ useEffect(() => {
                           setShowProfile(false);
                           router.push('/ka-p4m/profil');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
                         Profil Saya
                       </button>
@@ -468,7 +468,7 @@ useEffect(() => {
                           setShowProfile(false);
                           router.push('/ka-p4m/pengaturan');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
                         Pengaturan
                       </button>

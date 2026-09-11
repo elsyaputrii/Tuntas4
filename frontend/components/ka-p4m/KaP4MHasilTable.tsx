@@ -221,8 +221,16 @@ export default function KaP4MHasilTable() {
 
               <div className="w-[24%] border-r-2 border-black p-3">
                 <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
-                  {item.hasil_tindakan || (
-                    <span className="text-gray-400 italic">Belum diisi Kepala Unit</span>
+                  {item.hasil_tindakan ? (
+                    item.hasil_tindakan
+                  ) : item.approval_staf === "diterima" ? (
+                    <span className="text-green-600 italic font-semibold">
+                      Selesai
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic">
+                      Belum diisi Kepala Unit
+                    </span>
                   )}
                 </div>
                 {item.tanggal_pelaksanaan && (

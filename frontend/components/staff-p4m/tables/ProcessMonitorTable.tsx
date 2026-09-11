@@ -218,7 +218,7 @@ export default function ProcessMonitorTable() {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
     }
     if (!item.hasil_tindakan) {
-      return <span className="text-[9px] text-gray-400 italic text-center">Menunggu hasil unit</span>;
+      return <span className="text-[10px] text-gray-400 italic text-center">Selesai</span>;
     }
 
     const apprVal = item.approval_staf && item.approval_staf !== "menunggu" ? item.approval_staf : null;
@@ -530,12 +530,22 @@ export default function ProcessMonitorTable() {
 
                       <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-top">
                         {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                        {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
+                        {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-7">{item.aksi_masukan}</p>}
                       </div>
 
                       <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
                         <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
-                          {item.hasil_tindakan || (item.status_review === "tidak_ditindaklanjuti" ? "— (tidak ditindaklanjuti)" : "Belum ada hasil")}
+                          {item.hasil_tindakan ? (
+                            item.hasil_tindakan
+                          ) : item.status_review === "tidak_ditindaklanjuti" ? (
+                            <span className="inline-block text-[9px] text-gray-400 italic bg-gray-50 px-1.5 py-0.5 rounded">
+                              Sudah sesuai, tidak ditindaklanjuti
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-gray-400 italic">
+                              Belum ada hasil
+                            </span>
+                          )}
                         </div>
                         {item.tanggal_pelaksanaan && (
                           <p className="text-[9px] text-gray-400 mt-1">
@@ -609,12 +619,22 @@ export default function ProcessMonitorTable() {
 
                           <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-top">
                             {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                            {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-2">{item.aksi_masukan}</p>}
+                            {item.aksi_masukan && <p className="text-[9px] text-gray-500 italic mt-1 line-clamp-7">{item.aksi_masukan}</p>}
                           </div>
 
                           <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
                             <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
-                              {item.hasil_tindakan || "— (tidak ditindaklanjuti)"}
+                              {item.hasil_tindakan ? (
+                                item.hasil_tindakan
+                              ) : item.status_review === "tidak_ditindaklanjuti" ? (
+                                <span className="inline-block text-[9px] text-gray-400 italic bg-gray-50 px-1.5 py-0.5 rounded">
+                                  Sudah sesuai, tidak ditindaklanjuti
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-gray-400 italic">
+                                  Belum ada hasil
+                                </span>
+                              )}
                             </div>
                             {item.tanggal_pelaksanaan && (
                               <p className="text-[9px] text-gray-400 mt-1">
