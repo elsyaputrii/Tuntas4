@@ -296,10 +296,7 @@ async function cekStatusLaporan(req, res) {
         SUM(CASE WHEN r.status_review = 'tidak_ditindaklanjuti' THEN 1 ELSE 0 END) AS jumlah_tidak,
         COUNT(DISTINCT p.id_pelaksanaan) AS jumlah_pelaksanaan,
         SUM(CASE WHEN b.status = 'selesai' THEN 1 ELSE 0 END) AS jumlah_selesai,
-        GROUP_CONCAT(DISTINCT b.unit_tujuan ORDER BY b.unit_tujuan SEPARATOR '||') AS units_raw,
-        GROUP_CONCAT(DISTINCT r.deskripsi ORDER BY r.id_rancangan SEPARATOR '||') AS rencana_raw,
-        GROUP_CONCAT(DISTINCT r.catatan ORDER BY r.id_rancangan SEPARATOR '||') AS catatan_raw,
-        GROUP_CONCAT(DISTINCT r.status_review ORDER BY r.id_rancangan SEPARATOR '||') AS review_raw
+        GROUP_CONCAT(DISTINCT b.unit_tujuan ORDER BY b.unit_tujuan SEPARATOR '||') AS units_raw
       FROM boxing_ketidaksesuaian b
       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
@@ -318,10 +315,38 @@ async function cekStatusLaporan(req, res) {
       jumlah_pelaksanaan: Number(raw.jumlah_pelaksanaan) || 0,
       jumlah_selesai: Number(raw.jumlah_selesai) || 0,
       unit_tujuan: split(raw.units_raw),
-      rencana_tindakan: split(raw.rencana_raw)[0] || null,
-      catatan_staf: split(raw.catatan_raw)[0] || null,
-      status_rancangan: split(raw.review_raw)[0] || null,
     };
+
+    // ✅ FIX: ambil rencana tindakan / catatan PER UNIT (per id_boxing),
+    // bukan digabung jadi satu string lalu diambil elemen pertamanya saja
+    // (bug lama: laporan yang didistribusikan ke >1 unit kehilangan data
+    // rencana tindakan dari unit ke-2 dst). Subquery dipakai supaya kalau
+    // suatu saat 1 unit punya lebih dari 1 rancangan, yang diambil selalu
+    // rancangan terbaru untuk unit tsb — tidak fanout jadi banyak baris.
+    const [detailUnitRows] = await pool.query(
+      `SELECT
+        b.unit_tujuan,
+        (SELECT r.deskripsi FROM rancangan_tindakan r
+          WHERE r.id_boxing = b.id_boxing
+          ORDER BY r.id_rancangan DESC LIMIT 1) AS rencana_tindakan,
+        (SELECT r.catatan FROM rancangan_tindakan r
+          WHERE r.id_boxing = b.id_boxing
+          ORDER BY r.id_rancangan DESC LIMIT 1) AS catatan_staf,
+        (SELECT r.status_review FROM rancangan_tindakan r
+          WHERE r.id_boxing = b.id_boxing
+          ORDER BY r.id_rancangan DESC LIMIT 1) AS status_review
+      FROM boxing_ketidaksesuaian b
+      WHERE b.id_laporan = ?
+      ORDER BY b.unit_tujuan`,
+      [id_laporan]
+    );
+
+    const detail_unit = detailUnitRows.map((row) => ({
+      unit_tujuan: row.unit_tujuan,
+      rencana_tindakan: row.rencana_tindakan || null,
+      catatan_staf: row.catatan_staf || null,
+      status_review: row.status_review || null,
+    }));
 
     return res.status(200).json({
       success: true,
@@ -339,9 +364,7 @@ async function cekStatusLaporan(req, res) {
         created_at: laporan.created_at,
         updated_at: laporan.updated_at,
         unit_tujuan: ringkasan.unit_tujuan,
-        rencana_tindakan: ringkasan.rencana_tindakan,
-        catatan_staf: ringkasan.catatan_staf,
-        status_rancangan: ringkasan.status_rancangan,
+        detail_unit,
         tahap_progres: buildTahapProgres(laporan, ringkasan),
         update_terbaru: buildUpdateTerbaru(laporan, ringkasan),
       },

@@ -28,6 +28,7 @@ router.get("/proses", async (req, res) => {
         r.id_rancangan,
         r.penyebab,
         r.deskripsi AS rencana_tindakan,
+        r.tanggal_rencana,
         r.status_review,
         r.aksi_masukan,
         r.catatan AS catatan_kepala,
@@ -187,6 +188,7 @@ router.get("/kepala-unit/laporan-masuk", async (req, res) => {
         l.lampiran AS lampiran_laporan, l.status AS status_laporan,
         l.created_at,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
+        r.tanggal_rencana,
         r.status_review, r.aksi_masukan, r.catatan AS catatan_review
       FROM boxing_ketidaksesuaian b
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
@@ -210,6 +212,7 @@ router.get("/kepala-unit/laporan-hasil", async (req, res) => {
         b.id_boxing, b.unit_tujuan, b.status AS status_boxing, b.approval_staf,
         l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
+        r.tanggal_rencana,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan,

@@ -21,6 +21,12 @@ interface LaporanItem {
   catatan_approval: string | null;
   penyebab: string | null;
   rencana_tindakan: string | null;
+  // ✅ FITUR BARU: target tanggal selesai rencana tindak lanjut, diisi
+  // Kepala Unit lewat kalender di bawah kotak "Rencana Tindak Lanjut".
+  // Otomatis ikut terbaca Ka P4M lewat GET /ka-p4m/proses (lihat
+  // KaP4MReviewTable.tsx) supaya Ka P4M tahu target selesainya kapan
+  // sebelum memutuskan.
+  tanggal_rencana: string | null;
   status_review: string | null;
   created_at?: string | null;
   // ✅ tanggal_laporan = tanggal KEJADIAN yang diisi civitas akademika
@@ -44,6 +50,8 @@ export default function DiscrepancyTable() {
   const [laporanList, setLaporanList] = useState<LaporanItem[]>([]);
   const [penyebab,    setPenyebab]    = useState<Record<number, string>>({});
   const [rencana,     setRencana]     = useState<Record<number, string>>({});
+  // ✅ FITUR BARU: tanggal target selesai rencana tindak lanjut
+  const [tanggalRencana, setTanggalRencana] = useState<Record<number, string>>({});
   const [sending,     setSending]     = useState<Record<number, boolean>>({});
   const [loading,     setLoading]     = useState(true);
   const [errMsg,      setErrMsg]      = useState("");
@@ -61,11 +69,17 @@ export default function DiscrepancyTable() {
         setLaporanList(result.data);
         const initP: Record<number, string> = {};
         const initR: Record<number, string> = {};
+        const initT: Record<number, string> = {};
         result.data.forEach((item: LaporanItem) => {
           initP[item.id_boxing] = item.penyebab         || "";
           initR[item.id_boxing] = item.rencana_tindakan || "";
+          // tanggal_rencana dari backend berformat "YYYY-MM-DDTHH:mm:ss.sssZ"
+          // atau "YYYY-MM-DD" — <input type="date"> butuh persis "YYYY-MM-DD".
+          initT[item.id_boxing] = item.tanggal_rencana
+            ? String(item.tanggal_rencana).slice(0, 10)
+            : "";
         });
-        setPenyebab(initP); setRencana(initR);
+        setPenyebab(initP); setRencana(initR); setTanggalRencana(initT);
       }
     } catch (err: unknown) {
       setErrMsg(err instanceof Error ? err.message : "Gagal memuat data laporan.");
@@ -83,6 +97,19 @@ export default function DiscrepancyTable() {
       alert("Penyebab dan rencana tindak lanjut harus diisi.");
       return;
     }
+    // ✅ FITUR BARU: Tanggal Rencana wajib diisi, dan tidak boleh tanggal
+    // yang sudah lewat (kalender di UI cuma bisa "maju", lihat atribut
+    // `min` pada <input type="date"> di bawah — validasi ini jaga-jaga
+    // kalau ada cara lain untuk mengubah tanggal).
+    if (!tanggalRencana[id_boxing]) {
+      alert("Tanggal rencana harus diisi.");
+      return;
+    }
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (tanggalRencana[id_boxing] < todayStr) {
+      alert("Tanggal rencana tidak boleh tanggal yang sudah lewat.");
+      return;
+    }
     setConfirmId(id_boxing);
   };
 
@@ -95,6 +122,7 @@ export default function DiscrepancyTable() {
         id_boxing,
         penyebab:         penyebab[id_boxing].trim(),
         rencana_tindakan: rencana[id_boxing].trim(),
+        tanggal_rencana:  tanggalRencana[id_boxing],
       });
       if (result.success) { alert("Laporan berhasil dikirim!"); fetchData(); }
     } catch (err: unknown) {
@@ -145,7 +173,7 @@ export default function DiscrepancyTable() {
       <ConfirmDialog
         open={confirmId !== null}
         title="Konfirmasi Kirim"
-        message="Yakin ingin mengirim ini? Penyebab dan Rencana Tindak Lanjut akan diteruskan ke Ka P4M. Anda tetap bisa mengedit & mengirim ulang selama Ka P4M belum mengambil keputusan."
+        message="Yakin ingin mengirim ini? Penyebab, Rencana Tindak Lanjut, dan Tanggal Rencana akan diteruskan ke Ka P4M. Anda tetap bisa mengedit & mengirim ulang selama Ka P4M belum mengambil keputusan."
         confirmLabel="Kirim"
         cancelLabel="Batal"
         loading={confirmId !== null && !!sending[confirmId]}
@@ -228,6 +256,19 @@ export default function DiscrepancyTable() {
                     onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
                   />
                 </div>
+                {/* ✅ FITUR BARU: Tanggal Rencana — kalender cuma bisa
+                    "maju" (atribut `min` dikunci ke hari ini, jadi tanggal
+                    yang sudah lewat tidak bisa dipilih sama sekali). */}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Tanggal Rencana</p>
+                  <input
+                    type="date"
+                    className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam rounded"
+                    value={tanggalRencana[item.id_boxing] || ""}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setTanggalRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  />
+                </div>
                 <div className="flex justify-end">
                   {/* ✅ FIX: kolom Penyebab & Rencana Tindak Lanjut sekarang
                       selalu bisa diedit, jadi tombol Kirim juga selalu
@@ -306,8 +347,9 @@ export default function DiscrepancyTable() {
                   />
                 </div>
 
-                {/* Kolom 5: Rencana Tindak Lanjut — sama seperti Kolom 4 */}
-                <div className="w-[18%] border-r-2 border-black p-5">
+                {/* Kolom 5: Rencana Tindak Lanjut — sama seperti Kolom 4,
+                    ditambah kalender "Tanggal Rencana" di bawahnya. */}
+                <div className="w-[18%] border-r-2 border-black p-5 space-y-2">
                   <AutoResizeTextarea
                     minHeight={112}
                     className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed"
@@ -316,6 +358,18 @@ export default function DiscrepancyTable() {
                     onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
                     spellCheck={false}
                   />
+                  {/* ✅ FITUR BARU: Tanggal Rencana — kalender cuma bisa
+                      "maju" (atribut `min` dikunci ke hari ini). */}
+                  <div>
+                    <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">Tanggal Rencana</p>
+                    <input
+                      type="date"
+                      className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam"
+                      value={tanggalRencana[item.id_boxing] || ""}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setTanggalRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
                 {/* Kolom 6: Aksi */}

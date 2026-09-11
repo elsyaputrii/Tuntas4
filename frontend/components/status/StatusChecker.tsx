@@ -13,6 +13,13 @@ export interface TahapProgres {
   deskripsi: string;
 }
 
+export interface DetailUnit {
+  unit_tujuan: string;
+  rencana_tindakan: string | null;
+  catatan_staf: string | null;
+  status_review: string | null;
+}
+
 export interface StatusLaporanData {
   kode_laporan: string;
   status_pelapor_label: string;
@@ -23,8 +30,7 @@ export interface StatusLaporanData {
   status_label: string;
   created_at: string;
   unit_tujuan: string[];
-  rencana_tindakan: string | null;
-  catatan_staf: string | null;
+  detail_unit: DetailUnit[];
   tahap_progres: TahapProgres[];
   update_terbaru: string;
 }
@@ -99,7 +105,7 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-3xl p-8 text-white shadow-xl overflow-hidden relative">
+      <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-3xl p-8 text-white shadow-xl overflow-hidden relative">
         <div className="relative z-10">
           <span className="bg-white/20 px-4 py-2 rounded-full text-sm font-medium">
             Tracking Laporan
@@ -164,22 +170,32 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
             <div className="space-y-4 text-sm">
               <div className="flex justify-between border-b pb-3 gap-4">
                 <span className="text-gray-500 shrink-0">Nomor Tiket</span>
-                <span className="font-bold text-gray-800 tracking-wider">{data.kode_laporan}</span>
+                <span className="font-bold text-gray-800 tracking-wider">
+                  {data.kode_laporan}
+                </span>
               </div>
+
               <div className="flex justify-between border-b pb-3 gap-4">
                 <span className="text-gray-500 shrink-0">Tanggal Laporan</span>
                 <span className="font-semibold text-gray-800 text-right">
                   {formatTanggal(data.created_at)}
                 </span>
               </div>
+
               <div className="flex justify-between border-b pb-3 gap-4">
                 <span className="text-gray-500 shrink-0">Status Pelapor</span>
-                <span className="font-semibold text-gray-800">{data.status_pelapor_label}</span>
+                <span className="font-semibold text-gray-800">
+                  {data.status_pelapor_label}
+                </span>
               </div>
+
               <div className="flex justify-between border-b pb-3 gap-4">
                 <span className="text-gray-500 shrink-0">Jenis Laporan</span>
-                <span className="font-semibold text-gray-800">{data.jenis_laporan_label}</span>
+                <span className="font-semibold text-gray-800">
+                  {data.jenis_laporan_label}
+                </span>
               </div>
+
               <div className="flex justify-between border-b pb-3 gap-4 items-center">
                 <span className="text-gray-500 shrink-0">Status Saat Ini</span>
                 <span
@@ -190,6 +206,7 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                   {data.status_label}
                 </span>
               </div>
+
               {data.unit_tujuan.length > 0 && (
                 <div className="flex justify-between border-b pb-3 gap-4">
                   <span className="text-gray-500 shrink-0">Unit Tujuan</span>
@@ -198,28 +215,63 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                   </span>
                 </div>
               )}
+
               <div>
                 <p className="text-gray-500 mb-2">Isi Laporan</p>
                 <div className="bg-gray-50 rounded-2xl p-4 text-gray-700 leading-relaxed">
                   {data.deskripsi}
                 </div>
               </div>
-              {data.rencana_tindakan && (
-                <div>
-                  <p className="text-gray-500 mb-2">Rencana Tindak Lanjut</p>
-                  <div className="bg-blue-50 rounded-2xl p-4 text-gray-700 text-sm">
-                    {data.rencana_tindakan}
-                  </div>
+
+              {/* Rencana Tindak Lanjut PER UNIT */}
+              {data.detail_unit && data.detail_unit.length > 0 && (
+                <div className="space-y-4">
+                  {data.detail_unit.map((unit, idx) => {
+                    const adaRencana = !!unit.rencana_tindakan;
+                    const adaCatatan = !!unit.catatan_staf;
+
+                    if (!adaRencana && !adaCatatan) return null;
+
+                    const tampilkanLabelUnit = data.detail_unit.length > 1;
+
+                    return (
+                      <div
+                        key={`${unit.unit_tujuan}-${idx}`}
+                        className="space-y-3"
+                      >
+                        {tampilkanLabelUnit && (
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            Unit: {unit.unit_tujuan}
+                          </p>
+                        )}
+
+                        {adaRencana && (
+                          <div>
+                            <p className="text-gray-500 mb-2">
+                              Rencana Tindak Lanjut
+                            </p>
+                            <div className="bg-blue-50 rounded-2xl p-4 text-gray-700 text-sm">
+                              {unit.rencana_tindakan}
+                            </div>
+                          </div>
+                        )}
+
+                        {adaCatatan && (
+                          <div>
+                            <p className="text-gray-500 mb-2">
+                              Catatan P4M
+                            </p>
+                            <div className="bg-yellow-50 rounded-2xl p-4 text-gray-700 text-sm">
+                              {unit.catatan_staf}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-              {data.catatan_staf && (
-                <div>
-                  <p className="text-gray-500 mb-2">Catatan P4M</p>
-                  <div className="bg-yellow-50 rounded-2xl p-4 text-gray-700 text-sm">
-                    {data.catatan_staf}
-                  </div>
-                </div>
-              )}
+
               {lampiranUrl && (
                 <div>
                   <p className="text-gray-500 mb-3">Bukti Lampiran</p>
@@ -242,8 +294,12 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                 🚀
               </div>
               <div>
-                <h2 className="font-bold text-xl text-gray-800">Progress Laporan</h2>
-                <p className="text-gray-500 text-sm">Pantau proses laporan Anda</p>
+                <h2 className="font-bold text-xl text-gray-800">
+                  Progress Laporan
+                </h2>
+                <p className="text-gray-500 text-sm">
+                  Pantau proses laporan Anda
+                </p>
               </div>
             </div>
 
@@ -258,14 +314,16 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                     >
                       {item.selesai ? "✓" : ""}
                     </div>
+
                     {index < data.tahap_progres.length - 1 && (
                       <div
-                        className={`w-0.5 flex-1 min-h-[40px] mt-1 ${
+                        className={`w-0.5 flex-1 min-h-10 mt-1 ${
                           item.selesai ? "bg-green-300" : "bg-gray-200"
                         }`}
                       />
                     )}
                   </div>
+
                   <div className="pb-2">
                     <h3
                       className={`font-semibold ${
@@ -274,18 +332,27 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                     >
                       {item.title}
                     </h3>
-                    <p className="text-sm text-gray-500 mt-1 leading-relaxed">{item.deskripsi}</p>
+
+                    <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                      {item.deskripsi}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="mt-8 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-5">
+            <div className="mt-8 bg-linear-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-5">
               <div className="flex items-start gap-3">
                 <span className="text-xl">ℹ️</span>
+
                 <div>
-                  <h4 className="font-bold text-blue-700 mb-1">Update Terbaru</h4>
-                  <p className="text-sm text-gray-700 leading-relaxed">{data.update_terbaru}</p>
+                  <h4 className="font-bold text-blue-700 mb-1">
+                    Update Terbaru
+                  </h4>
+
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {data.update_terbaru}
+                  </p>
                 </div>
               </div>
             </div>
@@ -299,13 +366,17 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
           onClick={() => setPreviewImage(false)}
         >
-          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative max-w-4xl max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={lampiranUrl}
               alt="Bukti laporan"
               className="rounded-2xl max-h-[85vh] object-contain mx-auto"
             />
+
             <button
               type="button"
               onClick={() => setPreviewImage(false)}

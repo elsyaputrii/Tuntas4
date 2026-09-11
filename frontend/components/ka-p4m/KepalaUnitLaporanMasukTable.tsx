@@ -19,6 +19,7 @@ interface LaporanItem {
   status_boxing: string;
   penyebab: string | null;
   rencana_tindakan: string | null;
+  tanggal_rencana: string | null;
   status_review: string | null;
   catatan_review: string | null;
   created_at?: string | null;
@@ -127,6 +128,7 @@ export default function KepalaUnitLaporanMasukTable() {
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Tindak Lanjut</p>
                   <p className="text-xs text-gray-700 whitespace-pre-wrap">{item.rencana_tindakan || "—"}</p>
                 </div>
+                <p className="text-[10px] text-gray-500">🎯 Target Selesai: {item.tanggal_rencana ? fmtDate(item.tanggal_rencana) : "—"}</p>
                 {badge && <div className={`px-2 py-1 border rounded text-[10px] font-medium inline-block ${badge.cls}`}>{badge.label}</div>}
               </div>
 
@@ -158,6 +160,7 @@ export default function KepalaUnitLaporanMasukTable() {
                 </div>
                 <div className="w-[20%] border-r-2 border-black p-5">
                   <p className="text-xs text-gray-700 whitespace-pre-wrap">{item.rencana_tindakan || "—"}</p>
+                  <p className="mt-1 text-[10px] text-gray-500">🎯 Target: {item.tanggal_rencana ? fmtDate(item.tanggal_rencana) : "—"}</p>
                 </div>
                 <div className="flex-1 p-5 flex items-center justify-center">
                   {badge ? (
