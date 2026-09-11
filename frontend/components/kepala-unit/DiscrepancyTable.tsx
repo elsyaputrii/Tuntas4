@@ -23,11 +23,6 @@ interface LaporanItem {
   rencana_tindakan: string | null;
   status_review: string | null;
   created_at?: string | null;
-  // ✅ Fitur sinkronisasi (poin #6): true kalau Penyebab & Rencana di
-  // bawah ini berasal dari draft yang diisi Kepala Unit lain (unit ini
-  // sendiri belum pernah mengirim rancangan untuk laporan ini).
-  dari_sinkronisasi?: boolean | number;
-  sinkron_dari_unit?: string | null;
   // ✅ tanggal_laporan = tanggal KEJADIAN yang diisi civitas akademika
   // saat lapor (fallback ke created_at kalau tanggal_kejadian kosong).
   // Ini yang seharusnya tampil di kolom "Tanggal Masuk", bukan created_at
@@ -213,11 +208,6 @@ export default function DiscrepancyTable() {
                     <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}
                   </div>
                 )}
-                {item.dari_sinkronisasi ? (
-                  <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                    🔄 Sudah diisi Kepala Unit {item.sinkron_dari_unit || "lain"} untuk laporan ini — silakan cek/edit sebelum mengirim.
-                  </p>
-                ) : null}
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
                   <AutoResizeTextarea
@@ -283,11 +273,6 @@ export default function DiscrepancyTable() {
                       <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}
                     </div>
                   )}
-                  {item.dari_sinkronisasi ? (
-                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700">
-                      🔄 Penyebab &amp; Rencana sudah diisi Kepala Unit {item.sinkron_dari_unit || "lain"} — silakan cek/edit sebelum mengirim.
-                    </div>
-                  ) : null}
                 </div>
 
                 {/* Kolom 2: Tanggal Masuk (tanggal laporan diterima/dibuat di sistem) */}

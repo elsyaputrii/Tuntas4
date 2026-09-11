@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { kaP4MApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
@@ -111,6 +111,31 @@ export default function KaP4MReviewTable() {
     return data.filter((item) => isInPeriod(item.created_at, filterPeriod));
   }, [data, filterPeriod]);
 
+  const groupedData = useMemo(() => {
+    const map = new Map<number, {
+      id_laporan: number;
+      kode_laporan: string;
+      isi_laporan: string;
+      lampiran_laporan?: string | null;
+      units: RancanganItem[];
+    }>();
+    const order: number[] = [];
+    filteredData.forEach((item) => {
+      if (!map.has(item.id_laporan)) {
+        map.set(item.id_laporan, {
+          id_laporan: item.id_laporan,
+          kode_laporan: item.kode_laporan,
+          isi_laporan: item.isi_laporan,
+          lampiran_laporan: item.lampiran_laporan,
+          units: [],
+        });
+        order.push(item.id_laporan);
+      }
+      map.get(item.id_laporan)!.units.push(item);
+    });
+    return order.map((id) => map.get(id)!);
+  }, [filteredData]);
+
   function openModalView(item: RancanganItem) {
     setModal({ open: true, item, mode: 'view' });
     setKeputusan(item.status_review === "ditindaklanjuti" ? "ditindaklanjuti" : "tidak");
@@ -127,12 +152,12 @@ export default function KaP4MReviewTable() {
 
   async function handleSubmit() {
     if (!modal.item?.id_rancangan) return;
-    
+
     if (!aksiMasukan.trim()) {
       setError("Aksi / Masukan ke Kepala Unit wajib diisi!");
       return;
     }
-    
+
     setSubmitting(true);
     try {
       await kaP4MApi.keputusanKa({
@@ -140,11 +165,11 @@ export default function KaP4MReviewTable() {
         keputusan,
         aksi_masukan: aksiMasukan.trim(),
       });
-      
-      const label = keputusan === "ditindaklanjuti" 
-        ? "🔄 Perbaikan Berkelanjutan" 
+
+      const label = keputusan === "ditindaklanjuti"
+        ? "🔄 Perbaikan Berkelanjutan"
         : "✅ Sesuai";
-      
+
       setMsgOk(`✅ Keputusan berhasil diperbarui menjadi "${label}"!`);
       setTimeout(() => setMsgOk(""), 4000);
       setModal({ open: false, item: null, mode: 'view' });
@@ -168,7 +193,7 @@ export default function KaP4MReviewTable() {
   if (loading) {
     return (
       <div className="w-full border-2 border-black bg-white p-12 text-center">
-        <div className="w-6 h-6 border-4 border-[#5da0dd] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <div className="w-6 h-6 border-4 border-blue-polibatam border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-gray-400 text-xs">Memuat data...</p>
       </div>
     );
@@ -215,13 +240,12 @@ export default function KaP4MReviewTable() {
             </div>
 
             {modal.mode === 'view' ? (
-              // ── VIEW MODE ──
               <>
                 <div className="mb-4">
                   <p className="text-[11px] font-bold uppercase block mb-1">Keputusan:</p>
                   <div className={`p-2 border rounded text-xs font-semibold inline-block ${
-                    keputusan === 'ditindaklanjuti' 
-                      ? 'border-red-500 bg-red-50 text-red-700' 
+                    keputusan === 'ditindaklanjuti'
+                      ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-green-500 bg-green-50 text-green-700'
                   }`}>
                     {keputusan === 'ditindaklanjuti' ? '🔄 Perbaikan Berkelanjutan' : '✅ Sesuai'}
@@ -229,13 +253,12 @@ export default function KaP4MReviewTable() {
                 </div>
                 <div className="mb-4">
                   <p className="text-[11px] font-bold uppercase block mb-1">Aksi / Masukan:</p>
-                  <div className="border border-gray-300 p-2 text-xs rounded bg-gray-50 min-h-[60px]">
+                  <div className="border border-black p-2 text-xs rounded bg-gray-50 min-h-15">
                     {aksiMasukan || '-'}
                   </div>
                 </div>
               </>
             ) : (
-              // ── EDIT MODE ──
               <>
                 <label className="text-[11px] font-bold uppercase block mb-2">Keputusan :</label>
                 <div className="flex gap-2 mb-4">
@@ -293,7 +316,7 @@ export default function KaP4MReviewTable() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="px-6 py-2 bg-[#5da0dd] text-white text-[11px] font-bold disabled:opacity-50"
+                  className="px-6 py-2 bg-blue-polibatam text-white text-[11px] font-bold disabled:opacity-50"
                 >
                   {submitting ? "Menyimpan..." : "Update Keputusan"}
                 </button>
@@ -311,7 +334,7 @@ export default function KaP4MReviewTable() {
               key={opt.id}
               type="button"
               onClick={() => setFilterPeriod(opt.id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all
+              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all
                 ${filterPeriod === opt.id
                   ? "bg-[#4E617A] text-white border-[#4E617A] shadow"
                   : "bg-white text-[#4E617A] border-[#4E617A]/30 hover:bg-[#4E617A]/10"
@@ -339,218 +362,268 @@ export default function KaP4MReviewTable() {
           <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>
         )}
 
-        {/* HEADER DESKTOP */}
-        <div className="hidden sm:flex font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[11px]">
-          <div className="flex-1 border-r-2 border-black p-3">Laporan Civitas</div>
-          <div className="w-[14%] border-r-2 border-black p-3">Tanggal Masuk</div>
-          <div className="w-[16%] border-r-2 border-black p-3">Penyebab</div>
-          <div className="w-[20%] border-r-2 border-black p-3">Rencana Unit</div>
-          <div className="w-[12%] border-r-2 border-black p-3">Status</div>
-          <div className="w-[16%] p-3">Aksi</div>
+        {/* ── MOBILE (card list) ── */}
+        <div className="sm:hidden">
+          {groupedData.length === 0 ? (
+            <div className="p-12 text-center text-gray-400 italic text-sm">
+              {filterPeriod === "semua"
+                ? "Belum ada rancangan dari Kepala Unit."
+                : `Tidak ada laporan untuk periode ${FILTER_OPTIONS.find(o => o.id === filterPeriod)?.label.toLowerCase()}.`}
+            </div>
+          ) : (
+            groupedData.map((group, gIdx) => (
+              <div
+                key={group.id_laporan}
+                className={`p-4 space-y-3 ${gIdx > 0 ? "border-t-2 border-black" : ""}`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-[#4E617A] bg-blue-50 px-2 py-0.5 rounded">
+                      {group.kode_laporan}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Laporan Civitas</p>
+                  <div className="border border-gray-300 p-2 text-[11px] rounded whitespace-pre-wrap wrap-break-words">{group.isi_laporan}</div>
+                  {group.lampiran_laporan && (
+                    <button
+                      onClick={() => {
+                        const url = `${BASE_URL}/uploads/${group.lampiran_laporan}`;
+                        setModalSrc(url);
+                      }}
+                      className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
+                    >
+                      🖼️ Lihat Gambar
+                    </button>
+                  )}
+                </div>
+
+                {group.units.map((item, uIdx) => {
+                  const badge = item.status_review ? statusBadge[item.status_review] : null;
+                  const bisaPutus = item.status_review === "menunggu_keputusan_ka";
+                  const sudahDiputus = item.status_review === "ditindaklanjuti" || item.status_review === "tidak_ditindaklanjuti";
+
+                  return (
+                    <div
+                      key={item.id_boxing}
+                      className={`space-y-2 ${uIdx > 0 ? "pt-3 border-t border-dashed border-gray-300" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                          Unit: {item.nama_unit}
+                        </span>
+                        {badge && (
+                          <span className={`text-[9px] font-bold px-2 py-0.5 border rounded ${badge.cls}`}>
+                            {badge.label}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-500">
+                        📅 Tanggal Masuk: {item.created_at
+                          ? new Date(item.created_at).toLocaleDateString('id-ID', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : '-'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
+                          <div className="border border-black p-2 text-[10px] rounded min-h-15 whitespace-pre-wrap wrap-break-words">
+                            {item.penyebab || "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Unit</p>
+                          <div className="border border-black p-2 text-[10px] rounded min-h-15 whitespace-pre-wrap wrap-break-words">
+                            {item.rencana_tindakan || "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {bisaPutus ? (
+                          <button
+                            type="button"
+                            onClick={() => openModalEdit(item)}
+                            className="flex-1 bg-blue-polibatam text-white font-bold py-2 text-[10px] rounded"
+                          >
+                            Beri Keputusan
+                          </button>
+                        ) : sudahDiputus ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openModalView(item)}
+                              className="flex-1 bg-blue-500 text-white font-bold py-2 text-[10px] rounded hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
+                            >
+                              <Eye size={14} /> Lihat
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openModalEdit(item)}
+                              className="p-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
+                              title="Edit Keputusan"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 text-center w-full">Sudah diputuskan</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          )}
         </div>
 
-        {filteredData.length === 0 ? (
-          <div className="p-12 text-center text-gray-400 italic text-sm">
-            {filterPeriod === "semua"
-              ? "Belum ada rancangan dari Kepala Unit."
-              : `Tidak ada laporan untuk periode ${FILTER_OPTIONS.find(o => o.id === filterPeriod)?.label.toLowerCase()}.`}
-          </div>
-        ) : (
-          filteredData.map((item, idx) => {
-            const badge = item.status_review ? statusBadge[item.status_review] : null;
-            const bisaPutus = item.status_review === "menunggu_keputusan_ka";
-            const sudahDiputus = item.status_review === "ditindaklanjuti" || item.status_review === "tidak_ditindaklanjuti";
+        {/* ── DESKTOP: SATU CSS GRID untuk header + semua baris ──
+            ✅ FIX (scroll horizontal saat zoom): grid dibungkus wrapper
+            `overflow-x-auto` + diberi `min-w-[900px]` supaya kolom tidak
+            diperas jadi sempit saat halaman di-zoom / viewport mengecil.
+            Kalau lebar container < min-w, otomatis muncul scrollbar
+            horizontal di dalam tabel dan bisa digeser (scroll/trackpad),
+            tanpa mengganggu layout grid & rowspan yang sudah ada. */}
+        <div className="hidden sm:block overflow-x-auto">
+          <div
+            className="grid text-[11px] min-w-225"
+            style={{ gridTemplateColumns: "22fr 14fr 16fr 20fr 12fr 16fr" }}
+          >
+            {/* HEADER */}
+            <div className="font-bold uppercase bg-gray-50 border-b-2 border-r-2 border-black p-3 text-center">Laporan Civitas</div>
+            <div className="font-bold uppercase bg-gray-50 border-b-2 border-r-2 border-black p-3 text-center">Tanggal Masuk</div>
+            <div className="font-bold uppercase bg-gray-50 border-b-2 border-r-2 border-black p-3 text-center">Penyebab</div>
+            <div className="font-bold uppercase bg-gray-50 border-b-2 border-r-2 border-black p-3 text-center">Rencana Unit</div>
+            <div className="font-bold uppercase bg-gray-50 border-b-2 border-r-2 border-black p-3 text-center">Status</div>
+            <div className="font-bold uppercase bg-gray-50 border-b-2 border-black p-3 text-center">Aksi</div>
 
-            return (
-              <div
-                key={`${item.id_boxing}-${idx}`}
-                className={`${idx > 0 ? "border-t-2 border-black" : ""}`}
-              >
-                {/* MOBILE CARD */}
-                <div className="sm:hidden p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-[10px] font-bold text-[#4E617A] bg-blue-50 px-2 py-0.5 rounded">
-                      {item.kode_laporan} · {item.nama_unit}
-                    </span>
-                    {badge && (
-                      <span className={`text-[9px] font-bold px-2 py-0.5 border rounded ${badge.cls}`}>
-                        {badge.label}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Laporan Civitas</p>
-                    {/* ✅ FIX (poin #4): tanpa tinggi tetap/scroll, teks
-                        panjang memanjang ke bawah secara alami. */}
-                    <div className="border border-gray-300 p-2 text-[11px] rounded whitespace-pre-wrap break-words">{item.isi_laporan}</div>
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      📅 Tanggal Masuk: {item.created_at
-                        ? new Date(item.created_at).toLocaleDateString('id-ID', {
-                            day: '2-digit',
-                            month: 'long',
-                            year: 'numeric',
-                          })
-                        : '-'}
-                    </p>
-                    {item.lampiran_laporan && (
-                      <button
-                        onClick={() => {
-                          const url = `${BASE_URL}/uploads/${item.lampiran_laporan}`;
-                          setModalSrc(url);
-                        }}
-                        className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
-                      >
-                        🖼️ Lihat Gambar
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
-                      <div className="border border-gray-300 p-2 text-[10px] rounded min-h-[60px] whitespace-pre-wrap break-words">
-                        {item.penyebab || "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Unit</p>
-                      <div className="border border-gray-300 p-2 text-[10px] rounded min-h-[60px] whitespace-pre-wrap break-words">
-                        {item.rencana_tindakan || "—"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {bisaPutus ? (
-                      <button
-                        type="button"
-                        onClick={() => openModalEdit(item)}
-                        className="flex-1 bg-[#5da0dd] text-white font-bold py-2 text-[10px] rounded"
-                      >
-                        Beri Keputusan
-                      </button>
-                    ) : sudahDiputus ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => openModalView(item)}
-                          className="flex-1 bg-blue-500 text-white font-bold py-2 text-[10px] rounded hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
-                        >
-                          <Eye size={14} /> Lihat
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openModalEdit(item)}
-                          className="p-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
-                          title="Edit Keputusan"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                      </>
-                    ) : (
-                      <span className="text-[10px] text-gray-400 text-center w-full">Sudah diputuskan</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* DESKTOP ROW */}
-                <div className="hidden sm:flex min-h-[160px]">
-                  {/* Kolom 1: Laporan Civitas — ✅ FIX (poin #4): dulu tinggi
-                      tetap (h-24) + scroll bikin teks panjang terlihat
-                      menciut/terpotong. Sekarang kotak memanjang ke bawah
-                      mengikuti isi teks (tanpa scroll). */}
-                  <div className="flex-1 border-r-2 border-black p-4">
-                    <p className="text-[10px] text-gray-400 mb-1">
-                      {item.kode_laporan} · {item.nama_unit}
-                    </p>
-                    <div className="border border-gray-300 p-2 min-h-24 text-[11px] whitespace-pre-wrap break-words">
-                      {item.isi_laporan}
-                    </div>
-                    {item.lampiran_laporan && (
-                      <button
-                        onClick={() => {
-                          const url = `${BASE_URL}/uploads/${item.lampiran_laporan}`;
-                          setModalSrc(url);
-                        }}
-                        className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
-                      >
-                        🖼️ Lihat Gambar
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Kolom 2: Tanggal Masuk */}
-                  <div className="w-[14%] border-r-2 border-black p-4 flex items-center justify-center">
-                    <span className="text-xs text-gray-700">
-                      {item.created_at
-                        ? new Date(item.created_at).toLocaleDateString('id-ID', {
-                            day: '2-digit',
-                            month: 'long',
-                            year: 'numeric',
-                          })
-                        : '-'}
-                    </span>
-                  </div>
-
-                  {/* Kolom 3: Penyebab — ✅ FIX (poin #4): sama seperti
-                      Kolom 1, kotak sekarang memanjang mengikuti teks. */}
-                  <div className="w-[16%] border-r-2 border-black p-4">
-                    <div className="border border-gray-300 p-2 min-h-20 text-[10px] whitespace-pre-wrap break-words">
-                      {item.penyebab || "—"}
-                    </div>
-                  </div>
-
-                  {/* Kolom 4: Rencana Unit */}
-                  <div className="w-[20%] border-r-2 border-black p-4">
-                    <div className="border border-gray-300 p-2 min-h-20 text-[10px] whitespace-pre-wrap break-words">
-                      {item.rencana_tindakan || "—"}
-                    </div>
-                  </div>
-
-                  {/* Kolom 5: Status */}
-                  <div className="w-[12%] border-r-2 border-black p-4 flex items-center justify-center">
-                    {badge && (
-                      <span className={`text-[9px] font-bold px-1 py-1 border rounded text-center ${badge.cls}`}>
-                        {badge.label}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Kolom 6: Aksi */}
-                  <div className="w-[16%] p-4 flex flex-col items-center justify-center gap-1">
-                    {bisaPutus ? (
-                      <button
-                        type="button"
-                        onClick={() => openModalEdit(item)}
-                        className="w-full bg-[#5da0dd] text-white font-bold py-2 text-[10px] rounded hover:bg-blue-600 transition-colors"
-                      >
-                        Beri Keputusan
-                      </button>
-                    ) : sudahDiputus ? (
-                      <div className="flex items-center gap-1 w-full">
-                        <button
-                          type="button"
-                          onClick={() => openModalView(item)}
-                          className="flex-1 bg-blue-500 text-white font-bold py-1.5 text-[10px] rounded hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
-                        >
-                          <Eye size={14} /> Lihat
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openModalEdit(item)}
-                          className="p-1.5 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
-                          title="Edit Keputusan"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] text-gray-400 text-center">Sudah diputuskan</span>
-                    )}
-                  </div>
-                </div>
+            {groupedData.length === 0 ? (
+              <div className="col-span-6 p-12 text-center text-gray-400 italic text-sm">
+                {filterPeriod === "semua"
+                  ? "Belum ada rancangan dari Kepala Unit."
+                  : `Tidak ada laporan untuk periode ${FILTER_OPTIONS.find(o => o.id === filterPeriod)?.label.toLowerCase()}.`}
               </div>
-            );
-          })
-        )}
+            ) : (
+              groupedData.map((group) => {
+                const rowSpan = group.units.length;
+                return (
+                  <Fragment key={group.id_laporan}>
+                    {/* Kolom 1: Laporan Civitas — SATU sel, span N baris. */}
+                    <div
+                      style={{ gridRow: `span ${rowSpan}` }}
+                      className="border-r-2 border-b-2 border-black p-4"
+                    >
+                      <p className="text-[10px] text-gray-400 mb-1">
+                        {group.kode_laporan}
+                      </p>
+                      <div className="border border-black p-2 min-h-24 text-[11px] whitespace-pre-wrap wrap-break-words">
+                        {group.isi_laporan}
+                      </div>
+                      {group.lampiran_laporan && (
+                        <button
+                          onClick={() => {
+                            const url = `${BASE_URL}/uploads/${group.lampiran_laporan}`;
+                            setModalSrc(url);
+                          }}
+                          className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
+                        >
+                          🖼️ Lihat Gambar
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Kolom 2–6: satu baris grid per unit tujuan. */}
+                    {group.units.map((item, uIdx) => {
+                      const badge = item.status_review ? statusBadge[item.status_review] : null;
+                      const bisaPutus = item.status_review === "menunggu_keputusan_ka";
+                      const sudahDiputus = item.status_review === "ditindaklanjuti" || item.status_review === "tidak_ditindaklanjuti";
+                      const isLastUnit = uIdx === rowSpan - 1;
+                      const rowBorder = isLastUnit ? "border-b-2 border-black" : "border-b border-black";
+
+                      return (
+                        <Fragment key={item.id_boxing}>
+                          {/* Tanggal Masuk + label unit */}
+                          <div className={`border-r-2 border-black p-4 flex flex-col items-center justify-center gap-1 text-center ${rowBorder}`}>
+                            <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {item.nama_unit}
+                            </span>
+                            <span className="text-xs text-gray-700">
+                              {item.created_at
+                                ? new Date(item.created_at).toLocaleDateString('id-ID', {
+                                    day: '2-digit',
+                                    month: 'long',
+                                    year: 'numeric',
+                                  })
+                                : '-'}
+                            </span>
+                          </div>
+
+                          {/* Penyebab */}
+                          <div className={`border-r-2 border-black p-4 ${rowBorder}`}>
+                            <div className="border border-black p-2 min-h-20 text-[10px] whitespace-pre-wrap wrap-break-words">
+                              {item.penyebab || "—"}
+                            </div>
+                          </div>
+
+                          {/* Rencana Unit */}
+                          <div className={`border-r-2 border-black p-4 ${rowBorder}`}>
+                            <div className="border border-black p-2 min-h-20 text-[10px] whitespace-pre-wrap wrap-break-words">
+                              {item.rencana_tindakan || "—"}
+                            </div>
+                          </div>
+
+                          {/* Status */}
+                          <div className={`border-r-2 border-black p-4 flex items-center justify-center ${rowBorder}`}>
+                            {badge && (
+                              <span className={`text-[9px] font-bold px-1 py-1 border rounded text-center ${badge.cls}`}>
+                                {badge.label}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Aksi */}
+                          <div className={`p-4 flex flex-col items-center justify-center gap-1 ${rowBorder}`}>
+                            {bisaPutus ? (
+                              <button
+                                type="button"
+                                onClick={() => openModalEdit(item)}
+                                className="w-full bg-blue-polibatam text-white font-bold py-2 text-[10px] rounded hover:bg-blue-600 transition-colors"
+                              >
+                                Beri Keputusan
+                              </button>
+                            ) : sudahDiputus ? (
+                              <div className="flex items-center gap-1 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => openModalView(item)}
+                                  className="flex-1 bg-blue-500 text-white font-bold py-1.5 text-[10px] rounded hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
+                                >
+                                  <Eye size={14} /> Lihat
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openModalEdit(item)}
+                                  className="p-1.5 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
+                                  title="Edit Keputusan"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 text-center font-normal">Sudah diputuskan</span>
+                            )}
+                          </div>
+                        </Fragment>
+                      );
+                    })}
+                  </Fragment>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
     </>
   );
