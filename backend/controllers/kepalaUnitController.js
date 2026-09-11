@@ -82,6 +82,7 @@ async function getLaporanMasuk(req, res) {
         -- salinan unit lain.
         r.penyebab,
         r.deskripsi AS rencana_tindakan,
+        r.tanggal_rencana,
         r.status_review, r.aksi_masukan, r.catatan AS catatan_review
       FROM boxing_ketidaksesuaian b
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
@@ -119,12 +120,37 @@ async function getLaporanMasuk(req, res) {
 }
 
 async function submitRancangan(req, res) {
-  const { id_boxing, penyebab, rencana_tindakan } = req.body;
+  const { id_boxing, penyebab, rencana_tindakan, tanggal_rencana } = req.body;
 
-  if (!id_boxing || !penyebab || !rencana_tindakan) {
+  if (!id_boxing || !penyebab || !rencana_tindakan || !tanggal_rencana) {
     return res.status(400).json({
       success: false,
-      message: "id_boxing, penyebab, dan rencana_tindakan wajib diisi.",
+      message:
+        "id_boxing, penyebab, rencana_tindakan, dan tanggal_rencana wajib diisi.",
+    });
+  }
+
+  // ✅ FITUR BARU: Tanggal Rencana = target tanggal selesai rencana
+  // tindak lanjut. Kalender ini HANYA BOLEH MAJU — tidak boleh memilih
+  // tanggal yang sudah lewat (hari ini masih dihitung boleh, karena
+  // "hari ini" belum lewat). Validasi juga di-mirror di frontend lewat
+  // atribut `min` pada <input type="date"> (lihat DiscrepancyTable.tsx),
+  // tapi divalidasi ulang di sini supaya tidak bisa dilewati lewat
+  // request manual ke API.
+  const todayCheck = new Date();
+  todayCheck.setHours(0, 0, 0, 0);
+  const tanggalRencanaInput = new Date(tanggal_rencana);
+  tanggalRencanaInput.setHours(0, 0, 0, 0);
+  if (isNaN(tanggalRencanaInput.getTime())) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal rencana tidak valid.",
+    });
+  }
+  if (tanggalRencanaInput < todayCheck) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
     });
   }
 
@@ -163,15 +189,15 @@ async function submitRancangan(req, res) {
       }
       await pool.query(
         `UPDATE rancangan_tindakan
-         SET penyebab = ?, deskripsi = ?, updated_at = NOW()
+         SET penyebab = ?, deskripsi = ?, tanggal_rencana = ?, updated_at = NOW()
          WHERE id_boxing = ?`,
-        [penyebab, rencana_tindakan, id_boxing],
+        [penyebab, rencana_tindakan, tanggal_rencana, id_boxing],
       );
     } else {
       await pool.query(
-        `INSERT INTO rancangan_tindakan (id_boxing, penyebab, deskripsi, status_review)
-         VALUES (?, ?, ?, 'menunggu_keputusan_ka')`,
-        [id_boxing, penyebab, rencana_tindakan],
+        `INSERT INTO rancangan_tindakan (id_boxing, penyebab, deskripsi, tanggal_rencana, status_review)
+         VALUES (?, ?, ?, ?, 'menunggu_keputusan_ka')`,
+        [id_boxing, penyebab, rencana_tindakan, tanggal_rencana],
       );
     }
 
@@ -227,6 +253,7 @@ async function getLaporanHasil(req, res) {
         b.catatan_approval,
         l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         r.id_rancangan, r.penyebab, r.deskripsi AS rencana_tindakan,
+        r.tanggal_rencana,
         r.status_review, r.aksi_masukan, r.updated_at AS tanggal_ditindaklanjuti,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan,
@@ -291,7 +318,8 @@ async function getRiwayat(req, res) {
         b.approval_staf, b.catatan_approval, b.created_at AS tanggal_distribusi,
         l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
-        r.penyebab, r.deskripsi AS rencana_tindakan, r.status_review, r.aksi_masukan,
+        r.penyebab, r.deskripsi AS rencana_tindakan, r.tanggal_rencana,
+        r.status_review, r.aksi_masukan,
         p.id_pelaksanaan, p.deskripsi AS hasil_tindakan, p.lampiran AS lampiran_hasil,
         p.tanggal AS tanggal_pelaksanaan, p.created_at AS tanggal_kirim_hasil
       FROM boxing_ketidaksesuaian b

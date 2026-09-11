@@ -18,6 +18,11 @@ interface RancanganItem {
   id_rancangan: number | null;
   penyebab: string | null;
   rencana_tindakan: string | null;
+  // ✅ FITUR BARU: target tanggal selesai rencana tindak lanjut, diisi
+  // Kepala Unit. Datang dari kolom rancangan_tindakan.tanggal_rencana
+  // lewat GET /api/ka-p4m/proses, supaya Ka P4M tahu kapan target
+  // selesainya sebelum menyetujui/menolak.
+  tanggal_rencana: string | null;
   status_review: string | null;
   aksi_masukan: string | null;
   created_at?: string | null;
@@ -237,6 +242,16 @@ export default function KaP4MReviewTable() {
               )}
               <p><span className="font-bold">Penyebab (Kepala Unit):</span> {modal.item!.penyebab}</p>
               <p><span className="font-bold">Rencana (Kepala Unit):</span> {modal.item!.rencana_tindakan}</p>
+              <p>
+                <span className="font-bold">Target Selesai (Tanggal Rencana):</span>{" "}
+                {modal.item!.tanggal_rencana
+                  ? new Date(modal.item!.tanggal_rencana).toLocaleDateString('id-ID', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                  : '-'}
+              </p>
             </div>
 
             {modal.mode === 'view' ? (
@@ -440,6 +455,16 @@ export default function KaP4MReviewTable() {
                           </div>
                         </div>
                       </div>
+                      {/* ✅ FITUR BARU: Target Selesai (Tanggal Rencana) */}
+                      <p className="text-[10px] text-gray-500">
+                        🎯 Target Selesai: {item.tanggal_rencana
+                          ? new Date(item.tanggal_rencana).toLocaleDateString('id-ID', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : '-'}
+                      </p>
                       <div className="flex items-center gap-2">
                         {bisaPutus ? (
                           <button
@@ -567,11 +592,20 @@ export default function KaP4MReviewTable() {
                             </div>
                           </div>
 
-                          {/* Rencana Unit */}
-                          <div className={`border-r-2 border-black p-4 ${rowBorder}`}>
+                          {/* Rencana Unit + Target Selesai (Tanggal Rencana) */}
+                          <div className={`border-r-2 border-black p-4 space-y-1 ${rowBorder}`}>
                             <div className="border border-black p-2 min-h-20 text-[10px] whitespace-pre-wrap wrap-break-words">
                               {item.rencana_tindakan || "—"}
                             </div>
+                            <p className="text-[9px] text-gray-500 text-center">
+                              🎯 Target: {item.tanggal_rencana
+                                ? new Date(item.tanggal_rencana).toLocaleDateString('id-ID', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })
+                                : '-'}
+                            </p>
                           </div>
 
                           {/* Status */}
