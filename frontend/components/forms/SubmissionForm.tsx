@@ -22,7 +22,6 @@ export default function SubmissionForm({ onGoToStatus }: SubmissionFormProps) {
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const fileRef = useRef<HTMLInputElement>(null);
-
   const MAX_CHARS = 10000;
 
   // Helper: dapatkan hari ini (jam direset ke 00:00:00 untuk perbandingan)

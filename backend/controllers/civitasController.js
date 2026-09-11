@@ -6,6 +6,7 @@ const { notifikasiUntukRole } = require("../utils/notifikasi");
 const { generateUniqueKodeLaporan } = require("../utils/kodeLaporan");
 
 console.log("🔥 CIVITAS CONTROLLER VERSI BARU TERLOAD");
+
 // ============================================================
 // KIRIM LAPORAN — tanpa nama, tanpa login
 // Yang wajib diisi: status_pelapor, jenis_laporan, deskripsi
@@ -23,7 +24,6 @@ async function kirimLaporan(req, res) {
   }
 
   // Validasi format & pastikan tanggal kejadian tidak di masa depan
-  // (frontend sudah validasi ini, tapi backend tidak boleh percaya begitu saja)
   const tglKejadian = new Date(`${tanggal_kejadian}T00:00:00`);
   if (isNaN(tglKejadian.getTime())) {
     return res.status(400).json({
@@ -62,14 +62,10 @@ async function kirimLaporan(req, res) {
   const lampiran = req.file ? req.file.filename : null;
 
   try {
-    // ✅ Kode tiket acak (bukan sequential dari id_laporan) — lihat
-    // utils/kodeLaporan.js. Ini yang jadi "kata sandi" untuk cek status,
-    // jadi harus digenerate SEBELUM insert dan tidak boleh ditebak dari id.
+    // ✅ Kode tiket acak — jadi "kata sandi" untuk cek status
     const kode_laporan = await generateUniqueKodeLaporan();
 
     // Simpan ke DB
-    // id_civitas  = NULL  → anonim, tidak perlu akun
-    // nama_pelapor = 'Anonim' → karena laporan anonim
     const [result] = await pool.query(
       `INSERT INTO laporan_ketidaksesuaian
         (kode_laporan, id_civitas, nama_pelapor, status_pelapor, jenis_laporan, deskripsi, lampiran, status, tanggal_kejadian)
@@ -106,15 +102,10 @@ async function kirimLaporan(req, res) {
 }
 
 // ============================================================
-// CEK STATUS LAPORAN — berdasarkan kode tiket acak (mis. LAP-8F2A93C1)
-// ✅ Kode disimpan sebagai kolom asli (kode_laporan), BUKAN diturunkan
-// dari id_laporan yang sequential — supaya tidak bisa dienumerasi
-// (dulu: LAP-00001, LAP-00002, dst tinggal di-loop).
+// CEK STATUS LAPORAN — berdasarkan kode tiket acak
 // ============================================================
 function normalizeKodeLaporan(kode) {
   const normalized = String(kode).trim().toUpperCase();
-  // Format kode acak: LAP- diikuti 6-12 karakter hex. Validasi bentuk saja,
-  // BUKAN mengekstrak angka id dari situ (tidak ada relasi kode → id lagi).
   if (!/^LAP-[0-9A-F]{6,12}$/.test(normalized)) return null;
   return normalized;
 }
@@ -144,13 +135,24 @@ function labelStatusLaporan(v) {
   return map[v] || v;
 }
 
+// ============================================================
+// BUILD TAHAP PROGRES — diperbaiki
+// ============================================================
 function buildTahapProgres(laporan, ringkasan) {
   const { status } = laporan;
+
   const adaBoxing = ringkasan.jumlah_unit > 0;
   const adaRancangan = ringkasan.jumlah_rancangan > 0;
   const adaDitindaklanjuti = ringkasan.jumlah_ditindaklanjuti > 0;
+  const adaTidakDitindaklanjuti = ringkasan.jumlah_tidak > 0;
   const adaPelaksanaan = ringkasan.jumlah_pelaksanaan > 0;
   const adaSelesaiBoxing = ringkasan.jumlah_selesai > 0;
+
+  // ✅ Flag: Ka P4M sudah mengambil keputusan (baik ditindaklanjuti maupun tidak)
+  const keputusanKaSudahAda = adaDitindaklanjuti || adaTidakDitindaklanjuti;
+
+  // ✅ Flag: laporan dinyatakan "sesuai / tidak perlu tindak lanjut"
+  const tidakPerluTindakLanjut = adaTidakDitindaklanjuti && !adaDitindaklanjuti;
 
   return [
     {
@@ -168,24 +170,28 @@ function buildTahapProgres(laporan, ringkasan) {
         : "Menunggu peninjauan dan penentuan unit oleh Staf P4M.",
     },
     {
-  id: "keputusan_ka",
-  title: "Keputusan Ka P4M",
-  selesai: adaDitindaklanjuti || ringkasan.jumlah_tidak > 0,
-  deskripsi: adaDitindaklanjuti
-    ? "Ka P4M menindaklanjuti — unit melaksanakan tindakan."
-    : ringkasan.jumlah_tidak > 0
-    ? "Keputusan Ka P4M telah diproses."
-    : "Menunggu keputusan Ka P4M.",
-},
+      id: "keputusan_ka",
+      title: "Keputusan Ka P4M",
+      selesai: keputusanKaSudahAda,
+      deskripsi: adaDitindaklanjuti
+        ? "Ka P4M menindaklanjuti — unit melaksanakan tindakan."
+        : adaTidakDitindaklanjuti
+        ? "Laporan dinyatakan sesuai dan tidak memerlukan tindakan lanjutan."
+        : "Menunggu keputusan Ka P4M.",
+    },
     {
       id: "pelaksanaan",
       title: "Hasil Tindak Lanjut Unit",
-      selesai: adaPelaksanaan,
+      // ✅ Kalau Ka P4M bilang "tidak perlu tindak lanjut", tahap ini
+      //    otomatis dianggap selesai (tidak ada yang perlu dikerjakan).
+      selesai: adaPelaksanaan || tidakPerluTindakLanjut,
       deskripsi: adaPelaksanaan
         ? "Kepala unit telah melaporkan hasil."
+        : tidakPerluTindakLanjut
+        ? "Tidak memerlukan tindak lanjut unit."
         : adaDitindaklanjuti
         ? "Menunggu hasil dari kepala unit."
-        : "Tidak memerlukan tindak lanjut unit.",
+        : "Menunggu keputusan Ka P4M.",
     },
     {
       id: "selesai",
@@ -194,11 +200,16 @@ function buildTahapProgres(laporan, ringkasan) {
       deskripsi:
         status === "selesai"
           ? "Laporan dinyatakan selesai oleh Staf P4M."
+          : tidakPerluTindakLanjut
+          ? "Laporan dinyatakan sesuai — menunggu penutupan oleh Staf P4M."
           : "Menunggu penilaian akhir Staf P4M.",
     },
   ];
 }
 
+// ============================================================
+// BUILD UPDATE TERBARU — perbaiki duplikasi cek jumlah_pelaksanaan
+// ============================================================
 function buildUpdateTerbaru(laporan, ringkasan) {
   if (laporan.status === "selesai") {
     return "Laporan Anda telah diselesaikan. Terima kasih atas partisipasinya.";
@@ -212,14 +223,13 @@ function buildUpdateTerbaru(laporan, ringkasan) {
   if (ringkasan.jumlah_selesai > 0) {
     return "Sebagian atau seluruh unit telah diselesaikan Staf P4M.";
   }
-  if (ringkasan.jumlah_pelaksanaan > 0) {
-    return "Hasil tindak lanjut unit telah masuk. Staf P4M menilai selesai atau belum.";
-  }
+  // ✅ Baris duplikat "jumlah_pelaksanaan > 0" di sini sudah dihapus
+  //    karena sebelumnya tidak akan pernah tercapai (sudah dicek di atas).
   if (ringkasan.jumlah_ditindaklanjuti > 0) {
     return "Ka P4M menindaklanjuti. Kepala unit menyusun hasil pelaksanaan.";
   }
   if (ringkasan.jumlah_tidak > 0) {
-    return "Ka P4M tidak menindaklanjuti. Staf P4M memproses penutupan.";
+    return "Ka P4M menyatakan laporan sesuai dan tidak memerlukan tindakan lanjutan. Menunggu penutupan oleh Staf P4M.";
   }
   if (ringkasan.jumlah_rancangan > 0) {
     return "Kepala unit telah mengajukan rancangan. Menunggu keputusan Ka P4M.";
@@ -244,8 +254,6 @@ async function cekStatusLaporan(req, res) {
   }
 
   try {
-    // ✅ Lookup langsung pakai kolom kode_laporan (bukan parse angka id dari
-    // format lama) — tidak ada lagi jalur "?id=" publik yang bisa dienumerasi.
     const kodeNormalized = normalizeKodeLaporan(kode);
     if (!kodeNormalized) {
       return res.status(400).json({
@@ -349,8 +357,6 @@ async function cekStatusLaporan(req, res) {
 
 // ============================================================
 // GET RIWAYAT LAPORAN
-// Dipakai oleh staf P4M untuk lihat semua laporan masuk
-// Bisa difilter by status
 // ============================================================
 async function getRiwayatLaporan(req, res) {
   const { status, page = 1, limit = 10 } = req.query;
@@ -372,7 +378,6 @@ async function getRiwayatLaporan(req, res) {
     `;
     const params = [];
 
-    // Filter opsional berdasarkan status laporan
     const validStatus = ["menunggu", "diproses", "selesai", "ditolak"];
     if (status && validStatus.includes(status)) {
       query += " AND status = ?";
