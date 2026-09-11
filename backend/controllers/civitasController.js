@@ -168,15 +168,15 @@ function buildTahapProgres(laporan, ringkasan) {
         : "Menunggu peninjauan dan penentuan unit oleh Staf P4M.",
     },
     {
-      id: "keputusan_ka",
-      title: "Keputusan Ka P4M",
-      selesai: adaDitindaklanjuti || ringkasan.jumlah_tidak > 0,
-      deskripsi: adaDitindaklanjuti
-        ? "Ka P4M menindaklanjuti — unit melaksanakan tindakan."
-        : ringkasan.jumlah_tidak > 0
-        ? "Ka P4M tidak menindaklanjuti — diproses Staf P4M."
-        : "Menunggu keputusan Ka P4M.",
-    },
+  id: "keputusan_ka",
+  title: "Keputusan Ka P4M",
+  selesai: adaDitindaklanjuti || ringkasan.jumlah_tidak > 0,
+  deskripsi: adaDitindaklanjuti
+    ? "Ka P4M menindaklanjuti — unit melaksanakan tindakan."
+    : ringkasan.jumlah_tidak > 0
+    ? "Keputusan Ka P4M telah diproses."
+    : "Menunggu keputusan Ka P4M.",
+},
     {
       id: "pelaksanaan",
       title: "Hasil Tindak Lanjut Unit",
