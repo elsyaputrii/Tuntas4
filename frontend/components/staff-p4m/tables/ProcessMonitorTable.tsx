@@ -325,7 +325,7 @@ export default function ProcessMonitorTable() {
         </div>
 
         <div>
-          <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-20 overflow-auto bg-gray-50">
+          <div className="border border-gray-300 p-2 text-xs text-gray-700 min-h-16 bg-gray-50">
             {item.isi_laporan}
           </div>
           <p className="text-[9px] text-gray-400 mt-1">
@@ -349,7 +349,7 @@ export default function ProcessMonitorTable() {
         {item.hasil_tindakan && (
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Hasil Unit:</p>
-            <div className="border border-gray-300 p-2 text-xs text-gray-700 max-h-14 overflow-auto">{item.hasil_tindakan}</div>
+            <div className="border border-gray-300 p-2 text-xs text-gray-700 min-h-14">{item.hasil_tindakan}</div>
             {item.tanggal_pelaksanaan && (
               <p className="text-[9px] text-gray-400 mt-1">
                 📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
@@ -513,7 +513,7 @@ export default function ProcessMonitorTable() {
                           <span className="font-bold">{item.kode_laporan}</span><br />
                           {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}</span>
                         </p>
-                        <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">{item.isi_laporan}</div>
+                        <div className="border border-gray-400 p-2 min-h-16 text-[10px]">{item.isi_laporan}</div>
                         <p className="text-[9px] text-gray-400 mt-1">
                           📅 {formatTanggal(item.created_at)}
                         </p>
@@ -534,7 +534,7 @@ export default function ProcessMonitorTable() {
                       </div>
 
                       <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
-                        <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
+                        <div className="border border-gray-300 p-2 min-h-16 text-[10px]">
                           {item.hasil_tindakan ? (
                             item.hasil_tindakan
                           ) : item.status_review === "tidak_ditindaklanjuti" ? (
@@ -602,7 +602,7 @@ export default function ProcessMonitorTable() {
                               <span className="font-bold">{item.kode_laporan}</span><br />
                               {item.nama_unit} · <span className="italic">Selesai</span>
                             </p>
-                            <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">{item.isi_laporan}</div>
+                            <div className="border border-gray-400 p-2 min-h-16 text-[10px]">{item.isi_laporan}</div>
                             <p className="text-[9px] text-gray-400 mt-1">
                               📅 {formatTanggal(item.created_at)}
                             </p>
@@ -623,7 +623,7 @@ export default function ProcessMonitorTable() {
                           </div>
 
                           <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
-                            <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
+                            <div className="border border-gray-300 p-2 min-h-16 text-[10px]">
                               {item.hasil_tindakan ? (
                                 item.hasil_tindakan
                               ) : item.status_review === "tidak_ditindaklanjuti" ? (

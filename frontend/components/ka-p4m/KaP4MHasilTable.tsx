@@ -200,7 +200,7 @@ export default function KaP4MHasilTable() {
                   <span className="font-bold">{item.kode_laporan}</span><br />
                   {item.nama_unit}
                 </p>
-                <div className="border border-gray-400 p-2 h-16 text-[10px] overflow-auto">{item.isi_laporan}</div>
+                <div className="border border-gray-400 p-2 min-h-16 text-[10px]">{item.isi_laporan}</div>
                 <p className="text-[9px] text-gray-400 mt-1">📅 {formatTanggal(item.created_at)}</p>
                 {item.lampiran_laporan && (
                   <button
@@ -214,13 +214,13 @@ export default function KaP4MHasilTable() {
               </div>
 
               <div className="w-[20%] border-r-2 border-black p-3">
-                <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto text-gray-600">
+                <div className="border border-gray-300 p-2 min-h-16 text-[10px] text-gray-600">
                   {item.aksi_masukan || item.rencana_tindakan || "—"}
                 </div>
               </div>
 
               <div className="w-[24%] border-r-2 border-black p-3">
-                <div className="border border-gray-300 p-2 h-16 text-[10px] overflow-auto">
+                <div className="border border-gray-300 min-h-16 p-2 text-[10px]">
                   {item.hasil_tindakan ? (
                     item.hasil_tindakan
                   ) : item.approval_staf === "diterima" ? (

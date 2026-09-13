@@ -278,13 +278,13 @@ export default function RiwayatTable() {
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_laporan)}</p>
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
-                  <div className="border border-gray-400 p-2 h-16 overflow-auto">{item.isi_laporan}</div>
+                  <div className="border border-gray-400 p-2 min-h-16">{item.isi_laporan}</div>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3">
-                  <p className="italic text-gray-500 text-[10px] overflow-auto max-h-16">{item.rencana_tindakan ?? "—"}</p>
+                  <p className="italic text-gray-500 text-[10px] min-h-16">{item.rencana_tindakan ?? "—"}</p>
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
-                  <div className="border border-gray-300 p-2 h-16 overflow-auto">
+                  <div className="border border-gray-300 p-2 min-h-16">
                     {hasilTindakLanjutText(item)}
                   </div>
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
@@ -345,7 +345,7 @@ export default function RiwayatTable() {
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
-                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16 overflow-auto">
+                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16 ">
                     {hasilTindakLanjutText(item)}
                   </div>
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>

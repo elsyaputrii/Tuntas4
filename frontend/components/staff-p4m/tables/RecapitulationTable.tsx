@@ -914,7 +914,7 @@ export default function RecapitulationTable() {
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
-                  <div className="border border-gray-400 p-2 h-20 font-bold text-[10px] overflow-auto uppercase">{item.uraian}</div>
+                  <div className="border border-gray-400 p-2 min-h-20 font-bold text-[10px] uppercase">{item.uraian}</div>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
                   <span className="italic text-gray-500 text-center text-[10px]">{item.penyebab}</span>
@@ -931,7 +931,7 @@ export default function RecapitulationTable() {
                   <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>{statusInfo.label}</span>
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
-                  <div className="border border-gray-400 p-2 h-20 italic text-gray-500 overflow-auto">
+                  <div className="border border-gray-400 p-2 min-h-20 italic text-gray-500">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>
@@ -968,7 +968,7 @@ export default function RecapitulationTable() {
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${statusInfo.cls}`}>{statusInfo.label}</span>
                 </div>
-                <div className="border border-gray-300 p-2 text-[11px] font-semibold uppercase bg-gray-50 rounded max-h-20 overflow-auto">
+                <div className="border border-gray-300 p-2 text-[11px] font-semibold uppercase bg-gray-50 rounded min-h-20">
                   {item.uraian}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -988,7 +988,7 @@ export default function RecapitulationTable() {
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
-                  <div className="border border-gray-200 p-2 text-[10px] italic text-gray-600 rounded max-h-16 overflow-auto">
+                  <div className="border border-gray-200 p-2 text-[10px] italic text-gray-600 rounded min-h-16">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>
