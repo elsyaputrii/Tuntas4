@@ -183,7 +183,12 @@ export default function ProcessMonitorTable() {
       );
       return;
     }
-    if (!item.hasil_tindakan) {
+    // ✅ FIX: hasil_tindakan cuma wajib ada kalau Ka P4M memutuskan
+    // "ditindaklanjuti" (unit memang diminta bertindak). Kalau Ka P4M
+    // sudah bilang "Sesuai" (status_review = tidak_ditindaklanjuti),
+    // unit gak pernah diminta isi hasil — jadi kosong itu normal dan
+    // gak boleh nge-block keputusan Staf P4M.
+    if (item.status_review === "ditindaklanjuti" && !item.hasil_tindakan) {
       setError("Hasil tindak lanjut belum diisi Kepala Unit.");
       return;
     }
@@ -217,9 +222,15 @@ export default function ProcessMonitorTable() {
     if (item.status_boxing !== "di_staff" && item.status_boxing !== "selesai") {
       return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
     }
-    if (!item.hasil_tindakan) {
-      return <span className="text-[10px] text-gray-400 italic text-center">Selesai</span>;
-    }
+    // ✅ FIX: sebelumnya "!item.hasil_tindakan" langsung dianggap
+    // "Selesai" dan nge-block tombol ✅/❌ — padahal laporan yang
+    // diputuskan "Sesuai" oleh Ka P4M (status_review =
+    // tidak_ditindaklanjuti) MEMANG gak akan pernah punya
+    // hasil_tindakan (unit gak diminta bertindak). Laporan begini
+    // justru harus langsung bisa dikonfirmasi Staf P4M, jadi
+    // pengecekan hasil_tindakan dihapus dari sini — status_boxing
+    // 'di_staff' + belum ada approval_staf sudah cukup buat nampilin
+    // tombol keputusan.
 
     const apprVal = item.approval_staf && item.approval_staf !== "menunggu" ? item.approval_staf : null;
 
@@ -246,23 +257,32 @@ export default function ProcessMonitorTable() {
       return <span className="text-[9px] text-gray-400 italic text-center">—</span>;
     }
 
+    // ✅ FIX tampilan: sebelumnya pakai emoji ✅❌ yang udah punya
+    // bentuk/warna sendiri, ditumpuk lagi di atas lingkaran hijau/merah
+    // — hasilnya kelihatan dobel & berantakan. Ganti pakai SVG polos
+    // (garis putih) di atas lingkaran solid, biar bersih kayak ikon
+    // pada umumnya.
     return (
       <div className="flex gap-3 justify-center">
         <button
           type="button"
           onClick={() => openModal(item, "diterima")}
           title="Siap — laporan otomatis Selesai"
-          className="w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow"
+          className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow transition-colors"
         >
-          ✅
+          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 13l4 4L19 7" />
+          </svg>
         </button>
         <button
           type="button"
           onClick={() => openModal(item, "ditolak")}
           title="Belum Siap — kembalikan ke unit untuk revisi hasil"
-          className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow"
+          className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow transition-colors"
         >
-          ❌
+          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
         </button>
       </div>
     );
