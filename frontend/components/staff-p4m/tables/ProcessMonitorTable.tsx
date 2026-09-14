@@ -271,17 +271,21 @@ export default function ProcessMonitorTable() {
             type="button"
             onClick={() => openModal(item, "diterima")}
             title="Siap — laporan otomatis Selesai"
-            className="w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow"
+            className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow transition-colors"
           >
-            ✅
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
           </button>
           <button
             type="button"
             onClick={() => openModal(item, "ditolak")}
             title="Belum Siap — kembalikan ke unit untuk revisi hasil"
-            className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow"
+            className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow transition-colors"
           >
-            ❌
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
           </button>
         </div>
       </div>
@@ -506,8 +510,8 @@ export default function ProcessMonitorTable() {
             style={{ display: "table", tableLayout: "fixed", width: "100%" }}
           >
             <div style={{ display: "table-row" }}>
-              <div style={{ display: "table-cell", width: "40%" }} className="border-r-2 border-black p-3 align-middle">Laporan</div>
-              <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Ka</div>
+              <div style={{ display: "table-cell", width: "38%" }} className="border-r-2 border-black p-3 align-middle">Laporan</div>
+              <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Ka</div>
               <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Hasil Unit</div>
               <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Staff</div>
               <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">Dokumen</div>
@@ -528,7 +532,7 @@ export default function ProcessMonitorTable() {
                   >
                     <div style={{ display: "table-row" }}>
                       {/* Kolom Laporan + Tanggal + Gambar */}
-                      <div style={{ display: "table-cell", width: "40%" }} className="border-r-2 border-black p-3 align-top">
+                      <div style={{ display: "table-cell", width: "38%" }} className="border-r-2 border-black p-3 align-top">
                         <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                           <span className="font-bold">{item.kode_laporan}</span><br />
                           {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}</span>
@@ -548,9 +552,9 @@ export default function ProcessMonitorTable() {
                         )}
                       </div>
 
-                      <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-top">
+                      <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-top">
                         {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                        {item.aksi_masukan && <p className="text-[9px] text-gray-500 mt-1 line-clamp-7">{item.aksi_masukan}</p>}
+                        {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 line-clamp-7">{item.aksi_masukan}</p>}
                       </div>
 
                       <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
@@ -617,7 +621,7 @@ export default function ProcessMonitorTable() {
                         style={{ display: "table", tableLayout: "fixed", width: "100%" }}
                       >
                         <div style={{ display: "table-row" }}>
-                          <div style={{ display: "table-cell", width: "40%" }} className="border-r-2 border-black p-3 align-top">
+                          <div style={{ display: "table-cell", width: "38%" }} className="border-r-2 border-black p-3 align-top">
                             <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                               <span className="font-bold">{item.kode_laporan}</span><br />
                               {item.nama_unit} · <span className="italic">Selesai</span>
@@ -637,9 +641,9 @@ export default function ProcessMonitorTable() {
                             )}
                           </div>
 
-                          <div style={{ display: "table-cell", width: "12%" }} className="border-r-2 border-black p-3 align-top">
+                          <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-top">
                             {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                            {item.aksi_masukan && <p className="text-[9px] text-gray-500 mt-1 line-clamp-7">{item.aksi_masukan}</p>}
+                            {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 line-clamp-7">{item.aksi_masukan}</p>}
                           </div>
 
                           <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">

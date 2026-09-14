@@ -795,13 +795,13 @@ export default function RecapitulationTable() {
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
-                  <div className="border border-gray-400 p-2 min-h-20 font-bold text-[10px] uppercase">{item.uraian}</div>
+                  <div className="border border-gray-400 p-2 min-h-20 text-[10px]">{item.uraian}</div>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
-                  <span className="italic text-gray-500 text-center text-[10px]">{item.penyebab}</span>
+                  <span className=" text-gray-600 text-center text-[10px]">{item.penyebab}</span>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
-                  <span className="italic text-gray-500 text-center text-[10px]">
+                  <span className="text-gray-600 text-center text-[10px]">
                     {item.rencana}
                     {item.tglRencana !== "—" && (
                       <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 Direncanakan: {item.tglRencana}</span>
@@ -812,7 +812,7 @@ export default function RecapitulationTable() {
                   <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>{statusInfo.label}</span>
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
-                  <div className="border border-gray-400 p-2 min-h-20 italic text-gray-500">
+                  <div className="border border-gray-400 p-2 min-h-20 text-gray-600">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>
@@ -860,11 +860,11 @@ export default function RecapitulationTable() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Penyebab</p>
-                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">{item.penyebab}</p>
+                    <p className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">{item.penyebab}</p>
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana</p>
-                    <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">
+                    <p className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">
                       {item.rencana}
                       {item.tglRencana !== "—" && (
                         <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 {item.tglRencana}</span>
@@ -874,7 +874,7 @@ export default function RecapitulationTable() {
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
-                  <div className="border border-gray-200 p-2 text-[10px] italic text-gray-600 rounded min-h-16">
+                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded min-h-16">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>

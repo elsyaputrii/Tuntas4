@@ -157,10 +157,10 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
+    <div className="h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
       <aside
         className={`bg-linear-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
-        text-white transition-all duration-300 flex flex-col shadow-2xl
+        text-white transition-all duration-300 flex flex-col shadow-2xl shadow-2xl h-screen sticky top-0
         ${sidebarOpen ? 'w-65' : 'w-21.25'}`}
       >
         <div className={`px-5 py-5 border-b border-white/10 flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col justify-center gap-3'}`}>
@@ -223,7 +223,7 @@ useEffect(() => {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="bg-linear-to-r from-[#3b4b65] to-[#51627e] dark:from-slate-700 dark:to-slate-600 rounded-[22px] shadow-lg mx-5 mt-5 px-6 py-5 text-white">
           <div className="flex justify-between items-center">
             <div>
@@ -293,7 +293,7 @@ useEffect(() => {
           </div>
         </div>
 
-        <div className="flex-1 mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
+        <div className="flex-1 min-h-0 overflow-y-auto mx-5 mt-6 mb-5 bg-[#e9edf2] dark:bg-slate-800 rounded-[22px] p-5">
           <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-md overflow-hidden min-h-125 p-6">
             {children}
           </div>

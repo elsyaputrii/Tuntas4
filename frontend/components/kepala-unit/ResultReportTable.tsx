@@ -21,6 +21,15 @@ interface LaporanHasilItem {
   catatan_approval: string | null;
 }
 
+function getTodayLocalDate(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export default function ResultReportTable() {
   const [laporanList, setLaporanList] = useState<LaporanHasilItem[]>([]);
   const [tanggal,     setTanggal]     = useState<Record<number, string>>({});
@@ -39,9 +48,14 @@ export default function ResultReportTable() {
         const initT: Record<number, string> = {};
         const initU: Record<number, string> = {};
         result.data.forEach((item: LaporanHasilItem) => {
-          initT[item.id_boxing] = item.tanggal_pelaksanaan || "";
-          initU[item.id_boxing] = item.hasil_tindakan      || "";
-        });
+  // Kalau sudah ada tanggal dari backend, pertahankan.
+  // Kalau belum ada tanggal, default ke tanggal hari ini.
+  initT[item.id_boxing] =
+    item.tanggal_pelaksanaan || getTodayLocalDate();
+
+  initU[item.id_boxing] = item.hasil_tindakan || "";
+});
+
         setTanggal(initT); setUraian(initU);
       }
     } catch (err: unknown) {
@@ -214,18 +228,25 @@ export default function ResultReportTable() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <input type="date"
-                    className="w-full border border-black p-2 text-[11px] outline-none focus:border-blue-polibatam"
-                    value={tanggal[item.id_boxing] || ""}
-                    max={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => setTanggal((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  <input
+                    type="date" className="w-full border border-black p-2 text-[11px] outline-none focus:border-blue-polibatam"
+                    value={tanggal[item.id_boxing] || ""} max={getTodayLocalDate()}
+                    onChange={(e) =>
+                      setTanggal((prev) => ({...prev,
+                        [item.id_boxing]: e.target.value,
+                      }))
+                    }
                   />
+
                   <AutoResizeTextarea
-                    minHeight={96}
-                    className="w-full border border-black p-3 text-[11px] text-black outline-none focus:border-blue-polibatam"
-                    placeholder="Tambahkan Uraian Hasil Tindak Lanjut..."
-                    value={uraian[item.id_boxing] || ""}
-                    onChange={(e) => setUraian((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                    minHeight={96} className="w-full border border-black p-3 text-[11px] text-black outline-none focus:border-blue-polibatam"
+                    placeholder="Tambahkan Uraian Hasil Tindak Lanjut..." value={uraian[item.id_boxing] || ""}
+                    onChange={(e) =>
+                      setUraian((prev) => ({
+                        ...prev,
+                        [item.id_boxing]: e.target.value,
+                      }))
+                    }
                   />
                   <div className="flex items-center gap-2">
                     <input type="file" id={`upload-${item.id_boxing}`} className="hidden" accept="image/*,application/pdf"
