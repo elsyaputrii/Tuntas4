@@ -305,7 +305,7 @@ export default function KaP4MHasilTable() {
                                 {item.hasil_tindakan ? (
                                   item.hasil_tindakan
                                 ) : item.approval_staf === "diterima" ? (
-                                  <span className="text-green-600 italic font-semibold">Selesai</span>
+                                  <span className="text-gray-400 italic ">Sudah sesuai, tidak ditindaklanjuti</span>
                                 ) : (
                                   <span className="text-gray-400 italic">Belum diisi Kepala Unit</span>
                                 )}
