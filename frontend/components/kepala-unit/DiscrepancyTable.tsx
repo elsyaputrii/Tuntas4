@@ -6,9 +6,13 @@ import ImageModal from "@/components/ui/ImageModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
 import { fmtTgl } from "@/lib/exportHelpers";
+import { Plus, Pencil, Trash2, Calendar } from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TIPE DATA
+// ─────────────────────────────────────────────────────────────────────────────
 interface LaporanItem {
   id_boxing: number;
   id_laporan: number;
@@ -21,45 +25,323 @@ interface LaporanItem {
   catatan_approval: string | null;
   penyebab: string | null;
   rencana_tindakan: string | null;
-  // ✅ FITUR BARU: target tanggal selesai rencana tindak lanjut, diisi
-  // Kepala Unit lewat kalender di bawah kotak "Rencana Tindak Lanjut".
-  // Otomatis ikut terbaca Ka P4M lewat GET /ka-p4m/proses (lihat
-  // KaP4MReviewTable.tsx) supaya Ka P4M tahu target selesainya kapan
-  // sebelum memutuskan.
   tanggal_rencana: string | null;
   status_review: string | null;
   created_at?: string | null;
-  // ✅ tanggal_laporan = tanggal KEJADIAN yang diisi civitas akademika
-  // saat lapor (fallback ke created_at kalau tanggal_kejadian kosong).
-  // Ini yang seharusnya tampil di kolom "Tanggal Masuk", bukan created_at
-  // mentah (yang cuma tanggal record disimpan ke DB).
   tanggal_laporan?: string | null;
 }
 
-// ✅ Vocabulary status_review SUDAH DIPERBARUI mengikuti migrate_alur_v2.sql.
-// Di tab ini (Ketidaksesuaian Masuk), status_review yang mungkin muncul
-// HANYA: null (belum pernah diisi) atau "menunggu_keputusan_ka" (sudah
-// dikirim, menunggu keputusan Ka P4M). Begitu Ka P4M memutuskan
-// "ditindaklanjuti"/"tidak_ditindaklanjuti", baris otomatis pindah ke
-// tab lain (Laporan Hasil / ditangani Staf) dan tidak lagi muncul di sini.
+interface RencanaItem {
+  id: number;
+  teks: string;
+  tanggal: string;
+}
+
 const statusBadge: Record<string, { label: string; cls: string }> = {
   menunggu_keputusan_ka: { label: "⏳ Menunggu Keputusan Ka P4M", cls: "text-blue-500 bg-blue-50 border-blue-200" },
 };
 
+const todayStr = () => new Date().toISOString().split("T")[0];
+
+// ═════════════════════════════════════════════════════════════════════════════
+// KOMPONEN: RencanaPanel — panel rencana inline
+// ✅ FIX: onCountChange sekarang terima (idBoxing, count) supaya parent
+// bisa pakai useCallback yang stabil → tidak infinite loop.
+// ✅ FIX: fetchRencana cuma depend on idBoxing, useEffect langsung
+// panggil fetchRencana dgn dependency [idBoxing].
+// ═════════════════════════════════════════════════════════════════════════════
+function RencanaPanel({
+  idBoxing,
+  onCountChange,
+}: {
+  idBoxing: number;
+  onCountChange?: (idBoxing: number, count: number) => void;
+}) {
+  const [items, setItems]             = useState<RencanaItem[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [errMsg, setErrMsg]           = useState("");
+
+  const [formMode, setFormMode]       = useState<"new" | number | null>(null);
+  const [formTeks, setFormTeks]       = useState("");
+  const [formTanggal, setFormTanggal] = useState("");
+  const [formErr, setFormErr]         = useState("");
+  const [savingForm, setSavingForm]   = useState(false);
+
+  // ✅ FIX: useCallback cuma depend on idBoxing (bukan onCountChange)
+  // supaya tidak re-create tiap render → tidak infinite loop.
+  const fetchRencana = useCallback(async () => {
+    setLoading(true); setErrMsg("");
+    try {
+      const res = await kepalaUnitApi.getRencana(idBoxing);
+      if (res.success) {
+        const data = res.data.map((r: { id: number; teks: string; tanggal: string }) => ({
+          id: r.id,
+          teks: r.teks,
+          tanggal: String(r.tanggal).slice(0, 10),
+        }));
+        setItems(data);
+        onCountChange?.(idBoxing, data.length);
+      }
+    } catch (e: unknown) {
+      setErrMsg(e instanceof Error ? e.message : "Gagal memuat rencana.");
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idBoxing]);
+
+  // ✅ FIX: useEffect depend on idBoxing saja
+  useEffect(() => {
+    fetchRencana();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idBoxing]);
+
+  const handleOpenAdd = () => {
+    setFormMode("new");
+    setFormTeks("");
+    setFormTanggal("");
+    setFormErr("");
+  };
+
+  const handleOpenEdit = (item: RencanaItem) => {
+    setFormMode(item.id);
+    setFormTeks(item.teks);
+    setFormTanggal(item.tanggal);
+    setFormErr("");
+  };
+
+  const handleCancelForm = () => {
+    setFormMode(null);
+    setFormErr("");
+  };
+
+  const validateForm = (): boolean => {
+    if (!formTeks.trim()) {
+      setFormErr("Teks tidak boleh kosong.");
+      return false;
+    }
+    if (!formTanggal) {
+      setFormErr("Tanggal harus diisi.");
+      return false;
+    }
+    if (formTanggal < todayStr()) {
+      setFormErr("Tanggal tidak boleh lewat.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleSaveNew = async () => {
+    if (!validateForm()) return;
+    setSavingForm(true); setFormErr("");
+    try {
+      const res = await kepalaUnitApi.addRencana({
+        id_boxing: idBoxing,
+        teks: formTeks.trim(),
+        tanggal: formTanggal,
+      });
+      if (res.success && res.data) {
+        const newList = [
+          ...items,
+          { id: res.data.id, teks: formTeks.trim(), tanggal: formTanggal },
+        ];
+        setItems(newList);
+        onCountChange?.(idBoxing, newList.length);
+        setFormMode(null);
+      }
+    } catch (e: unknown) {
+      setFormErr(e instanceof Error ? e.message : "Gagal menyimpan.");
+    } finally {
+      setSavingForm(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (typeof formMode !== "number" || !validateForm()) return;
+    setSavingForm(true); setFormErr("");
+    try {
+      await kepalaUnitApi.updateRencana(formMode, {
+        teks: formTeks.trim(),
+        tanggal: formTanggal,
+      });
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === formMode
+            ? { ...it, teks: formTeks.trim(), tanggal: formTanggal }
+            : it
+        )
+      );
+      setFormMode(null);
+    } catch (e: unknown) {
+      setFormErr(e instanceof Error ? e.message : "Gagal memperbarui.");
+    } finally {
+      setSavingForm(false);
+    }
+  };
+
+  const handleDelete = async (item: RencanaItem) => {
+    if (!confirm(`Hapus rencana "${item.teks}"?`)) return;
+    try {
+      await kepalaUnitApi.deleteRencana(item.id);
+      const newList = items.filter((it) => it.id !== item.id);
+      setItems(newList);
+      onCountChange?.(idBoxing, newList.length);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Gagal menghapus.");
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {formMode === null && (
+        <div className="flex justify-start">
+          <button
+            onClick={handleOpenAdd}
+            disabled={loading}
+            className="border-2 border-black bg-white hover:bg-gray-100 w-12 h-8 flex items-center justify-center rounded transition-all disabled:opacity-50"
+            title="Tambah rencana"
+            aria-label="Tambah rencana"
+          >
+            <Plus size={16} className="text-black" />
+          </button>
+        </div>
+      )}
+
+      {formMode !== null && (
+        <div className="border border-black rounded p-2 space-y-1.5 bg-white">
+          <p className="text-[9px] font-bold text-black uppercase">
+            {formMode === "new" ? "Tambah Rencana" : "Edit Rencana"}
+          </p>
+
+          <textarea
+            className="w-full border border-black p-1.5 text-[10px] outline-none focus:border-blue-polibatam rounded resize-none"
+            rows={3}
+            placeholder="tulis rencana tindak lanjut"
+            value={formTeks}
+            onChange={(e) => setFormTeks(e.target.value)}
+            autoFocus
+          />
+
+          <input
+            type="date"
+            className="w-full border border-black p-1.5 text-[10px] outline-none focus:border-blue-polibatam rounded"
+            value={formTanggal}
+            min={todayStr()}
+            onChange={(e) => setFormTanggal(e.target.value)}
+          />
+
+          {formErr && (
+            <p className="text-[9px] text-red-500 bg-red-50 border border-red-200 rounded p-1.5">
+              {formErr}
+            </p>
+          )}
+
+          <div className="flex justify-center pt-0.5">
+            <button
+              onClick={formMode === "new" ? handleSaveNew : handleSaveEdit}
+              disabled={savingForm}
+              className="bg-blue-polibatam text-white font-bold text-[10px] px-5 py-1.5 rounded hover:bg-blue-600 transition-all disabled:opacity-50"
+            >
+              {savingForm ? "..." : "simpan"}
+            </button>
+          </div>
+
+          <div className="text-center">
+            <button
+              onClick={handleCancelForm}
+              disabled={savingForm}
+              className="text-[9px] text-gray-500 hover:text-black underline disabled:opacity-50"
+            >
+              batal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-2">
+          <div className="w-3 h-3 border-2 border-blue-polibatam border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : errMsg ? (
+        <p className="text-[9px] text-red-500">{errMsg}</p>
+      ) : items.length === 0 && formMode === null ? (
+        <p className="text-[9px] text-gray-400 italic text-center">
+          Belum ada rencana
+        </p>
+      ) : (
+        items.map((it, idx) => {
+          if (formMode === it.id) return null;
+
+          return (
+            <div
+              key={it.id}
+              className="border border-black rounded p-2 bg-white space-y-1"
+            >
+              <p className="text-[10px] font-semibold text-black">
+                Rencana {idx + 1}
+              </p>
+              <p className="text-[10px] text-gray-800 leading-snug break-words">
+                {it.teks}
+              </p>
+              <p className="text-[9px] text-gray-600 flex items-center gap-1">
+                <Calendar size={9} />
+                {it.tanggal
+                  ? new Date(it.tanggal).toLocaleDateString("id-ID", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })
+                  : "(belum diisi)"}
+              </p>
+              <div className="flex items-center gap-1 pt-0.5">
+                <button
+                  onClick={() => handleOpenEdit(it)}
+                  disabled={formMode !== null}
+                  className="border border-black text-black hover:bg-black hover:text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 text-[9px] font-medium transition-all disabled:opacity-40"
+                  title="Edit"
+                >
+                  <Pencil size={9} /> edit
+                </button>
+                <button
+                  onClick={() => handleDelete(it)}
+                  disabled={formMode !== null}
+                  className="border border-black text-black hover:bg-black hover:text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 text-[9px] font-medium transition-all disabled:opacity-40"
+                  title="Hapus"
+                >
+                  <Trash2 size={9} /> hapus
+                </button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// KOMPONEN UTAMA: DiscrepancyTable
+// ═════════════════════════════════════════════════════════════════════════════
 export default function DiscrepancyTable() {
   const [laporanList, setLaporanList] = useState<LaporanItem[]>([]);
   const [penyebab,    setPenyebab]    = useState<Record<number, string>>({});
-  const [rencana,     setRencana]     = useState<Record<number, string>>({});
-  // ✅ FITUR BARU: tanggal target selesai rencana tindak lanjut
-  const [tanggalRencana, setTanggalRencana] = useState<Record<number, string>>({});
   const [sending,     setSending]     = useState<Record<number, boolean>>({});
   const [loading,     setLoading]     = useState(true);
   const [errMsg,      setErrMsg]      = useState("");
-  const [modalSrc,    setModalSrc]    = useState<string | null>(null);  // ✅ UNTUK IMAGE MODAL
-  // ✅ Konfirmasi sebelum kirim (poin #3): simpan id_boxing yang mau
-  // dikirim di sini dulu, baru benar-benar dikirim kalau user menekan
-  // tombol "Kirim" di modal konfirmasi.
+  const [modalSrc,    setModalSrc]    = useState<string | null>(null);
   const [confirmId,   setConfirmId]   = useState<number | null>(null);
+
+  const [rencanaCount, setRencanaCount] = useState<Record<number, number>>({});
+
+  // ✅ FIX: useCallback stabil, cuma depend on setRencanaCount (yang stabil)
+  // supaya RencanaPanel tidak re-render terus.
+  const handleCountChange = useCallback((idBoxing: number, count: number) => {
+    setRencanaCount((prev) => {
+      // Cegah update kalau nilai sama (biar tidak trigger re-render)
+      if (prev[idBoxing] === count) return prev;
+      return { ...prev, [idBoxing]: count };
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setErrMsg("");
@@ -68,18 +350,10 @@ export default function DiscrepancyTable() {
       if (result.success) {
         setLaporanList(result.data);
         const initP: Record<number, string> = {};
-        const initR: Record<number, string> = {};
-        const initT: Record<number, string> = {};
         result.data.forEach((item: LaporanItem) => {
-          initP[item.id_boxing] = item.penyebab         || "";
-          initR[item.id_boxing] = item.rencana_tindakan || "";
-          // tanggal_rencana dari backend berformat "YYYY-MM-DDTHH:mm:ss.sssZ"
-          // atau "YYYY-MM-DD" — <input type="date"> butuh persis "YYYY-MM-DD".
-          initT[item.id_boxing] = item.tanggal_rencana
-            ? String(item.tanggal_rencana).slice(0, 10)
-            : "";
+          initP[item.id_boxing] = item.penyebab || "";
         });
-        setPenyebab(initP); setRencana(initR); setTanggalRencana(initT);
+        setPenyebab(initP);
       }
     } catch (err: unknown) {
       setErrMsg(err instanceof Error ? err.message : "Gagal memuat data laporan.");
@@ -88,26 +362,13 @@ export default function DiscrepancyTable() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ✅ FIX (poin #3): klik "Kirim" TIDAK langsung mengirim ke server.
-  // Cuma validasi isian dulu, lalu buka modal konfirmasi "Yakin ingin
-  // mengirim ini?". Data baru benar-benar dikirim kalau user menekan
-  // tombol "Kirim" di modal (lihat handleConfirmSend di bawah).
   const handleSend = (id_boxing: number) => {
-    if (!penyebab[id_boxing]?.trim() || !rencana[id_boxing]?.trim()) {
-      alert("Penyebab dan rencana tindak lanjut harus diisi.");
+    if (!penyebab[id_boxing]?.trim()) {
+      alert("Penyebab harus diisi.");
       return;
     }
-    // ✅ FITUR BARU: Tanggal Rencana wajib diisi, dan tidak boleh tanggal
-    // yang sudah lewat (kalender di UI cuma bisa "maju", lihat atribut
-    // `min` pada <input type="date"> di bawah — validasi ini jaga-jaga
-    // kalau ada cara lain untuk mengubah tanggal).
-    if (!tanggalRencana[id_boxing]) {
-      alert("Tanggal rencana harus diisi.");
-      return;
-    }
-    const todayStr = new Date().toISOString().split("T")[0];
-    if (tanggalRencana[id_boxing] < todayStr) {
-      alert("Tanggal rencana tidak boleh tanggal yang sudah lewat.");
+    if ((rencanaCount[id_boxing] || 0) === 0) {
+      alert("Minimal 1 rencana tindak lanjut harus ditambahkan.");
       return;
     }
     setConfirmId(id_boxing);
@@ -120,11 +381,12 @@ export default function DiscrepancyTable() {
     try {
       const result = await kepalaUnitApi.submitRancangan({
         id_boxing,
-        penyebab:         penyebab[id_boxing].trim(),
-        rencana_tindakan: rencana[id_boxing].trim(),
-        tanggal_rencana:  tanggalRencana[id_boxing],
+        penyebab: penyebab[id_boxing].trim(),
       });
-      if (result.success) { alert("Laporan berhasil dikirim!"); fetchData(); }
+      if (result.success) {
+        alert("Laporan berhasil dikirim ke Ka P4M!");
+        fetchData();
+      }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Gagal mengirim. Coba lagi.");
     } finally {
@@ -132,17 +394,6 @@ export default function DiscrepancyTable() {
       setConfirmId(null);
     }
   };
-
-  // ✅ FIX (permintaan user): Penyebab & Rencana Tindak Lanjut yang sudah
-  // diisi Kepala Unit TETAP bisa diedit — termasuk saat masih menunggu
-  // keputusan Ka P4M (status_review = "menunggu_keputusan_ka"). Kalau
-  // datanya sudah sesuai, Kepala Unit tidak wajib mengubahnya; kalau mau
-  // direvisi, tinggal edit & kirim ulang (backend submitRancangan
-  // mengizinkan update selama masih "menunggu_keputusan_ka"). Kolom
-  // hanya benar-benar terkunci setelah Ka P4M mengambil keputusan — tapi
-  // saat itu laporan sudah tidak lagi tampil di tab ini (lihat query
-  // getLaporanMasuk), jadi textarea & tombol Kirim di bawah sengaja
-  // tidak lagi punya kondisi "disabled"/"non-editable" apa pun.
 
   if (loading) return (
     <div className="w-full border-2 border-black bg-white p-12 text-center">
@@ -166,14 +417,12 @@ export default function DiscrepancyTable() {
 
   return (
     <>
-      {/* ===== IMAGE MODAL ===== */}
       {modalSrc && <ImageModal src={modalSrc} onClose={() => setModalSrc(null)} />}
 
-      {/* ===== KONFIRMASI KIRIM (poin #3) ===== */}
       <ConfirmDialog
         open={confirmId !== null}
         title="Konfirmasi Kirim"
-        message="Yakin ingin mengirim ini? Penyebab, Rencana Tindak Lanjut, dan Tanggal Rencana akan diteruskan ke Ka P4M. Anda tetap bisa mengedit & mengirim ulang selama Ka P4M belum mengambil keputusan."
+        message="Yakin ingin mengirim ini ke Ka P4M? Penyebab dan semua Rencana Tindak Lanjut akan diteruskan."
         confirmLabel="Kirim"
         cancelLabel="Batal"
         loading={confirmId !== null && !!sending[confirmId]}
@@ -182,7 +431,6 @@ export default function DiscrepancyTable() {
       />
 
       <div className="w-full border-2 border-black bg-white overflow-hidden text-sm">
-        {/* ===== HEADER DESKTOP ===== */}
         <div className="hidden sm:flex font-semibold uppercase bg-gray-50 border-b-2 border-black text-center">
           <div className="w-[26%] border-r-2 border-black p-3 text-[11px]">Kritik atau Pengaduan Terkait Polibatam</div>
           <div className="w-[12%] border-r-2 border-black p-3 text-[11px]">Tanggal Masuk</div>
@@ -194,26 +442,18 @@ export default function DiscrepancyTable() {
 
         {laporanList.map((item, idx) => {
           const ditolakStaf = item.approval_staf === "ditolak";
-          // ✅ FIX: badge cuma dicari untuk status yang benar-benar masih
-          // relevan di tab ini (lihat comment statusBadge di atas).
           const badge = !ditolakStaf && item.status_review ? statusBadge[item.status_review] : null;
+
           return (
             <div key={item.id_boxing} className={`${idx > 0 ? "border-t-2 border-black" : ""}`}>
-
-              {/* ===== MOBILE CARD ===== */}
+              {/* MOBILE */}
               <div className="sm:hidden p-4 space-y-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.kode_laporan}</span>
                   <span className="text-[10px] text-gray-400 capitalize">{item.jenis_laporan}</span>
-                  <span className="text-[10px] text-gray-500">
-                    📥 Masuk: {fmtTgl(item.created_at ?? null)}
-                  </span>
-                  <span className="text-[10px] text-gray-500">
-                    📅 Kejadian: {fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}
-                  </span>
                   {ditolakStaf ? (
                     <span className="text-[9px] font-medium px-2 py-0.5 border rounded text-red-500 bg-red-50 border-red-200">
-                      ⚠ Ditolak Staf P4M — Perlu Revisi
+                      Ditolak Staf P4M
                     </span>
                   ) : badge && (
                     <span className={`text-[9px] font-medium px-2 py-0.5 border rounded ${badge.cls}`}>{badge.label}</span>
@@ -221,16 +461,9 @@ export default function DiscrepancyTable() {
                 </div>
                 <p className="text-xs text-black leading-relaxed">{item.isi_laporan}</p>
                 {item.lampiran_laporan && (
-                  <button
-                    onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran_laporan}`)}
-                    className="text-[10px] text-blue-500 hover:underline flex items-center gap-1"
-                  >
-                    🖼️ Lihat Gambar
-                  </button>
+                  <button onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran_laporan}`)}
+                    className="text-[10px] text-blue-500 hover:underline">Lihat Gambar</button>
                 )}
-                {/* ✅ FIX: catatan revisi sekarang dari catatan_approval (Staf
-                    P4M), bukan status_review === "revisi" yang sudah tidak
-                    dipakai lagi sejak migrasi alur v2. */}
                 {ditolakStaf && item.catatan_approval && (
                   <div className="p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800">
                     <span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}
@@ -240,7 +473,7 @@ export default function DiscrepancyTable() {
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
                   <AutoResizeTextarea
                     minHeight={80}
-                    className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
+                    className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam rounded"
                     placeholder="Ketik penyebab di sini..."
                     value={penyebab[item.id_boxing] || ""}
                     onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
@@ -248,46 +481,22 @@ export default function DiscrepancyTable() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Tindak Lanjut</p>
-                  <AutoResizeTextarea
-                    minHeight={80}
-                    className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed rounded"
-                    placeholder="Ketik rencana di sini..."
-                    value={rencana[item.id_boxing] || ""}
-                    onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  <RencanaPanel
+                    idBoxing={item.id_boxing}
+                    onCountChange={handleCountChange}
                   />
                 </div>
-                {/* ✅ FITUR BARU: Tanggal Rencana — kalender cuma bisa
-                    "maju" (atribut `min` dikunci ke hari ini, jadi tanggal
-                    yang sudah lewat tidak bisa dipilih sama sekali). */}
-                <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Tanggal Rencana</p>
-                  <input
-                    type="date"
-                    className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam rounded"
-                    value={tanggalRencana[item.id_boxing] || ""}
-                    min={new Date().toISOString().split("T")[0]}
-                    onChange={(e) => setTanggalRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                  />
-                </div>
-                <div className="flex justify-end">
-                  {/* ✅ FIX: kolom Penyebab & Rencana Tindak Lanjut sekarang
-                      selalu bisa diedit, jadi tombol Kirim juga selalu
-                      aktif — termasuk saat masih menunggu keputusan Ka
-                      P4M, supaya Kepala Unit bisa kirim ulang revisi
-                      tanpa harus menunggu ditolak dulu. */}
-                  <button
-                    onClick={() => handleSend(item.id_boxing)}
-                    disabled={sending[item.id_boxing]}
-                    className="w-full bg-blue-polibatam text-white py-2.5 rounded font-bold uppercase text-[11px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
-                  >
-                    {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleSend(item.id_boxing)}
+                  disabled={sending[item.id_boxing]}
+                  className="w-full bg-blue-polibatam text-white py-2.5 rounded font-bold uppercase text-[11px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
+                >
+                  {sending[item.id_boxing] ? "Mengirim..." : "Kirimkan"}
+                </button>
               </div>
 
-              {/* ===== DESKTOP ROW ===== */}
+              {/* DESKTOP */}
               <div className="hidden sm:flex min-h-40">
-                {/* Kolom 1: Laporan */}
                 <div className="w-[26%] border-r-2 border-black p-5">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.kode_laporan}</span>
@@ -295,16 +504,12 @@ export default function DiscrepancyTable() {
                   </div>
                   <p className="text-xs text-black leading-relaxed">{item.isi_laporan}</p>
                   {item.lampiran_laporan && (
-                    <button
-                      onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran_laporan}`)}
-                      className="mt-2 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
-                    >
-                      🖼️ Lihat Gambar
-                    </button>
+                    <button onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran_laporan}`)}
+                      className="mt-2 text-[10px] text-blue-500 hover:underline">Lihat Gambar</button>
                   )}
                   {ditolakStaf ? (
                     <div className="mt-3 px-2 py-1 border rounded text-[10px] font-medium text-red-500 bg-red-50 border-red-200">
-                      ⚠ Ditolak Staf P4M — Perlu Revisi
+                      Ditolak Staf P4M — Perlu Revisi
                     </div>
                   ) : badge && (
                     <div className={`mt-3 px-2 py-1 border rounded text-[10px] font-medium ${badge.cls}`}>{badge.label}</div>
@@ -316,30 +521,18 @@ export default function DiscrepancyTable() {
                   )}
                 </div>
 
-                {/* Kolom 2: Tanggal Masuk (tanggal laporan diterima/dibuat di sistem) */}
                 <div className="w-[12%] border-r-2 border-black p-5 flex items-center justify-center">
-                  <span className="text-xs text-gray-700">
-                    {fmtTgl(item.created_at ?? null)}
-                  </span>
+                  <span className="text-xs text-gray-700">{fmtTgl(item.created_at ?? null)}</span>
                 </div>
 
-                {/* Kolom 3: Tanggal Kejadian (tanggal kejadian yang diisi pelapor saat lapor) */}
                 <div className="w-[12%] border-r-2 border-black p-5 flex items-center justify-center">
-                  <span className="text-xs text-gray-700">
-                    {fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}
-                  </span>
+                  <span className="text-xs text-gray-700">{fmtTgl(item.tanggal_laporan ?? item.created_at ?? null)}</span>
                 </div>
 
-                {/* Kolom 4: Penyebab — ✅ FIX (poin #2): dulu kotak tinggi
-                    tetap (h-30) + scroll, teks panjang jadi terlihat
-                    menciut/terpotong. Sekarang pakai AutoResizeTextarea
-                    supaya kotaknya memanjang ke bawah mengikuti isi teks,
-                    sama seperti perilaku kolom "Kritik atau Pengaduan
-                    Terkait Polibatam" di sebelah kiri. */}
                 <div className="w-[18%] border-r-2 border-black p-5">
                   <AutoResizeTextarea
                     minHeight={112}
-                    className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam"
                     placeholder="Ketik penyebab di sini..."
                     value={penyebab[item.id_boxing] || ""}
                     onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
@@ -347,32 +540,13 @@ export default function DiscrepancyTable() {
                   />
                 </div>
 
-                {/* Kolom 5: Rencana Tindak Lanjut — sama seperti Kolom 4,
-                    ditambah kalender "Tanggal Rencana" di bawahnya. */}
-                <div className="w-[18%] border-r-2 border-black p-5 space-y-2">
-                  <AutoResizeTextarea
-                    minHeight={112}
-                    className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-polibatam disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    placeholder="Ketik rencana di sini..."
-                    value={rencana[item.id_boxing] || ""}
-                    onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                    spellCheck={false}
+                <div className="w-[18%] border-r-2 border-black p-3">
+                  <RencanaPanel
+                    idBoxing={item.id_boxing}
+                    onCountChange={handleCountChange}
                   />
-                  {/* ✅ FITUR BARU: Tanggal Rencana — kalender cuma bisa
-                      "maju" (atribut `min` dikunci ke hari ini). */}
-                  <div>
-                    <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">Tanggal Rencana</p>
-                    <input
-                      type="date"
-                      className="w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam"
-                      value={tanggalRencana[item.id_boxing] || ""}
-                      min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setTanggalRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-                    />
-                  </div>
                 </div>
 
-                {/* Kolom 6: Aksi */}
                 <div className="flex-1 p-5 flex items-center justify-center">
                   <button
                     onClick={() => handleSend(item.id_boxing)}

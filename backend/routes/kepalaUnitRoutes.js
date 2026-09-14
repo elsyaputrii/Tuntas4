@@ -10,6 +10,10 @@ const {
   getLaporanHasil,
   getRiwayat,
   submitPelaksanaan,
+  getRencana,
+  addRencana,
+  updateRencana,
+  deleteRencana,
 } = require("../controllers/kepalaUnitController");
 
 // Semua route di bawah wajib: token valid + role = kepala_unit ATAU ka_p4m
@@ -30,6 +34,12 @@ router.post("/pelaksanaan",  upload.single("lampiran"), submitPelaksanaan); // P
 // Kepala Unit ini (apa pun tahapnya sekarang: masih di Kepala Unit,
 // menunggu keputusan Ka P4M, di Staf P4M, atau sudah selesai), plus
 // export PDF per laporan. Lihat getRiwayat di kepalaUnitController.js.
-router.get("/riwayat", getRiwayat);                                     // GET  /api/kepala-unit/riwayat
+router.get("/riwayat", getRiwayat);               
+
+// ✅ FITUR BARU: CRUD rencana tindak lanjut (multi-item per laporan)
+router.get("/rencana/:id_boxing",  getRencana);      // GET    /api/kepala-unit/rencana/:id_boxing
+router.post("/rencana",            addRencana);      // POST   /api/kepala-unit/rencana
+router.put("/rencana/:id",         updateRencana);   // PUT    /api/kepala-unit/rencana/:id
+router.delete("/rencana/:id",      deleteRencana);   // DELETE /api/kepala-unit/rencana/:id// GET  /api/kepala-unit/riwayat
 
 module.exports = router;

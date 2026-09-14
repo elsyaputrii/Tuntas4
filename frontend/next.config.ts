@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 // Ambil hostname backend dari env var (dipakai fetchUserData/foto profil dkk)
 // supaya next/image diizinkan me-load gambar dari domain backend produksi,
@@ -29,6 +30,15 @@ function getBackendImagePatterns() {
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: getBackendImagePatterns(),
+  },
+
+  // ✅ FIX: kasih tahu Turbopack root-nya di folder ini (frontend/),
+  // bukan di C:\Users\ASUS\ yang ada package-lock.json lain. Tanpa ini,
+  // Next.js bakal salah nebak workspace root → cache .next jadi kacau
+  // → error "Persisting failed: Unable to commit operations" dan
+  // "Cannot find module '../chunks/ssr/[turbopack]_runtime.js'".
+  turbopack: {
+    root: path.join(__dirname),
   },
 };
 

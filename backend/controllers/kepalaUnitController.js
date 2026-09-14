@@ -54,6 +54,10 @@ async function getKepalaInfo(req) {
   return rows[0] || null;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// TAB "KETIDAKSESUAIAN MASUK"
+// ═════════════════════════════════════════════════════════════════════════════
+
 async function getLaporanMasuk(req, res) {
   try {
     const kepala = await getKepalaInfo(req);
@@ -92,23 +96,11 @@ async function getLaporanMasuk(req, res) {
         AND (
           r.id_rancangan IS NULL
           OR r.status_review = 'menunggu_keputusan_ka'
-          -- ✅ FIX (permintaan user): "ditolak" oleh Staf P4M sekarang
-          -- mengembalikan laporan LANGSUNG ke tab "Laporan Hasil"
-          -- (status_boxing = 'menunggu_pelaksanaan', lihat setApprovalStaf
-          -- di stafController.js) — BUKAN lagi ke "Ketidaksesuaian Masuk".
-          -- Kondisi approval_staf='ditolak' di sini karena itu HANYA
-          -- dipakai untuk skenario lama (kalau suatu saat status boxing
-          -- masih 'di_staff' dengan approval 'ditolak'); dibatasi supaya
-          -- TIDAK ikut menangkap laporan yang sudah dipindah ke
-          -- 'menunggu_pelaksanaan' oleh alur revisi baru, yang harusnya
-          -- HANYA muncul di "Laporan Hasil", bukan di "Masuk" lagi.
           OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
         )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],
     );
-    // ✅ kode_laporan sekarang datang langsung dari kolom l.kode_laporan
-    // (token acak), bukan dihitung ulang dari id_laporan yang sequential.
     return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("Error getLaporanMasuk:", error);
@@ -119,38 +111,20 @@ async function getLaporanMasuk(req, res) {
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// SUBMIT RANCANGAN (kirim ke Ka P4M)
+// ✅ UPDATE: sekarang ambil rencana dari tabel `rencana_tindak_lanjut`
+// (multi-item) lalu gabungkan jadi 1 teks untuk backward-compat kolom
+// `rancangan_tindakan.deskripsi` yang masih dipakai query lama.
+// ═════════════════════════════════════════════════════════════════════════════
+
 async function submitRancangan(req, res) {
-  const { id_boxing, penyebab, rencana_tindakan, tanggal_rencana } = req.body;
+  const { id_boxing, penyebab } = req.body;
 
-  if (!id_boxing || !penyebab || !rencana_tindakan || !tanggal_rencana) {
+  if (!id_boxing || !penyebab) {
     return res.status(400).json({
       success: false,
-      message:
-        "id_boxing, penyebab, rencana_tindakan, dan tanggal_rencana wajib diisi.",
-    });
-  }
-
-  // ✅ FITUR BARU: Tanggal Rencana = target tanggal selesai rencana
-  // tindak lanjut. Kalender ini HANYA BOLEH MAJU — tidak boleh memilih
-  // tanggal yang sudah lewat (hari ini masih dihitung boleh, karena
-  // "hari ini" belum lewat). Validasi juga di-mirror di frontend lewat
-  // atribut `min` pada <input type="date"> (lihat DiscrepancyTable.tsx),
-  // tapi divalidasi ulang di sini supaya tidak bisa dilewati lewat
-  // request manual ke API.
-  const todayCheck = new Date();
-  todayCheck.setHours(0, 0, 0, 0);
-  const tanggalRencanaInput = new Date(tanggal_rencana);
-  tanggalRencanaInput.setHours(0, 0, 0, 0);
-  if (isNaN(tanggalRencanaInput.getTime())) {
-    return res.status(400).json({
-      success: false,
-      message: "Tanggal rencana tidak valid.",
-    });
-  }
-  if (tanggalRencanaInput < todayCheck) {
-    return res.status(400).json({
-      success: false,
-      message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
+      message: "id_boxing dan penyebab wajib diisi.",
     });
   }
 
@@ -163,6 +137,7 @@ async function submitRancangan(req, res) {
       });
     }
 
+    // Pastikan laporan ini milik unit ini
     const [boxingRows] = await pool.query(
       `SELECT id_boxing, id_laporan, status FROM boxing_ketidaksesuaian
        WHERE id_boxing = ? AND id_kepala = ?`,
@@ -174,12 +149,48 @@ async function submitRancangan(req, res) {
         message: "Laporan ini tidak ditujukan ke unit Anda.",
       });
     }
+
+    // ✅ Ambil semua rencana dari tabel rencana_tindak_lanjut
+    const [rencanaRows] = await pool.query(
+      `SELECT teks, tanggal FROM rencana_tindak_lanjut
+       WHERE id_boxing = ? ORDER BY urutan ASC, id ASC`,
+      [id_boxing],
+    );
+
+    if (rencanaRows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Minimal 1 rencana tindak lanjut harus ditambahkan. Klik '📝 Kelola Rencana' dulu.",
+      });
+    }
+
+    // ✅ Gabungkan jadi 1 teks: "1. Teks A (20/09/2026); 2. Teks B (25/09/2026)"
+    const gabunganTeks = rencanaRows
+      .map((r, i) => {
+        const tgl = new Date(r.tanggal).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+        return `${i + 1}. ${r.teks} (${tgl})`;
+      })
+      .join("; ");
+
+    // Tanggal rencana = tanggal paling akhir dari semua item
+    const tanggalTerakhir = rencanaRows.reduce((max, r) => {
+      const t = new Date(r.tanggal);
+      return t > max ? t : max;
+    }, new Date(rencanaRows[0].tanggal));
+    const tanggalTerakhirStr = tanggalTerakhir.toISOString().split("T")[0];
+
+    // Cek apakah rancangan sudah ada
     const [existing] = await pool.query(
       `SELECT id_rancangan, status_review FROM rancangan_tindakan WHERE id_boxing = ?`,
       [id_boxing],
     );
 
     if (existing.length > 0) {
+      // Hanya boleh update kalau status_review masih 'menunggu_keputusan_ka'
       if (existing[0].status_review !== "menunggu_keputusan_ka") {
         return res.status(400).json({
           success: false,
@@ -191,13 +202,13 @@ async function submitRancangan(req, res) {
         `UPDATE rancangan_tindakan
          SET penyebab = ?, deskripsi = ?, tanggal_rencana = ?, updated_at = NOW()
          WHERE id_boxing = ?`,
-        [penyebab, rencana_tindakan, tanggal_rencana, id_boxing],
+        [penyebab, gabunganTeks, tanggalTerakhirStr, id_boxing],
       );
     } else {
       await pool.query(
         `INSERT INTO rancangan_tindakan (id_boxing, penyebab, deskripsi, tanggal_rencana, status_review)
          VALUES (?, ?, ?, ?, 'menunggu_keputusan_ka')`,
-        [id_boxing, penyebab, rencana_tindakan, tanggal_rencana],
+        [id_boxing, penyebab, gabunganTeks, tanggalTerakhirStr],
       );
     }
 
@@ -205,14 +216,6 @@ async function submitRancangan(req, res) {
       `UPDATE boxing_ketidaksesuaian SET status = 'diproses' WHERE id_boxing = ?`,
       [id_boxing],
     );
-
-    // ✅ FIX (permintaan user): TIDAK ADA LAGI penyimpanan draft bersama
-    // lintas unit. Kalau satu laporan ditujukan ke lebih dari 1 unit
-    // (misal MANAJEMEN & P3M), tiap unit punya baris boxing_ketidaksesuaian
-    // dan rancangan_tindakan SENDIRI (dibedakan lewat id_boxing) — isian
-    // Penyebab & Rencana Tindak Lanjut satu unit TIDAK PERNAH muncul/
-    // menjadi nilai awal di unit lain. Masing-masing Kepala Unit mengisi
-    // dan mengirim ke Ka P4M secara independen.
 
     // Kasih tau Ka P4M ada rancangan tindakan yang perlu diputuskan
     notifikasiUntukRole("ka_p4m", {
@@ -235,9 +238,10 @@ async function submitRancangan(req, res) {
   }
 }
 
-// ✅ FIX: query getLaporanHasil sekarang punya 2 kondisi (OR) — lihat
-// penjelasan di komentar atas file. Ditambahkan juga b.approval_staf ke
-// SELECT supaya frontend bisa kasih konteks "ditolak, perlu revisi".
+// ═════════════════════════════════════════════════════════════════════════════
+// TAB "LAPORAN HASIL"
+// ═════════════════════════════════════════════════════════════════════════════
+
 async function getLaporanHasil(req, res) {
   try {
     const kepala = await getKepalaInfo(req);
@@ -279,81 +283,6 @@ async function getLaporanHasil(req, res) {
   }
 }
 
-// ✅ FIX (Riwayat menampilkan Total=0/Selesai=0/Persentase=0% walau
-// laporan sudah pernah didistribusikan & ditangani Kepala Unit):
-//
-// SEBELUMNYA query ini pakai INNER JOIN ke rancangan_tindakan DAN
-// pelaksanaan_tindakan sekaligus. Akibatnya laporan yang sudah masuk ke
-// Kepala Unit dan sudah diisi Penyebab + Rencana, tapi BELUM sampai
-// tahap pelaksanaan (misal: masih 'menunggu_keputusan_ka' — nunggu
-// Ka P4M putuskan), belum punya baris di pelaksanaan_tindakan sama
-// sekali, sehingga ikut TERBUANG oleh INNER JOIN dan tidak pernah
-// muncul di Riwayat sama sekali. Kalau itu satu-satunya laporan yang
-// pernah ditangani unit tsb (contoh kasus LAP-00002), hasilnya Total
-// Laporan = 0, Selesai = 0, Persentase = 0% — padahal laporan itu sudah
-// pernah didistribusikan dan sudah ditangani (Penyebab & Rencana sudah
-// diisi Kepala Unit).
-//
-// FIX: "Riwayat" sekarang didefinisikan sesuai alur yang benar — SEMUA
-// laporan yang PERNAH didistribusikan/ditangani oleh Kepala Unit ini,
-// yaitu SEMUA baris boxing_ketidaksesuaian milik id_kepala ini, apa pun
-// tahapnya sekarang (masih di Kepala Unit, di Staf P4M, atau sudah
-// selesai). rancangan_tindakan & pelaksanaan_tindakan di-LEFT JOIN
-// supaya baris yang belum sampai tahap itu tetap muncul (kolom terkait
-// bernilai NULL, ditangani di frontend sebagai "—" / belum diisi).
-// Filter "Selesai" tetap murni status_boxing = 'selesai' (lihat
-// RiwayatTable.tsx) — laporan yang masih berjalan TIDAK dihitung selesai.
-async function getRiwayat(req, res) {
-  try {
-    const kepala = await getKepalaInfo(req);
-    if (!kepala) {
-      return res.status(403).json({
-        success: false,
-        message: "Data kepala unit tidak ditemukan.",
-      });
-    }
-    const [rows] = await pool.query(
-      `SELECT
-        b.id_boxing, b.unit_tujuan AS nama_unit, b.status AS status_boxing,
-        b.approval_staf, b.catatan_approval, b.created_at AS tanggal_distribusi,
-        l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
-        COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
-        r.penyebab, r.deskripsi AS rencana_tindakan, r.tanggal_rencana,
-        r.status_review, r.aksi_masukan,
-        p.id_pelaksanaan, p.deskripsi AS hasil_tindakan, p.lampiran AS lampiran_hasil,
-        p.tanggal AS tanggal_pelaksanaan, p.created_at AS tanggal_kirim_hasil
-      FROM boxing_ketidaksesuaian b
-      JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
-      LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
-      LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
-      WHERE b.id_kepala = ?
-      ORDER BY COALESCE(p.tanggal, b.created_at) DESC, b.id_boxing DESC`,
-      [kepala.id_kepala],
-    );
-
-    // ✅ Statistik dihitung di backend juga (sumber kebenaran tunggal),
-    // supaya frontend tidak perlu re-derive dan berisiko tidak sinkron.
-    // total   = semua laporan yang pernah didistribusikan/ditangani unit ini
-    // selesai = yang BENAR-BENAR sudah selesai (status_boxing = 'selesai')
-    const total = rows.length;
-    const selesai = rows.filter((d) => d.status_boxing === "selesai").length;
-    const persentase = total > 0 ? Math.round((selesai / total) * 100) : 0;
-
-    return res.status(200).json({
-      success: true,
-      data: rows,
-      unit: kepala.unit,
-      stats: { total, selesai, persentase },
-    });
-  } catch (error) {
-    console.error("Error getRiwayat:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Gagal mengambil data riwayat.",
-    });
-  }
-}
-
 async function submitPelaksanaan(req, res) {
   const { id_boxing, deskripsi, tanggal } = req.body;
   const lampiran = req.file ? req.file.filename : null;
@@ -381,9 +310,6 @@ async function submitPelaksanaan(req, res) {
       });
     }
 
-    // ✅ FIX: validasi sekarang juga menerima kasus revisi (di_staff +
-    // ditolak), bukan cuma 'menunggu_pelaksanaan'. Tanpa ini, submit
-    // ulang setelah ditolak Staf akan ditolak backend dengan 403.
     const [boxingRows] = await pool.query(
       `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing, b.approval_staf,
               COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan, r.updated_at AS tanggal_ditindaklanjuti
@@ -408,16 +334,7 @@ async function submitPelaksanaan(req, res) {
     }
 
     const id_laporan = boxingRows[0].id_laporan;
-    // ✅ FIX (permintaan user): sebelumnya tanggal pelaksanaan TIDAK BOLEH
-    // lebih awal dari tanggal laporan/tanggal Ka P4M menindaklanjuti —
-    // di lapangan ini menyulitkan Kepala Unit karena pekerjaan/perbaikan
-    // fisiknya kadang sudah dilakukan lebih dulu sebelum pencatatan resmi
-    // di sistem selesai (mis. instruksi lisan lebih dulu). Sekarang
-    // Kepala Unit bebas memilih tanggal pelaksanaan kapan pun, TERMASUK
-    // tanggal sebelum tanggal laporan/keputusan Ka P4M — satu-satunya
-    // batasan yang tersisa adalah tidak boleh tanggal di MASA DEPAN
-    // (lebih besar dari hari ini), supaya tetap masuk akal sebagai
-    // catatan pelaksanaan yang sudah benar-benar terjadi.
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tanggalInput = new Date(tanggal);
@@ -455,9 +372,6 @@ async function submitPelaksanaan(req, res) {
       );
     }
 
-    // ✅ FIX: reset approval_staf balik ke 'menunggu' setiap kali Kepala
-    // Unit submit ulang (penting untuk kasus revisi setelah ditolak),
-    // supaya Staf P4M tahu ini hasil BARU yang perlu di-review lagi.
     await pool.query(
       `UPDATE boxing_ketidaksesuaian SET status = 'di_staff', approval_staf = 'menunggu' WHERE id_boxing = ?`,
       [id_boxing],
@@ -480,10 +394,353 @@ async function submitPelaksanaan(req, res) {
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// TAB "RIWAYAT"
+// ═════════════════════════════════════════════════════════════════════════════
+
+async function getRiwayat(req, res) {
+  try {
+    const kepala = await getKepalaInfo(req);
+    if (!kepala) {
+      return res.status(403).json({
+        success: false,
+        message: "Data kepala unit tidak ditemukan.",
+      });
+    }
+    const [rows] = await pool.query(
+      `SELECT
+        b.id_boxing, b.unit_tujuan AS nama_unit, b.status AS status_boxing,
+        b.approval_staf, b.catatan_approval, b.created_at AS tanggal_distribusi,
+        l.id_laporan, l.kode_laporan, l.jenis_laporan, l.deskripsi AS isi_laporan,
+        COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
+        r.penyebab, r.deskripsi AS rencana_tindakan, r.tanggal_rencana,
+        r.status_review, r.aksi_masukan,
+        p.id_pelaksanaan, p.deskripsi AS hasil_tindakan, p.lampiran AS lampiran_hasil,
+        p.tanggal AS tanggal_pelaksanaan, p.created_at AS tanggal_kirim_hasil
+      FROM boxing_ketidaksesuaian b
+      JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
+      LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
+      LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
+      WHERE b.id_kepala = ?
+      ORDER BY COALESCE(p.tanggal, b.created_at) DESC, b.id_boxing DESC`,
+      [kepala.id_kepala],
+    );
+
+    const total = rows.length;
+    const selesai = rows.filter((d) => d.status_boxing === "selesai").length;
+    const persentase = total > 0 ? Math.round((selesai / total) * 100) : 0;
+
+    return res.status(200).json({
+      success: true,
+      data: rows,
+      unit: kepala.unit,
+      stats: { total, selesai, persentase },
+    });
+  } catch (error) {
+    console.error("Error getRiwayat:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal mengambil data riwayat.",
+    });
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ✅ FITUR BARU: CRUD Rencana Tindak Lanjut (multi-item per laporan)
+//
+// Sebelumnya: 1 laporan = 1 teks "rencana_tindakan" + 1 "tanggal_rencana"
+// Sekarang:   1 laporan = BANYAK rencana, masing-masing punya teks + tanggal
+// Disimpan di tabel baru: rencana_tindak_lanjut (FK ke id_boxing)
+//
+// Alur:
+//   1. Kepala Unit buka modal "Kelola Rencana" di frontend
+//   2. Tambah/edit/hapus item rencana → tersimpan via endpoint ini
+//   3. Klik "Kirim" di tabel utama → submitRancangan gabungkan semua
+//      rencana jadi 1 teks panjang di rancangan_tindakan.deskripsi
+//      (backward compat) + update status_review
+// ═════════════════════════════════════════════════════════════════════════════
+
+// GET /api/kepala-unit/rencana/:id_boxing
+async function getRencana(req, res) {
+  const { id_boxing } = req.params;
+  try {
+    const kepala = await getKepalaInfo(req);
+    if (!kepala) {
+      return res.status(403).json({
+        success: false,
+        message: "Data kepala unit tidak ditemukan.",
+      });
+    }
+
+    const [boxingRows] = await pool.query(
+      `SELECT id_boxing FROM boxing_ketidaksesuaian 
+       WHERE id_boxing = ? AND id_kepala = ?`,
+      [id_boxing, kepala.id_kepala],
+    );
+    if (boxingRows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Laporan ini tidak ditujukan ke unit Anda.",
+      });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT id, id_boxing, teks, tanggal, urutan, 
+              created_at, updated_at
+       FROM rencana_tindak_lanjut
+       WHERE id_boxing = ?
+       ORDER BY urutan ASC, id ASC`,
+      [id_boxing],
+    );
+
+    return res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error("Error getRencana:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal mengambil data rencana.",
+    });
+  }
+}
+
+// POST /api/kepala-unit/rencana
+// Body: { id_boxing, teks, tanggal }
+async function addRencana(req, res) {
+  const { id_boxing, teks, tanggal } = req.body;
+
+  if (!id_boxing || !teks || !tanggal) {
+    return res.status(400).json({
+      success: false,
+      message: "id_boxing, teks, dan tanggal wajib diisi.",
+    });
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tgl = new Date(tanggal);
+  tgl.setHours(0, 0, 0, 0);
+  if (isNaN(tgl.getTime())) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal tidak valid.",
+    });
+  }
+  if (tgl < today) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
+    });
+  }
+
+  try {
+    const kepala = await getKepalaInfo(req);
+    if (!kepala) {
+      return res.status(403).json({
+        success: false,
+        message: "Data kepala unit tidak ditemukan.",
+      });
+    }
+
+    const [boxingRows] = await pool.query(
+      `SELECT id_boxing FROM boxing_ketidaksesuaian 
+       WHERE id_boxing = ? AND id_kepala = ?`,
+      [id_boxing, kepala.id_kepala],
+    );
+    if (boxingRows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Laporan ini tidak ditujukan ke unit Anda.",
+      });
+    }
+
+    const [existing] = await pool.query(
+      `SELECT status_review FROM rancangan_tindakan WHERE id_boxing = ?`,
+      [id_boxing],
+    );
+    if (existing.length > 0 && 
+        existing[0].status_review !== "menunggu_keputusan_ka") {
+      return res.status(400).json({
+        success: false,
+        message: "Rancangan sudah diputuskan Ka P4M, tidak bisa diubah lagi.",
+      });
+    }
+
+    const [maxUrut] = await pool.query(
+      `SELECT COALESCE(MAX(urutan), -1) + 1 AS next_urutan 
+       FROM rencana_tindak_lanjut WHERE id_boxing = ?`,
+      [id_boxing],
+    );
+    const urutan = maxUrut[0].next_urutan;
+
+    const [result] = await pool.query(
+      `INSERT INTO rencana_tindak_lanjut (id_boxing, teks, tanggal, urutan)
+       VALUES (?, ?, ?, ?)`,
+      [id_boxing, teks.trim(), tanggal, urutan],
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Rencana berhasil ditambahkan.",
+      data: { id: result.insertId, id_boxing, teks, tanggal, urutan },
+    });
+  } catch (error) {
+    console.error("Error addRencana:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal menambah rencana.",
+    });
+  }
+}
+
+// PUT /api/kepala-unit/rencana/:id
+// Body: { teks, tanggal }
+async function updateRencana(req, res) {
+  const { id } = req.params;
+  const { teks, tanggal } = req.body;
+
+  if (!teks || !tanggal) {
+    return res.status(400).json({
+      success: false,
+      message: "teks dan tanggal wajib diisi.",
+    });
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tgl = new Date(tanggal);
+  tgl.setHours(0, 0, 0, 0);
+  if (isNaN(tgl.getTime())) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal tidak valid.",
+    });
+  }
+  if (tgl < today) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
+    });
+  }
+
+  try {
+    const kepala = await getKepalaInfo(req);
+    if (!kepala) {
+      return res.status(403).json({
+        success: false,
+        message: "Data kepala unit tidak ditemukan.",
+      });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT r.id, r.id_boxing, ra.status_review
+       FROM rencana_tindak_lanjut r
+       JOIN boxing_ketidaksesuaian b ON b.id_boxing = r.id_boxing
+       LEFT JOIN rancangan_tindakan ra ON ra.id_boxing = r.id_boxing
+       WHERE r.id = ? AND b.id_kepala = ?`,
+      [id, kepala.id_kepala],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Rencana tidak ditemukan.",
+      });
+    }
+    if (rows[0].status_review && 
+        rows[0].status_review !== "menunggu_keputusan_ka") {
+      return res.status(400).json({
+        success: false,
+        message: "Rancangan sudah diputuskan Ka P4M, tidak bisa diubah lagi.",
+      });
+    }
+
+    await pool.query(
+      `UPDATE rencana_tindak_lanjut 
+       SET teks = ?, tanggal = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [teks.trim(), tanggal, id],
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Rencana berhasil diperbarui.",
+    });
+  } catch (error) {
+    console.error("Error updateRencana:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal memperbarui rencana.",
+    });
+  }
+}
+
+// DELETE /api/kepala-unit/rencana/:id
+async function deleteRencana(req, res) {
+  const { id } = req.params;
+  try {
+    const kepala = await getKepalaInfo(req);
+    if (!kepala) {
+      return res.status(403).json({
+        success: false,
+        message: "Data kepala unit tidak ditemukan.",
+      });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT r.id, ra.status_review
+       FROM rencana_tindak_lanjut r
+       JOIN boxing_ketidaksesuaian b ON b.id_boxing = r.id_boxing
+       LEFT JOIN rancangan_tindakan ra ON ra.id_boxing = r.id_boxing
+       WHERE r.id = ? AND b.id_kepala = ?`,
+      [id, kepala.id_kepala],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Rencana tidak ditemukan.",
+      });
+    }
+    if (rows[0].status_review && 
+        rows[0].status_review !== "menunggu_keputusan_ka") {
+      return res.status(400).json({
+        success: false,
+        message: "Rancangan sudah diputuskan Ka P4M, tidak bisa dihapus.",
+      });
+    }
+
+    await pool.query(
+      `DELETE FROM rencana_tindak_lanjut WHERE id = ?`,
+      [id],
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Rencana berhasil dihapus.",
+    });
+  } catch (error) {
+    console.error("Error deleteRencana:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal menghapus rencana.",
+    });
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ✅ EXPORT — HARUS DI PALING BAWAH, setelah SEMUA fungsi didefinisikan.
+// Sebelumnya module.exports ada di tengah file (setelah submitPelaksanaan),
+// jadi 4 fungsi CRUD rencana di bawahnya TIDAK ikut ke-export → bikin
+// error "Route.get() requires a callback function but got [object Undefined]"
+// di kepalaUnitRoutes.js.
+// ═════════════════════════════════════════════════════════════════════════════
 module.exports = {
   getLaporanMasuk,
   submitRancangan,
   getLaporanHasil,
   getRiwayat,
   submitPelaksanaan,
+  // ✅ FITUR BARU: CRUD rencana tindak lanjut (multi-item)
+  getRencana,
+  addRencana,
+  updateRencana,
+  deleteRencana,
 };

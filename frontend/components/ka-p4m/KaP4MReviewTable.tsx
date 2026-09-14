@@ -4,7 +4,23 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { kaP4MApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
-import { Pencil, Eye } from "lucide-react";
+import {
+  Pencil,
+  Eye,
+  Clock,
+  RefreshCw,
+  CheckCircle2,
+  Calendar,
+  CalendarDays,
+  CalendarRange,
+  CalendarCheck,
+  Archive,
+  ClipboardList,
+  XCircle,
+  Image as ImageIcon,
+  Mail,
+  Target,
+} from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -18,10 +34,6 @@ interface RancanganItem {
   id_rancangan: number | null;
   penyebab: string | null;
   rencana_tindakan: string | null;
-  // ✅ FITUR BARU: target tanggal selesai rencana tindak lanjut, diisi
-  // Kepala Unit. Datang dari kolom rancangan_tindakan.tanggal_rencana
-  // lewat GET /api/ka-p4m/proses, supaya Ka P4M tahu kapan target
-  // selesainya sebelum menyetujui/menolak.
   tanggal_rencana: string | null;
   status_review: string | null;
   aksi_masukan: string | null;
@@ -31,18 +43,30 @@ interface RancanganItem {
 
 type FilterPeriod = "semua" | "harian" | "mingguan" | "bulanan" | "tahunan";
 
-const statusBadge: Record<string, { label: string; cls: string }> = {
-  menunggu_keputusan_ka: { label: "⏳ Menunggu Keputusan", cls: "text-blue-600 bg-blue-50 border-blue-200" },
-  ditindaklanjuti:       { label: "🔄 Perbaikan Berkelanjutan", cls: "text-red-600 bg-red-50 border-red-200" },
-  tidak_ditindaklanjuti: { label: "✅ Sesuai", cls: "text-green-600 bg-green-50 border-green-200" },
+const statusBadge: Record<string, { label: string; cls: string; Icon: typeof Clock }> = {
+  menunggu_keputusan_ka: {
+    label: "Menunggu Keputusan",
+    cls: "text-blue-600 bg-blue-50 border-blue-200",
+    Icon: Clock,
+  },
+  ditindaklanjuti: {
+    label: "Perbaikan Berkelanjutan",
+    cls: "text-red-600 bg-red-50 border-red-200",
+    Icon: RefreshCw,
+  },
+  tidak_ditindaklanjuti: {
+    label: "Sesuai",
+    cls: "text-green-600 bg-green-50 border-green-200",
+    Icon: CheckCircle2,
+  },
 };
 
-const FILTER_OPTIONS: { id: FilterPeriod; label: string; icon: string }[] = [
-  { id: "harian",   label: "Harian",   icon: "📅" },
-  { id: "mingguan", label: "Mingguan", icon: "🗓️" },
-  { id: "bulanan",  label: "Bulanan",  icon: "📆" },
-  { id: "tahunan",  label: "Tahunan",  icon: "🗃️" },
-  { id: "semua",    label: "Semua",    icon: "📋" },
+const FILTER_OPTIONS: { id: FilterPeriod; label: string; Icon: typeof Calendar }[] = [
+  { id: "harian",   label: "Harian",   Icon: Calendar },
+  { id: "mingguan", label: "Mingguan", Icon: CalendarDays },
+  { id: "bulanan",  label: "Bulanan",  Icon: CalendarRange },
+  { id: "tahunan",  label: "Tahunan",  Icon: Archive },
+  { id: "semua",    label: "Semua",    Icon: ClipboardList },
 ];
 
 function isInPeriod(dateStr: string | null | undefined, period: FilterPeriod): boolean {
@@ -75,6 +99,68 @@ function isInPeriod(dateStr: string | null | undefined, period: FilterPeriod): b
     return d.getFullYear() === now.getFullYear();
   }
   return true;
+}
+
+/**
+ * ✅ HELPER BARU: pecah string rencana jadi array item list.
+ * Backend menyimpan rencana_tindakan sebagai string gabungan, contoh:
+ *   "1. datangin unhan (14/09/2026); 2. datang ke bogor (23/09/2026); 3. jdi mantu bunda kafka (25/09/2026)"
+ * Fungsi ini memecah berdasarkan ';' (dan newline) lalu membersihkan
+ * prefix numbering lama (1. 2. 3. atau 1) 2) dst) supaya kita bisa
+ * render ulang dengan format list vertikal yang rapi.
+ */
+function parseRencana(rencana: string | null | undefined): string[] {
+  if (!rencana) return [];
+
+  // Pisah berdasarkan ';' atau newline, lalu buang item kosong
+  const raw = rencana
+    .split(/;|\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Buang prefix numbering lama (contoh: "1.", "2)", "1 -", dll)
+  const cleaned = raw.map((s) =>
+    s.replace(/^\s*\d+\s*[\.\)\-:]\s*/, "").trim()
+  ).filter(Boolean);
+
+  // Kalau ternyata cuma ada 1 item (tidak ada pemisah), balikkan apa adanya
+  return cleaned.length > 0 ? cleaned : [rencana.trim()];
+}
+
+/**
+ * ✅ KOMPONEN BARU: render list rencana vertikal dengan numbering.
+ * Dipakai di mobile card, desktop grid, dan modal supaya konsisten.
+ */
+function RencanaList({
+  rencana,
+  emptyText = "—",
+  textClass = "text-[10px]",
+}: {
+  rencana: string | null | undefined;
+  emptyText?: string;
+  textClass?: string;
+}) {
+  const items = parseRencana(rencana);
+
+  if (items.length === 0) {
+    return (
+      <div className={`border border-black p-2 min-h-15 ${textClass} text-gray-400`}>
+        {emptyText}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`border border-black p-2 min-h-15 ${textClass}`}>
+      <ol className="list-decimal list-inside space-y-1">
+        {items.map((item, i) => (
+          <li key={i} className="whitespace-pre-wrap break-words leading-snug">
+            {item}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 export default function KaP4MReviewTable() {
@@ -172,10 +258,10 @@ export default function KaP4MReviewTable() {
       });
 
       const label = keputusan === "ditindaklanjuti"
-        ? "🔄 Perbaikan Berkelanjutan"
-        : "✅ Sesuai";
+        ? "Perbaikan Berkelanjutan"
+        : "Sesuai";
 
-      setMsgOk(`✅ Keputusan berhasil diperbarui menjadi "${label}"!`);
+      setMsgOk(`Keputusan berhasil diperbarui menjadi "${label}"!`);
       setTimeout(() => setMsgOk(""), 4000);
       setModal({ open: false, item: null, mode: 'view' });
       fetchData();
@@ -213,15 +299,24 @@ export default function KaP4MReviewTable() {
       {modal.open && modal.item && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white border-2 border-black w-full max-w-lg p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-sm uppercase mb-1 border-b-2 border-black pb-2">
-              {modal.mode === 'edit' ? '✏️ Edit' : '📨 Lihat'} Keputusan — {modal.item!.kode_laporan}
+            <h3 className="font-bold text-sm uppercase mb-1 border-b-2 border-black pb-2 flex items-center gap-2">
+              {modal.mode === 'edit' ? (
+                <>
+                  <Pencil size={16} /> Edit Keputusan — {modal.item!.kode_laporan}
+                </>
+              ) : (
+                <>
+                  <Mail size={16} /> Lihat Keputusan — {modal.item!.kode_laporan}
+                </>
+              )}
             </h3>
             <p className="text-[11px] text-gray-500 mb-3">Unit: <strong>{modal.item!.nama_unit}</strong></p>
 
             <div className="bg-gray-50 border p-3 mb-4 text-[11px] space-y-2">
               <p><span className="font-bold">Laporan civitas:</span> {modal.item!.isi_laporan}</p>
-              <p className="text-[10px] text-gray-500">
-                📅 Tanggal Masuk: {modal.item!.created_at
+              <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                <Calendar size={12} />
+                Tanggal Masuk: {modal.item!.created_at
                   ? new Date(modal.item!.created_at).toLocaleDateString('id-ID', {
                       day: '2-digit',
                       month: 'long',
@@ -237,12 +332,23 @@ export default function KaP4MReviewTable() {
                   }}
                   className="text-[10px] text-blue-500 hover:underline flex items-center gap-1"
                 >
-                  🖼️ Lihat Gambar
+                  <ImageIcon size={12} /> Lihat Gambar
                 </button>
               )}
               <p><span className="font-bold">Penyebab (Kepala Unit):</span> {modal.item!.penyebab}</p>
-              <p><span className="font-bold">Rencana (Kepala Unit):</span> {modal.item!.rencana_tindakan}</p>
-              <p>
+
+              {/* ✅ Rencana Unit tampil sebagai list vertikal */}
+              <div>
+                <p className="font-bold mb-1">Rencana (Kepala Unit):</p>
+                <RencanaList
+                  rencana={modal.item!.rencana_tindakan}
+                  textClass="text-[11px]"
+                  emptyText="Belum ada rencana"
+                />
+              </div>
+
+              <p className="flex items-center gap-1">
+                <Target size={12} className="text-gray-600 shrink-0" />
                 <span className="font-bold">Target Selesai (Tanggal Rencana):</span>{" "}
                 {modal.item!.tanggal_rencana
                   ? new Date(modal.item!.tanggal_rencana).toLocaleDateString('id-ID', {
@@ -258,12 +364,20 @@ export default function KaP4MReviewTable() {
               <>
                 <div className="mb-4">
                   <p className="text-[11px] font-bold uppercase block mb-1">Keputusan:</p>
-                  <div className={`p-2 border rounded text-xs font-semibold inline-block ${
+                  <div className={`p-2 border rounded text-xs font-semibold inline-flex items-center gap-1.5 ${
                     keputusan === 'ditindaklanjuti'
                       ? 'border-red-500 bg-red-50 text-red-700'
                       : 'border-green-500 bg-green-50 text-green-700'
                   }`}>
-                    {keputusan === 'ditindaklanjuti' ? '🔄 Perbaikan Berkelanjutan' : '✅ Sesuai'}
+                    {keputusan === 'ditindaklanjuti' ? (
+                      <>
+                        <RefreshCw size={14} /> Perbaikan Berkelanjutan
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={14} /> Sesuai
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="mb-4">
@@ -280,24 +394,24 @@ export default function KaP4MReviewTable() {
                   <button
                     type="button"
                     onClick={() => setKeputusan("ditindaklanjuti")}
-                    className={`flex-1 py-2 border-2 text-[11px] font-bold ${
+                    className={`flex-1 py-2 border-2 text-[11px] font-bold flex items-center justify-center gap-1.5 ${
                       keputusan === "ditindaklanjuti"
                         ? "border-red-500 bg-red-50 text-red-700"
                         : "border-gray-200 text-gray-400"
                     }`}
                   >
-                    🔄 Perbaikan Berkelanjutan
+                    <RefreshCw size={14} /> Perbaikan Berkelanjutan
                   </button>
                   <button
                     type="button"
                     onClick={() => setKeputusan("tidak")}
-                    className={`flex-1 py-2 border-2 text-[11px] font-bold ${
+                    className={`flex-1 py-2 border-2 text-[11px] font-bold flex items-center justify-center gap-1.5 ${
                       keputusan === "tidak"
                         ? "border-green-500 bg-green-50 text-green-700"
                         : "border-gray-200 text-gray-400"
                     }`}
                   >
-                    ✅ Sesuai
+                    <CheckCircle2 size={14} /> Sesuai
                   </button>
                 </div>
 
@@ -344,21 +458,24 @@ export default function KaP4MReviewTable() {
       {/* ── FILTER BAR ── */}
       <div className="mb-4">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {FILTER_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setFilterPeriod(opt.id)}
-              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all
-                ${filterPeriod === opt.id
-                  ? "bg-[#4E617A] text-white border-[#4E617A] shadow"
-                  : "bg-white text-[#4E617A] border-[#4E617A]/30 hover:bg-[#4E617A]/10"
-                }`}
-            >
-              <span>{opt.icon}</span>
-              {opt.label}
-            </button>
-          ))}
+          {FILTER_OPTIONS.map((opt) => {
+            const { Icon } = opt;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setFilterPeriod(opt.id)}
+                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all
+                  ${filterPeriod === opt.id
+                    ? "bg-[#4E617A] text-white border-[#4E617A] shadow"
+                    : "bg-white text-[#4E617A] border-[#4E617A]/30 hover:bg-[#4E617A]/10"
+                  }`}
+              >
+                <Icon size={14} />
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
         <p className="mt-2 text-[11px] text-gray-500 italic">
           Menampilkan: <span className="font-semibold text-[#4E617A]">{periodLabel[filterPeriod]}</span>
@@ -371,10 +488,14 @@ export default function KaP4MReviewTable() {
       {/* ── TABEL ── */}
       <div className="w-full border-2 border-black bg-white text-xs">
         {msgOk && (
-          <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>
+          <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b flex items-center gap-1.5">
+            <CheckCircle2 size={14} /> {msgOk}
+          </p>
         )}
         {error && !modal.open && (
-          <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>
+          <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b flex items-center gap-1.5">
+            <XCircle size={14} /> {error}
+          </p>
         )}
 
         {/* ── MOBILE (card list) ── */}
@@ -398,7 +519,7 @@ export default function KaP4MReviewTable() {
                     </span>
                   </div>
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Laporan Civitas</p>
-                  <div className="border border-gray-300 p-2 text-[11px] rounded whitespace-pre-wrap wrap-break-words">{group.isi_laporan}</div>
+                  <div className="border border-gray-300 p-2 text-[11px] rounded whitespace-pre-wrap break-words">{group.isi_laporan}</div>
                   {group.lampiran_laporan && (
                     <button
                       onClick={() => {
@@ -407,7 +528,7 @@ export default function KaP4MReviewTable() {
                       }}
                       className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
                     >
-                      🖼️ Lihat Gambar
+                      <ImageIcon size={12} /> Lihat Gambar
                     </button>
                   )}
                 </div>
@@ -427,13 +548,15 @@ export default function KaP4MReviewTable() {
                           Unit: {item.nama_unit}
                         </span>
                         {badge && (
-                          <span className={`text-[9px] font-bold px-2 py-0.5 border rounded ${badge.cls}`}>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 border rounded flex items-center gap-1 ${badge.cls}`}>
+                            <badge.Icon size={11} />
                             {badge.label}
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-500">
-                        📅 Tanggal Masuk: {item.created_at
+                      <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                        <Calendar size={11} />
+                        Tanggal Masuk: {item.created_at
                           ? new Date(item.created_at).toLocaleDateString('id-ID', {
                               day: '2-digit',
                               month: 'long',
@@ -444,20 +567,19 @@ export default function KaP4MReviewTable() {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
-                          <div className="border border-black p-2 text-[10px] rounded min-h-15 whitespace-pre-wrap wrap-break-words">
+                          <div className="border border-black p-2 text-[10px] rounded min-h-15 whitespace-pre-wrap break-words">
                             {item.penyebab || "—"}
                           </div>
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Unit</p>
-                          <div className="border border-black p-2 text-[10px] rounded min-h-15 whitespace-pre-wrap wrap-break-words">
-                            {item.rencana_tindakan || "—"}
-                          </div>
+                          {/* ✅ Rencana Unit jadi list turun ke bawah */}
+                          <RencanaList rencana={item.rencana_tindakan} textClass="text-[10px]" />
                         </div>
                       </div>
-                      {/* ✅ FITUR BARU: Target Selesai (Tanggal Rencana) */}
-                      <p className="text-[10px] text-gray-500">
-                        🎯 Target Selesai: {item.tanggal_rencana
+                      <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                        <Target size={11} />
+                        Target Selesai: {item.tanggal_rencana
                           ? new Date(item.tanggal_rencana).toLocaleDateString('id-ID', {
                               day: '2-digit',
                               month: 'long',
@@ -504,13 +626,7 @@ export default function KaP4MReviewTable() {
           )}
         </div>
 
-        {/* ── DESKTOP: SATU CSS GRID untuk header + semua baris ──
-            ✅ FIX (scroll horizontal saat zoom): grid dibungkus wrapper
-            `overflow-x-auto` + diberi `min-w-[900px]` supaya kolom tidak
-            diperas jadi sempit saat halaman di-zoom / viewport mengecil.
-            Kalau lebar container < min-w, otomatis muncul scrollbar
-            horizontal di dalam tabel dan bisa digeser (scroll/trackpad),
-            tanpa mengganggu layout grid & rowspan yang sudah ada. */}
+        {/* ── DESKTOP: SATU CSS GRID untuk header + semua baris ── */}
         <div className="hidden sm:block overflow-x-auto">
           <div
             className="grid text-[11px] min-w-225"
@@ -543,7 +659,7 @@ export default function KaP4MReviewTable() {
                       <p className="text-[10px] text-gray-400 mb-1">
                         {group.kode_laporan}
                       </p>
-                      <div className="border border-black p-2 min-h-24 text-[11px] whitespace-pre-wrap wrap-break-words">
+                      <div className="border border-black p-2 min-h-24 text-[11px] whitespace-pre-wrap break-words">
                         {group.isi_laporan}
                       </div>
                       {group.lampiran_laporan && (
@@ -554,7 +670,7 @@ export default function KaP4MReviewTable() {
                           }}
                           className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
                         >
-                          🖼️ Lihat Gambar
+                          <ImageIcon size={12} /> Lihat Gambar
                         </button>
                       )}
                     </div>
@@ -587,18 +703,17 @@ export default function KaP4MReviewTable() {
 
                           {/* Penyebab */}
                           <div className={`border-r-2 border-black p-4 ${rowBorder}`}>
-                            <div className="border border-black p-2 min-h-20 text-[10px] whitespace-pre-wrap wrap-break-words">
+                            <div className="border border-black p-2 min-h-20 text-[10px] whitespace-pre-wrap break-words">
                               {item.penyebab || "—"}
                             </div>
                           </div>
 
-                          {/* Rencana Unit + Target Selesai (Tanggal Rencana) */}
+                          {/* Rencana Unit + Target Selesai — ✅ jadi list vertikal */}
                           <div className={`border-r-2 border-black p-4 space-y-1 ${rowBorder}`}>
-                            <div className="border border-black p-2 min-h-20 text-[10px] whitespace-pre-wrap wrap-break-words">
-                              {item.rencana_tindakan || "—"}
-                            </div>
-                            <p className="text-[9px] text-gray-500 text-center">
-                              🎯 Target: {item.tanggal_rencana
+                            <RencanaList rencana={item.rencana_tindakan} textClass="text-[10px]" />
+                            <p className="text-[9px] text-gray-500 text-center flex items-center justify-center gap-1">
+                              <Target size={10} />
+                              Target: {item.tanggal_rencana
                                 ? new Date(item.tanggal_rencana).toLocaleDateString('id-ID', {
                                     day: '2-digit',
                                     month: 'short',
@@ -611,7 +726,8 @@ export default function KaP4MReviewTable() {
                           {/* Status */}
                           <div className={`border-r-2 border-black p-4 flex items-center justify-center ${rowBorder}`}>
                             {badge && (
-                              <span className={`text-[9px] font-bold px-1 py-1 border rounded text-center ${badge.cls}`}>
+                              <span className={`text-[9px] font-bold px-1 py-1 border rounded text-center flex items-center gap-1 ${badge.cls}`}>
+                                <badge.Icon size={11} />
                                 {badge.label}
                               </span>
                             )}
