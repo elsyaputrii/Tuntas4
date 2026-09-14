@@ -48,8 +48,6 @@ export const civitasApi = {
 // ⚠️ HANYA ADA 1 BLOK authApi — jangan buat 2x (duplicate identifier error).
 // ─────────────────────────────────────────────────────────────────────────────
 export const authApi = {
-  // ✅ Method generik — halaman login pakai `authApi.login(email, password)`.
-  // Backend deteksi role dari email (endpoint /auth/login).
   login: (email: string, password: string) =>
     apiFetch("/auth/login", {
       method: "POST",
@@ -145,6 +143,10 @@ export const kepalaUnitApi = {
       body: formData,
     }),
 
+  // ✅ Riwayat SEMUA laporan yang pernah ditangani unit ini
+  getRiwayat: () =>
+    apiFetch("/kepala-unit/riwayat"),
+
   // ✅ CRUD rencana tindak lanjut (multi-item per laporan)
   getRencana: (id_boxing: number) =>
     apiFetch(`/kepala-unit/rencana/${id_boxing}`),
@@ -169,11 +171,27 @@ export const kepalaUnitApi = {
 // KA P4M — dashboard, proses, hasil tindak lanjut
 // ⚠️ MODULE INI WAJIB ADA — dipakai di app/(dashboard)/ka-p4m/page.tsx
 // ─────────────────────────────────────────────────────────────────────────────
+export interface KeputusanKaPayload {
+  id_rancangan: number;
+  keputusan: "ditindaklanjuti" | "tidak";
+  aksi_masukan: string;
+}
+
 export const kaP4MApi = {
-  // Proses & pemantauan — dipakai di dashboard Ka P4M untuk lihat semua
-  // rancangan/pengaduan yang masuk ke P4M
   getProsesMonitor: () =>
     apiFetch("/ka-p4m/proses"),
+
+  keputusanKa: (body: KeputusanKaPayload) =>
+    apiFetch("/ka-p4m/keputusan", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  // ✅ Read-only monitor: Ka P4M lihat semua "Laporan Hasil" dari
+  // SEMUA Kepala Unit (semua unit), tanpa bisa mengedit apa pun.
+  // Dipakai di frontend/components/ka-p4m/KepalaUnitLaporanHasilTable.tsx
+  getKepalaUnitLaporanHasil: () =>
+    apiFetch("/ka-p4m/kepala-unit-laporan-hasil"),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -2,7 +2,17 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from 'next/navigation';
-import { FileText, CheckCircle2, Clock, AlertCircle, TrendingUp } from "lucide-react";
+import {
+  FileText,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  TrendingUp,
+  LayoutDashboard,
+  PieChart as PieChartIcon,
+  BarChart3,
+  ClipboardList,
+} from "lucide-react";
 import {
   LineChart,
   Line,
@@ -228,8 +238,9 @@ export default function DashboardKepalaUnitP4MPage() {
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-1">
-          📊 Dashboard — Kepala Unit P4M
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-1 flex items-center gap-2">
+          <LayoutDashboard size={24} className="text-blue-500" />
+          Dashboard — Kepala Unit P4M
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Ringkasan laporan ketidaksesuaian yang masuk ke unit P4M.
@@ -304,7 +315,8 @@ export default function DashboardKepalaUnitP4MPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-5 border border-slate-200 dark:border-slate-700">
           <h3 className="font-semibold text-slate-700 dark:text-white mb-4 flex items-center gap-2">
-            🥧 Status Laporan
+            <PieChartIcon size={18} className="text-purple-500" />
+            Status Laporan
           </h3>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
@@ -329,7 +341,8 @@ export default function DashboardKepalaUnitP4MPage() {
 
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-5 border border-slate-200 dark:border-slate-700">
           <h3 className="font-semibold text-slate-700 dark:text-white mb-4 flex items-center gap-2">
-            📊 Laporan Per Bulan
+            <BarChart3 size={18} className="text-blue-500" />
+            Laporan Per Bulan
           </h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
@@ -349,7 +362,10 @@ export default function DashboardKepalaUnitP4MPage() {
       <div className="mt-6">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="font-semibold text-slate-700 dark:text-white">📋 Laporan Terbaru</h3>
+            <h3 className="font-semibold text-slate-700 dark:text-white flex items-center gap-2">
+              <ClipboardList size={18} className="text-blue-500" />
+              Laporan Terbaru
+            </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
