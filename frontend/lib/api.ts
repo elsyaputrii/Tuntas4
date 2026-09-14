@@ -181,17 +181,27 @@ export const kaP4MApi = {
   getProsesMonitor: () =>
     apiFetch("/ka-p4m/proses"),
 
+  // ✅ FIX: method PATCH (bukan POST) — sesuai backend kaP4MRoutes.js
+  //    router.patch("/keputusan", ...)
   keputusanKa: (body: KeputusanKaPayload) =>
     apiFetch("/ka-p4m/keputusan", {
-      method: "POST",
+      method: "PATCH",
       body: JSON.stringify(body),
     }),
 
   // ✅ Read-only monitor: Ka P4M lihat semua "Laporan Hasil" dari
-  // SEMUA Kepala Unit (semua unit), tanpa bisa mengedit apa pun.
-  // Dipakai di frontend/components/ka-p4m/KepalaUnitLaporanHasilTable.tsx
+  // SEMUA Kepala Unit (semua unit). Sesuai backend:
+  //    router.get("/kepala-unit/laporan-hasil", ...)
+  // Dipakai di: KepalaUnitLaporanHasilTable.tsx
   getKepalaUnitLaporanHasil: () =>
-    apiFetch("/ka-p4m/kepala-unit-laporan-hasil"),
+    apiFetch("/ka-p4m/kepala-unit/laporan-hasil"),
+
+  // ✅ Read-only monitor: Ka P4M lihat semua "Ketidaksesuaian Masuk"
+  // milik Kepala Unit (semua unit). Sesuai backend:
+  //    router.get("/kepala-unit/laporan-masuk", ...)
+  // Dipakai di: KepalaUnitLaporanMasukTable.tsx
+  getKepalaUnitLaporanMasuk: () =>
+    apiFetch("/ka-p4m/kepala-unit/laporan-masuk"),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

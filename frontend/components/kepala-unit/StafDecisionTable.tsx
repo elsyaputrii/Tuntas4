@@ -2,6 +2,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
+import {
+  Image as ImageIcon,
+  XCircle,
+  CheckCircle2,
+  StickyNote,
+} from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -34,10 +40,6 @@ export default function StafDecisionTable() {
   // FORM REVISI RANCANGAN
   const [penyebab, setPenyebab] = useState<Record<number, string>>({});
   const [rencana, setRencana] = useState<Record<number, string>>({});
-  // ✅ FIX no-unused-vars: `tanggal`/`uraian` diisi tapi tidak pernah dibaca
-  // di form (form revisi cuma pakai penyebab & rencana) — dihapus sama
-  // seperti `files`/`setFiles` di bawah ini yang sudah dihapus duluan.
-  // const [files, setFiles] = useState<Record<number, File | null>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,7 +98,7 @@ export default function StafDecisionTable() {
         penyebab: penyebab[id_boxing].trim(),
         rencana_tindakan: rencana[id_boxing].trim(),
       });
-      alert("✅ Revisi rancangan dikirim ke Ka P4M untuk keputusan!");
+      alert("Revisi rancangan dikirim ke Ka P4M untuk keputusan!");
       fetchData();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Gagal mengirim revisi. Coba lagi.");
@@ -131,8 +133,8 @@ export default function StafDecisionTable() {
     return (
       <div className="w-full border-2 border-red-400 bg-red-50 p-8 text-center">
         <p className="text-red-500 text-sm">{errMsg}</p>
-        <button 
-          onClick={fetchData} 
+        <button
+          onClick={fetchData}
           className="mt-3 px-4 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
         >
           Coba Lagi
@@ -179,7 +181,7 @@ export default function StafDecisionTable() {
                   onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran_laporan}`)}
                   className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
                 >
-                  🖼️ Lihat Gambar
+                  <ImageIcon size={12} /> Lihat Gambar
                 </button>
               )}
             </div>
@@ -211,12 +213,13 @@ export default function StafDecisionTable() {
 
             {/* Kolom 5: Status Staf + Catatan */}
             <div className="w-[10%] border-r-2 border-black p-4 flex flex-col items-center justify-center gap-1">
-              <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-300 px-2 py-0.5 rounded">
-                ❌ Ditolak
+              <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-300 px-2 py-0.5 rounded flex items-center gap-1">
+                <XCircle size={11} /> Ditolak
               </span>
               {item.catatan_approval && (
-                <p className="text-[9px] text-gray-500 italic text-center mt-1 max-w-full wrap-break-words">
-                  📝 {item.catatan_approval}
+                <p className="text-[9px] text-gray-500 italic text-center mt-1 max-w-full break-words flex items-start gap-1 justify-center">
+                  <StickyNote size={10} className="shrink-0 mt-0.5" />
+                  {item.catatan_approval}
                 </p>
               )}
             </div>
