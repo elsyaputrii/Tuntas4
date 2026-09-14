@@ -11,52 +11,7 @@
 //   6. inputHasilPemantauan → Staf P4M input hasil pemantauan lapangan
 //   7. getRekapitulasi      → ringkasan semua laporan dari awal sampai selesai
 //   8. setApprovalStaf      → keputusan "Siap" (✅) / "Belum Siap" (❌) atas
-//                              hasil tindak lanjut unit. Sempat dipindah ke
-//                              /api/ka-p4m/approval-hasil, tapi sekarang
-//                              DIKEMBALIKAN lagi ke /api/staf/approval-hasil
-//                              (stafRoutes.js) — Staf P4M kembali menjadi
-//                              satu-satunya pemegang keputusan ini. Ka P4M
-//                              sekarang hanya read-only lewat GET /ka-p4m/proses.
-//
-// ════════════════════════════════════════════════════════════════════════
-// CATATAN PERBAIKAN (sesi ini) — alur "approve → selesai" & "reopen penuh"
-// ════════════════════════════════════════════════════════════════════════
-//
-// BUG #1 — [setApprovalStaf] "Disetujui" tidak otomatis "Selesai"
-//   Sebelumnya fungsi ini HANYA mengubah kolom approval_staf, dan TIDAK
-//   PERNAH menyentuh boxing.status. Akibatnya laporan yang sudah di-acc
-//   Staf P4M (approval_staf='diterima') tetap nyangkut di status_boxing
-//   ='di_staff', sehingga TIDAK PERNAH muncul di tab Rekapitulasi sebagai
-//   "Selesai" — terus terlihat sebagai "Dipantau" walau sudah di-acc.
-//   FIX: begitu approval='diterima', langsung set status='selesai' juga
-//   (dan panggil syncStatusLaporan supaya laporan_ketidaksesuaian ikut
-//   ter-update). Kalau approval='ditolak', laporan TETAP di status
-//   'di_staff' tapi dengan approval_staf='ditolak' — supaya Kepala Unit
-//   bisa melihatnya di tab "Laporan Hasil" sebagai revisi (lihat juga fix
-//   di kepalaUnitController.js untuk getLaporanHasil).
-//
-// BUG #2 — [setKeputusanBoxing aksi='lanjut'] reopen tidak mereset
-//   rancangan_tindakan. Sebelumnya tombol "buka kembali" cuma mengubah
-//   boxing.status jadi 'menunggu_pelaksanaan', TANPA mereset
-//   rancangan_tindakan.status_review balik ke 'menunggu_keputusan_ka'.
-//   Akibatnya kombinasi status jadi rusak: boxing bilang "menunggu unit
-//   isi pelaksanaan baru" tapi rancangan masih bilang "ditindaklanjuti"/
-//   "tidak_ditindaklanjuti" dari siklus SEBELUMNYA — sehingga laporan
-//   bisa hilang dari kedua tab Kepala Unit sekaligus (lihat investigasi
-//   data riil LAP-00002 sebelumnya).
-//   FIX: aksi 'lanjut' SEKARANG benar-benar mereset rancangan_tindakan
-//   (status_review → 'menunggu_keputusan_ka', aksi_masukan → NULL) DAN
-//   menghapus pelaksanaan_tindakan yang lama, supaya laporan benar-benar
-//   "lahir ulang" dari awal di tab "Ketidaksesuaian Masuk" Kepala Unit —
-//   sesuai alur yang diminta: Kepala Unit isi rancangan baru → Ka P4M
-//   putuskan lagi → Kepala Unit isi pelaksanaan baru → balik ke Staf P4M.
-//
-// BUG #4 — Staf P4M punya wewenang keputusan (selesai/belum) padahal
-//   seharusnya hanya wewenang Ka P4M.
-//   FIX: opsi "selesai" & "belum" DIHAPUS dari setKeputusanBoxing.
-//   Endpoint ini sekarang HANYA menerima "lanjut"/"ditindak_lanjut"
-//   (fitur "Buka ke Unit"), yang memang boleh dipakai Staf P4M untuk
-//   memantau proses — bukan memutuskan hasil.
+//                              hasil tindak lanjut unit.
 
 const { pool } = require("../config/db");
 const { notifikasiUntukPengguna } = require("../utils/notifikasi");
@@ -64,8 +19,6 @@ const { UNITS_UMUM } = require("../constants/unitsUmum");
 
 // ============================================================
 // 1. GET LAPORAN MASUK
-//    Tampilkan semua laporan yang belum diproses (status menunggu)
-//    Dipakai di tab "Laporan Masuk" Staf P4M
 // ============================================================
 async function getLaporanMasuk(req, res) {
   try {
@@ -99,7 +52,6 @@ async function getLaporanMasuk(req, res) {
 
 // ============================================================
 // 2. GET KEPALA UNIT
-//    Ambil daftar semua kepala unit untuk dropdown distribusi
 // ============================================================
 async function getKepalaUnit(req, res) {
   try {
@@ -122,15 +74,6 @@ async function getKepalaUnit(req, res) {
 
 // ============================================================
 // 3. DISTRIBUSI LAPORAN (BOXING)
-//    Staf P4M pilih laporan + unit tujuan → simpan ke boxing
-//
-//    Alur:
-//      a. Validasi laporan ada dan masih 'menunggu'
-//      b. Insert ke boxing_ketidaksesuaian (1 row per unit)
-//      c. Update status laporan → 'diproses'
-//    Pakai transaction supaya atomik
-//
-//    Body: { id_laporan, unit_tujuan: string[], id_standar? }
 // ============================================================
 async function distribusiLaporan(req, res) {
   const { id_laporan, unit_tujuan, id_standar } = req.body;
@@ -192,7 +135,7 @@ async function distribusiLaporan(req, res) {
     await conn.beginTransaction();
 
     const insertedIds = [];
-    const kepalaUntukNotif = []; // { id_pengguna, unit } — dinotif setelah commit sukses
+    const kepalaUntukNotif = [];
     for (const unit of unitArray) {
       const [kepalaRows] = await conn.query(
         `SELECT id_kepala, id_pengguna, nama FROM kepala_unit WHERE unit = ? LIMIT 1`,
@@ -227,7 +170,6 @@ async function distribusiLaporan(req, res) {
 
     await conn.commit();
 
-    // Kasih tau tiap kepala unit terkait ada laporan baru masuk ke unitnya
     for (const k of kepalaUntukNotif) {
       notifikasiUntukPengguna(k.id_pengguna, {
         judul: "Laporan Baru untuk Unit Anda",
@@ -256,16 +198,6 @@ async function distribusiLaporan(req, res) {
 
 // ============================================================
 // 4. GET PROSES & MONITOR
-//    Tampilkan semua laporan yang sudah didistribusi beserta
-//    rancangan tindakan dan hasil pelaksanaan.
-//
-//    !! Dipakai juga oleh Ka P4M (via role ka_p4m) !!
-//    → Tab "Review Rancangan Kepala Unit"
-//    → Tab "Laporan Pemantauan Staf P4M"
-//
-//    Mengambil data dari 4 tabel sekaligus lewat LEFT JOIN
-//    sehingga baris tetap muncul meski rancangan/pelaksanaan
-//    belum ada (nilai NULL).
 // ============================================================
 async function getProsesMonitor(req, res) {
   try {
@@ -292,9 +224,6 @@ async function getProsesMonitor(req, res) {
         r.status_review,
         r.aksi_masukan,
         r.catatan             AS catatan_kepala,
-        -- ✅ BARU (permintaan user): tanggal Kepala Unit mengisi/mengirim
-        -- Penyebab & Rencana Tindak Lanjut ("tanggal perencanaan"),
-        -- dipakai Rekapitulasi Staf P4M untuk melengkapi info tanggal.
         r.created_at           AS tanggal_perencanaan,
 
         p.deskripsi           AS hasil_tindakan,
@@ -318,28 +247,7 @@ async function getProsesMonitor(req, res) {
 }
 
 // ============================================================
-// 5. "BUKA KE UNIT" (reopen) per boxing — SATU-SATUNYA aksi yang boleh
-//    dilakukan Staf P4M lewat endpoint ini.
-//
-//    ✅ FIX (Staf P4M BUKAN pihak yang memberikan keputusan/menyetujui/
-//    menolak laporan — keputusan itu sepenuhnya wewenang Ka P4M, lihat
-//    kaP4MRoutes.js /keputusan dan /approval-hasil). Endpoint PATCH
-//    /staf/keputusan-boxing ini SEBELUMNYA juga menerima aksi "selesai"
-//    (menandai laporan selesai sendiri, memotong keputusan Ka P4M) dan
-//    "belum" (mengembalikan laporan ke Kepala Unit tanpa lewat Ka P4M)
-//    — dua aksi ini pada dasarnya adalah KEPUTUSAN, dan meskipun sudah
-//    tidak pernah dipanggil dari frontend manapun, endpoint ini tetap
-//    bisa diakses langsung oleh akun staf_p4m mana pun selama masih
-//    diterima backend — itu celah yang melanggar aturan "Staf P4M tidak
-//    mengambil keputusan".
-//
-//    FIX: kedua aksi tsb DIHAPUS dari backend. Endpoint ini sekarang HANYA
-//    menerima aksi "lanjut" / "ditindak_lanjut" — yaitu fitur "Buka ke
-//    Unit" yang memang secara eksplisit boleh dipakai Staf P4M untuk
-//    memantau proses (bukan memutuskan hasil). Tidak ada kolom/tabel yang
-//    dihapus di sini — kolom `status` pada boxing_ketidaksesuaian dan
-//    `approval_staf` tetap dipertahankan apa adanya karena masih dipakai
-//    di banyak tempat lain (getProsesMonitor, getRekapitulasi, Ka P4M).
+// 5. HELPER: Sync status laporan induk
 // ============================================================
 async function syncStatusLaporan(id_laporan) {
   const [pending] = await pool.query(
@@ -354,13 +262,13 @@ async function syncStatusLaporan(id_laporan) {
   );
 }
 
+// ============================================================
+// 5b. SET KEPUTUSAN BOXING (reopen — "Buka ke Unit")
+// ============================================================
 async function setKeputusanBoxing(req, res) {
   const { id_boxing, keputusan } = req.body;
 
   let aksi = keputusan;
-  // ✅ "selesai" dan "belum" DIHAPUS dari daftar valid — itu keputusan,
-  // bukan wewenang Staf P4M. Hanya reopen ("lanjut"/"ditindak_lanjut")
-  // yang tersisa di endpoint milik Staf P4M ini.
   const valid = ["lanjut", "ditindak_lanjut"];
   if (!id_boxing || !valid.includes(aksi)) {
     return res.status(400).json({
@@ -387,22 +295,6 @@ async function setKeputusanBoxing(req, res) {
 
     const row = rows[0];
 
-    // ════════════════════════════════════════════════════════════
-    // aksi === "lanjut"  (dipanggil juga untuk "ditindak_lanjut")
-    // Reopen PENUH dari awal — bukan cuma ubah status_boxing, tapi
-    // juga reset rancangan_tindakan dan hapus pelaksanaan_tindakan
-    // lama, supaya Kepala Unit benar-benar mulai dari "Ketidaksesuaian
-    // Masuk" lagi (isi rancangan baru), bukan langsung lompat ke
-    // "Laporan Hasil" dengan rancangan basi.
-    //
-    // bisaLanjut mengizinkan reopen untuk laporan yang sudah 'selesai',
-    // ditolak Ka P4M (status_review='tidak_ditindaklanjuti'), ATAU
-    // ditolak lewat approval_staf='ditolak' (status_boxing tetap
-    // 'di_staff') — approval_staf sendiri sekarang HANYA pernah diisi
-    // oleh Ka P4M (lihat setApprovalStaf, di-mount di
-    // /ka-p4m/approval-hasil dengan roleMiddleware('ka_p4m')), jadi
-    // kondisi ini konsisten dengan aturan "keputusan = wewenang Ka P4M".
-    // ════════════════════════════════════════════════════════════
     const bisaLanjut =
       row.status_boxing === "selesai" ||
       (row.status_boxing === "di_staff" && row.status_review === "tidak_ditindaklanjuti") ||
@@ -419,9 +311,6 @@ async function setKeputusanBoxing(req, res) {
     try {
       await conn.beginTransaction();
 
-      // 1) Boxing kembali ke titik PALING AWAL siklus Kepala Unit:
-      //    'terdistribusi' — supaya muncul di tab "Ketidaksesuaian Masuk",
-      //    bukan 'menunggu_pelaksanaan' (yang justru muncul di "Laporan Hasil").
       await conn.query(
         `UPDATE boxing_ketidaksesuaian
          SET status = 'terdistribusi', approval_staf = 'menunggu'
@@ -429,11 +318,6 @@ async function setKeputusanBoxing(req, res) {
         [id_boxing]
       );
 
-      // 2) Reset rancangan_tindakan supaya bisa diputuskan ulang oleh
-      //    Ka P4M — TAPI penyebab & deskripsi (rencana tindak lanjut)
-      //    TIDAK disentuh sama sekali di query ini, jadi TETAP
-      //    TERSIMPAN/TAMPIL dan bisa langsung diedit ulang oleh Kepala
-      //    Unit, bukan direset ke kosong.
       if (row.id_rancangan) {
         await conn.query(
           `UPDATE rancangan_tindakan
@@ -443,13 +327,11 @@ async function setKeputusanBoxing(req, res) {
         );
       }
 
-      // 3) Hapus pelaksanaan_tindakan LAMA — siklus baru butuh pelaksanaan baru.
       await conn.query(
         `DELETE FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
         [id_boxing]
       );
 
-      // 4) Laporan induk balik ke "diproses" (sedang berjalan lagi)
       await conn.query(
         `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
         [row.id_laporan]
@@ -478,9 +360,6 @@ async function setKeputusanBoxing(req, res) {
 
 // ============================================================
 // 6. INPUT HASIL PEMANTAUAN
-//    Staf P4M input hasil setelah Kepala Unit melaksanakan
-//    tindakan. Kepala Unit harus submit pelaksanaan dulu.
-//    Body: { id_boxing, hasil, catatan?, kp_pemantauan? }
 // ============================================================
 async function inputHasilPemantauan(req, res) {
   const { id_boxing, hasil, catatan, kp_pemantauan } = req.body;
@@ -507,7 +386,6 @@ async function inputHasilPemantauan(req, res) {
     }
     const id_staf = stafRows[0].id_staf;
 
-    // Kepala Unit harus sudah submit pelaksanaan sebelum staf bisa pantau
     const [pelaksanaan] = await pool.query(
       `SELECT id_pelaksanaan FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
       [id_boxing]
@@ -544,8 +422,7 @@ async function inputHasilPemantauan(req, res) {
 }
 
 // ============================================================
-// 7. GET REKAPITULASI — hanya boxing yang sudah selesai (Staf)
-//    Ringkasan semua laporan dari awal sampai selesai.
+// 7. GET REKAPITULASI
 // ============================================================
 async function getRekapitulasi(req, res) {
   try {
@@ -569,9 +446,6 @@ async function getRekapitulasi(req, res) {
         r.penyebab,
         r.deskripsi           AS rencana_tindakan,
         r.status_review,
-        -- ✅ BARU (permintaan user): tanggal perencanaan (Penyebab &
-        -- Rencana Tindak Lanjut diisi Kepala Unit), dilengkapi di
-        -- Rekapitulasi Staf P4M.
         r.created_at           AS tanggal_perencanaan,
 
         p.deskripsi           AS hasil_tindakan,
@@ -584,12 +458,6 @@ async function getRekapitulasi(req, res) {
       WHERE b.status = 'selesai'
       ORDER BY l.created_at DESC`
     );
-    // ✅ FIX kecil terkait: sebelumnya WHERE klausanya
-    // `b.status IN ('selesai', 'di_staff')` — artinya laporan yang BELUM
-    // selesai (masih nunggu approval Staf) ikut nyangkut dianggap data
-    // "rekap". Sekarang HANYA yang benar-benar 'selesai' yang dianggap
-    // bagian rekapitulasi final; sisanya (di_staff/dst) tetap dihitung
-    // sebagai "dipantau" oleh RecapitulationTable.tsx via getProsesMonitor.
 
     const data = rows;
 
@@ -604,11 +472,7 @@ async function getRekapitulasi(req, res) {
 }
 
 // ============================================================
-// 7b. UPLOAD ARSIP REKAP — POST /api/staf/rekap/arsip/upload
-//     Staf mengupload file Excel data tahun lalu (s/d 10 tahun
-//     ke belakang). Isi file dibaca lalu disimpan ke tabel
-//     arsip_rekapitulasi supaya bisa ikut ditampilkan rapi per
-//     tahun saat export Excel dibuat.
+// 7b. UPLOAD ARSIP REKAP
 // ============================================================
 const KOLOM_ALIAS = {
   kode:         ["kode laporan", "kode"],
@@ -646,7 +510,6 @@ function cariBarisHeader(sheet) {
       }
     });
 
-    // Minimal 4 kolom penting terbaca supaya baris ini dianggap header valid
     if (jumlahCocok >= 4) {
       return { headerRowNum: r, petaKolom };
     }
@@ -691,18 +554,6 @@ async function uploadArsipRekap(req, res) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
 
-    // ✅ DIPERBAIKI: sebelumnya kode ini asal ambil "sheet pertama yang
-    // bukan Ringkasan", sehingga kalau file yang diupload adalah hasil
-    // export TUNTAS (yang punya banyak sheet: Ringkasan, Laporan Masih
-    // Dipantau, Laporan Selesai, Arsip ...), yang kebaca malah sheet
-    // "Laporan Masih Dipantau" (karena urutannya duluan), bukan sheet
-    // "Laporan Selesai" yang seharusnya diarsipkan.
-    //
-    // Sekarang urutan prioritasnya:
-    //   1. Sheet yang namanya mengandung "selesai"      → paling diutamakan
-    //   2. Sheet yang bukan "ringkasan"/"masih dipantau" → alternatif aman
-    //   3. Sheet pertama yang bukan "ringkasan"
-    //   4. Sheet pertama apa pun (fallback terakhir)
     const sheet =
       workbook.worksheets.find((ws) => /selesai/i.test(ws.name)) ||
       workbook.worksheets.find(
@@ -733,7 +584,7 @@ async function uploadArsipRekap(req, res) {
       const row     = sheet.getRow(r);
       const kode    = ambilNilaiSel(row, petaKolom.kode);
       const uraian  = ambilNilaiSel(row, petaKolom.uraian);
-      if (!kode && !uraian) continue; // lewati baris kosong / baris "Tidak ada data"
+      if (!kode && !uraian) continue;
 
       barisSiapInsert.push([
         tahun,
@@ -760,9 +611,6 @@ async function uploadArsipRekap(req, res) {
       });
     }
 
-    // Upload ulang utk tahun yang sama akan MENGGANTI (bukan menumpuk)
-    // arsip tahun tsb, supaya tidak terjadi data dobel kalau staf
-    // mengupload file yang sama / versi revisi.
     await pool.query(`DELETE FROM arsip_rekapitulasi WHERE tahun = ?`, [tahun]);
 
     const placeholder = barisSiapInsert.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").join(",");
@@ -791,10 +639,7 @@ async function uploadArsipRekap(req, res) {
 }
 
 // ============================================================
-// 7c. GET ARSIP REKAP — GET /api/staf/rekap/arsip
-//     Ambil data arsip (opsional filter ?tahun=2024), dipakai
-//     saat export Excel supaya data lama ikut disertakan rapi
-//     per tahun.
+// 7c. GET ARSIP REKAP
 // ============================================================
 async function getArsipRekap(req, res) {
   try {
@@ -825,10 +670,7 @@ async function getArsipRekap(req, res) {
 }
 
 // ============================================================
-// 7d. DELETE ARSIP REKAP — DELETE /api/staf/rekap/arsip?tahun=2024
-//     Hapus data arsip Excel tahun tertentu yang sudah pernah
-//     diupload lewat "Upload Data Lama". Wajib sertakan ?tahun=
-//     supaya staf tidak salah hapus semua arsip sekaligus.
+// 7d. DELETE ARSIP REKAP
 // ============================================================
 async function deleteArsipRekap(req, res) {
   try {
@@ -871,53 +713,35 @@ async function deleteArsipRekap(req, res) {
 
 // ============================================================
 // 8. APPROVAL STAF — PATCH /api/staf/approval-hasil
-//    Staf P4M menentukan: Siap (diterima) atau Belum Siap (ditolak)
-//    setelah lihat hasil unit
-//    Body: { id_boxing, approval }  → approval: "diterima" | "ditolak"
-//
-//    ✅ FIX BUG #1: "diterima" SEKARANG otomatis menyelesaikan laporan
-//    (status_boxing → 'selesai' + sinkronisasi laporan_ketidaksesuaian),
-//    jadi begitu Staf klik ✓, laporan otomatis pindah ke Rekapitulasi
-//    sebagai "Selesai" — tidak perlu langkah tombol "Selesai" terpisah
-//    lagi. Kalau "ditolak", laporan TETAP di status 'di_staff' supaya
-//    Kepala Unit bisa merevisi hasil pelaksanaannya di tab "Laporan
-//    Hasil" (lihat juga fix terkait di kepalaUnitController.js).
-//
-//    ✅ FIX BUG #3: "ditolak" TIDAK LAGI mengosongkan penyebab &
-//    rencana tindak lanjut yang sudah ditulis Kepala Unit.
-//
-//    ✅ FIX (permintaan user, 2026): "ditolak" TIDAK LAGI mengirim
-//    laporan mundur ke tahap "Ketidaksesuaian Masuk" / minta keputusan
-//    Ka P4M ulang. Penyebab & Rencana Tindak Lanjut (rancangan_tindakan)
-//    SUDAH DIPUTUSKAN "ditindaklanjuti" oleh Ka P4M sebelumnya dan itu
-//    TIDAK berubah/tidak perlu diputuskan ulang hanya karena Staf P4M
-//    menilai HASIL PELAKSANAANNYA belum siap. Jadi status_review pada
-//    rancangan_tindakan DIBIARKAN tetap 'ditindaklanjuti' (tidak di-reset
-//    ke 'menunggu_keputusan_ka' lagi). Yang di-reset hanya status_boxing
-//    → 'menunggu_pelaksanaan', supaya laporan langsung nongol lagi di tab
-//    "Laporan Hasil" milik Kepala Unit (lihat getLaporanHasil di
-//    kepalaUnitController.js) — Kepala Unit tinggal isi ULANG bagian
-//    "Laporan Hasil Tindak Lanjut" saja (tanggal + uraian + bukti),
-//    TANPA perlu mengisi ulang Penyebab & Rencana Tindak Lanjut dari
-//    awal, dan TANPA perlu menunggu Ka P4M memutuskan lagi.
-//    pelaksanaan_tindakan lama tetap dihapus karena itu memang bagian
-//    yang mau direvisi.
+//    ✅ DITAMBAHKAN console.log DEBUG di beberapa titik untuk
+//    melacak error "Unexpected token '1', '19' is not valid JSON".
+//    Hapus log-log ini setelah bug ketemu.
 // ============================================================
 async function setApprovalStaf(req, res) {
+  console.log("🎯 [setApprovalStaf] === DIPANGGIL ===");
+  console.log("🎯 [setApprovalStaf] req.body:", JSON.stringify(req.body));
+  console.log("🎯 [setApprovalStaf] req.user:", JSON.stringify(req.user));
+
   const { id_boxing, approval, catatan } = req.body;
   const validApproval = ["diterima", "ditolak"];
+
+  console.log("🎯 [setApprovalStaf] id_boxing:", id_boxing, "| approval:", approval, "| catatan:", catatan);
+
   if (!id_boxing || !validApproval.includes(approval)) {
+    console.log("❌ [setApprovalStaf] VALIDASI GAGAL — id_boxing atau approval tidak valid");
     return res.status(400).json({
       success: false,
       message: "id_boxing dan approval (diterima|ditolak) wajib diisi.",
     });
   }
   if (!catatan || !String(catatan).trim()) {
+    console.log("❌ [setApprovalStaf] VALIDASI GAGAL — catatan kosong");
     return res.status(400).json({
       success: false,
       message: "Catatan / alasan approval wajib diisi.",
     });
   }
+
   try {
     const [rows] = await pool.query(
       `SELECT b.id_boxing, b.id_laporan, b.status AS status_boxing
@@ -926,13 +750,17 @@ async function setApprovalStaf(req, res) {
       [id_boxing]
     );
     if (rows.length === 0) {
+      console.log("❌ [setApprovalStaf] Boxing tidak ditemukan untuk id_boxing:", id_boxing);
       return res.status(404).json({
         success: false,
         message: "Data boxing tidak ditemukan.",
       });
     }
     const row = rows[0];
+    console.log("🎯 [setApprovalStaf] row dari DB:", JSON.stringify(row));
+
     if (row.status_boxing !== "di_staff") {
+      console.log("❌ [setApprovalStaf] status_boxing bukan di_staff:", row.status_boxing);
       return res.status(400).json({
         success: false,
         message: "Approval hanya bisa dilakukan jika laporan sudah ada di Staf P4M (di_staff).",
@@ -940,45 +768,43 @@ async function setApprovalStaf(req, res) {
     }
 
     if (approval === "diterima") {
-      // ✅ FIX: langsung selesai, sekali jalan.
+      console.log("🎯 [setApprovalStaf] Proses 'diterima' — UPDATE status=selesai");
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?, status = 'selesai'
          WHERE id_boxing = ?`,
         [approval, catatan.trim(), id_boxing]
       );
+      console.log("✅ [setApprovalStaf] UPDATE boxing sukses, panggil syncStatusLaporan");
       await syncStatusLaporan(row.id_laporan);
+      console.log("✅ [setApprovalStaf] syncStatusLaporan sukses");
     } else {
-      // "ditolak" → laporan dikembalikan LANGSUNG ke tab "Laporan Hasil"
-      // milik Kepala Unit (status_boxing = 'menunggu_pelaksanaan'), BUKAN
-      // ke "Ketidaksesuaian Masuk". Penyebab & Rencana Tindak Lanjut
-      // (rancangan_tindakan) TIDAK disentuh sama sekali — status_review-nya
-      // tetap 'ditindaklanjuti' seperti keputusan Ka P4M sebelumnya, jadi
-      // Kepala Unit TIDAK perlu mengisi ulang Penyebab/Rencana dan TIDAK
-      // perlu menunggu Ka P4M memutuskan lagi. Kepala Unit hanya perlu
-      // merevisi bagian "Laporan Hasil Tindak Lanjut" (tanggal, uraian,
-      // bukti) saja.
+      console.log("🎯 [setApprovalStaf] Proses 'ditolak' — UPDATE status=menunggu_pelaksanaan");
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?, status = 'menunggu_pelaksanaan'
          WHERE id_boxing = ?`,
         [approval, catatan.trim(), id_boxing]
       );
-      // Hapus pelaksanaan lama supaya tab Laporan Hasil bersih —
-      // ini yang memang mau direvisi, bukan penyebab/rencananya.
+      console.log("✅ [setApprovalStaf] UPDATE boxing (ditolak) sukses, hapus pelaksanaan lama");
       await pool.query(
         `DELETE FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
         [id_boxing]
       );
+      console.log("✅ [setApprovalStaf] DELETE pelaksanaan sukses");
     }
 
     const pesan =
       approval === "diterima"
         ? "Hasil tindak lanjut unit DITERIMA. Laporan otomatis ditandai SELESAI dan masuk Rekapitulasi."
         : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Laporan Hasil Kepala Unit untuk direvisi (Penyebab & Rencana Tindak Lanjut tidak perlu diisi ulang).";
+
+    console.log("✅ [setApprovalStaf] === SELESAI — kirim response sukses ===");
     return res.status(200).json({ success: true, message: pesan });
   } catch (error) {
-    console.error("Error setApprovalStaf:", error);
+    console.error("❌ [setApprovalStaf] ERROR:", error);
+    console.error("❌ [setApprovalStaf] error.message:", error.message);
+    console.error("❌ [setApprovalStaf] error.stack:", error.stack);
     return res.status(500).json({
       success: false,
       message: "Gagal menyimpan approval.",

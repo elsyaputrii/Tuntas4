@@ -44,8 +44,7 @@ export const civitasApi = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTH — login, forgot password, reset password
-// ⚠️ HANYA ADA 1 BLOK authApi — jangan buat 2x (duplicate identifier error).
+// AUTH
 // ─────────────────────────────────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
@@ -114,6 +113,44 @@ export const stafApi = {
 
   getRekapitulasi: () =>
     apiFetch("/staf/rekap"),
+
+  // ✅ Signature 3 argumen terpisah (sesuai ProcessMonitorTable.tsx).
+  // Normalisasi nilai approval dari UI ("siap"/"belum_siap") ke nilai
+  // yang backend harapkan ("diterima"/"ditolak").
+  setApprovalHasil: (id_boxing: number, approval: string, catatan: string) => {
+    const normalized =
+      approval === "siap" || approval === "diterima"
+        ? "diterima"
+        : "ditolak";
+
+    return apiFetch("/staf/approval-hasil", {
+      method: "PATCH",
+      body: JSON.stringify({
+        id_boxing,
+        approval: normalized,
+        catatan,
+      }),
+    });
+  },
+
+  // ✅ FIX: terima parameter opsional `tahun` — sesuai backend
+  //    (GET /api/staf/rekap/arsip?tahun=xxxx)
+  //    Kalau tahun undefined → ambil semua tahun.
+  getArsipRekap: (tahun?: number) =>
+    apiFetch(`/staf/rekap/arsip${tahun ? `?tahun=${tahun}` : ""}`),
+
+  // ✅ FIX: path upload sesuai backend stafRoutes.js:
+  //    POST /api/staf/rekap/arsip/upload
+  uploadArsipRekap: (formData: FormData) =>
+    apiFetch("/staf/rekap/arsip/upload", {
+      method: "POST",
+      body: formData,
+    }),
+
+  // ✅ FIX: pakai query `?tahun=` — sesuai backend deleteArsipRekap
+  //    DELETE /api/staf/rekap/arsip?tahun=2024
+  deleteArsipRekap: (tahun: number) =>
+    apiFetch(`/staf/rekap/arsip?tahun=${tahun}`, { method: "DELETE" }),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,11 +180,9 @@ export const kepalaUnitApi = {
       body: formData,
     }),
 
-  // ✅ Riwayat SEMUA laporan yang pernah ditangani unit ini
   getRiwayat: () =>
     apiFetch("/kepala-unit/riwayat"),
 
-  // ✅ CRUD rencana tindak lanjut (multi-item per laporan)
   getRencana: (id_boxing: number) =>
     apiFetch(`/kepala-unit/rencana/${id_boxing}`),
 
@@ -168,8 +203,7 @@ export const kepalaUnitApi = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KA P4M — dashboard, proses, hasil tindak lanjut
-// ⚠️ MODULE INI WAJIB ADA — dipakai di app/(dashboard)/ka-p4m/page.tsx
+// KA P4M
 // ─────────────────────────────────────────────────────────────────────────────
 export interface KeputusanKaPayload {
   id_rancangan: number;
@@ -181,25 +215,15 @@ export const kaP4MApi = {
   getProsesMonitor: () =>
     apiFetch("/ka-p4m/proses"),
 
-  // ✅ FIX: method PATCH (bukan POST) — sesuai backend kaP4MRoutes.js
-  //    router.patch("/keputusan", ...)
   keputusanKa: (body: KeputusanKaPayload) =>
     apiFetch("/ka-p4m/keputusan", {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
 
-  // ✅ Read-only monitor: Ka P4M lihat semua "Laporan Hasil" dari
-  // SEMUA Kepala Unit (semua unit). Sesuai backend:
-  //    router.get("/kepala-unit/laporan-hasil", ...)
-  // Dipakai di: KepalaUnitLaporanHasilTable.tsx
   getKepalaUnitLaporanHasil: () =>
     apiFetch("/ka-p4m/kepala-unit/laporan-hasil"),
 
-  // ✅ Read-only monitor: Ka P4M lihat semua "Ketidaksesuaian Masuk"
-  // milik Kepala Unit (semua unit). Sesuai backend:
-  //    router.get("/kepala-unit/laporan-masuk", ...)
-  // Dipakai di: KepalaUnitLaporanMasukTable.tsx
   getKepalaUnitLaporanMasuk: () =>
     apiFetch("/ka-p4m/kepala-unit/laporan-masuk"),
 };
@@ -209,6 +233,9 @@ export const kaP4MApi = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const notifikasiApi = {
   getAll: () =>
+    apiFetch("/notifikasi"),
+
+  getList: () =>
     apiFetch("/notifikasi"),
 
   getUnreadCount: () =>
@@ -225,15 +252,71 @@ export const notifikasiApi = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// USER
+// USER  — ⚠️ Backend mount di /api/users (PLURAL)
 // ─────────────────────────────────────────────────────────────────────────────
 export const userApi = {
   getAll: () =>
-    apiFetch("/user"),
+    apiFetch("/users"),
+
+  // ✅ Alias getAll — unwrap `.data` supaya caller dapat array langsung.
+  getUsers: async () => {
+    const res = await apiFetch("/users");
+    return Array.isArray(res) ? res : (res.data ?? []);
+  },
 
   getById: (id: number) =>
-    apiFetch(`/user/${id}`),
+    apiFetch(`/users/${id}`),
 
   getByRole: (role: string) =>
-    apiFetch(`/user?role=${encodeURIComponent(role)}`),
+    apiFetch(`/users?role=${encodeURIComponent(role)}`),
+
+  // ✅ FIX: parameter `body` tipe-nya longgar (Partial) supaya cocok
+  //    dengan pemanggilan dari data-akun/page.tsx yang pakai
+  //    `formData: Partial<User>`. Backend yang akan validasi.
+  createUser: (body: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    nip?: string;
+    phone?: string;
+    unit?: string;
+    status?: string;
+  }) =>
+    apiFetch("/users", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  updateUser: (id: number, body: {
+    name?: string;
+    email?: string;
+    password?: string;
+    role?: string;
+    nip?: string;
+    phone?: string;
+    unit?: string;
+    status?: string;
+  }) =>
+    apiFetch(`/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  deleteUser: (id: number) =>
+    apiFetch(`/users/${id}`, { method: "DELETE" }),
+
+  // ✅ FIX: parameter kedua adalah FormData (bukan File mentah).
+  //    Sesuai backend userRoutes.js:
+  //    uploadSignature.single("tanda_tangan")
+  //    Jadi caller harus bikin FormData dulu, append File ke field
+  //    bernama "tanda_tangan", baru kirim.
+  uploadTandaTangan: (id: number, formData: FormData) =>
+    apiFetch(`/users/${id}/tanda-tangan`, {
+      method: "POST",
+      body: formData,
+    }),
+
+  deleteTandaTangan: (id: number) =>
+    apiFetch(`/users/${id}/tanda-tangan`, { method: "DELETE" }),
 };

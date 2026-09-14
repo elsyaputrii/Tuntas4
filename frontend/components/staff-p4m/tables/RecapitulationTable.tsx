@@ -18,12 +18,7 @@ const BULAN_PANJANG = [
 
 type FilterMode = "semua"|"harian"|"mingguan"|"bulanan"|"tahunan";
 
-/** Format tanggal yang sumbernya gak pasti ISO atau teks bebas (kasus data
- *  arsip Excel tahun lalu, mis. tgl_pelaksanaan bisa aja udah berupa teks
- *  "16 Juli 2026" dari hasil export sebelumnya, bukan ISO "2026-07-16").
- *  Kalau berhasil diparse jadi Date valid → diformat ulang rapi via fmtTgl.
- *  Kalau gagal (Invalid Date) → tampilkan teks aslinya apa adanya, supaya
- *  gak muncul "NaN NaN NaN" di layar. */
+/** Format tanggal yang sumbernya gak pasti ISO atau teks bebas */
 function formatTglAman(v: string | null): string {
   if (!v) return "—";
   const d = new Date(v);
@@ -40,9 +35,6 @@ interface CalendarProps {
   highlightedDates: Set<string>;
 }
 
-/** Kalender kotak-kotak (grid) — dipakai berdampingan dengan dropdown picker.
- *  Tanggal setelah hari ini otomatis abu-abu/tidak bisa diklik. Klik satu
- *  tanggal akan langsung pindah ke mode "Harian" dengan tanggal itu. */
 function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: CalendarProps) {
   const [viewDate, setViewDate] = useState(new Date(selectedDate));
   const year  = viewDate.getFullYear();
@@ -106,7 +98,6 @@ interface DailyPickerProps {
   onChange: (d: Date) => void;
 }
 
-/** Picker Tanggal (harian) — 3 dropdown Tanggal/Bulan/Tahun, tidak bisa melewati hari ini */
 function DailyPicker({ selectedDate, onChange }: DailyPickerProps) {
   const today = new Date(); today.setHours(0,0,0,0);
   const currentYear = today.getFullYear();
@@ -122,7 +113,6 @@ function DailyPicker({ selectedDate, onChange }: DailyPickerProps) {
   const maxMonth = selYear === currentYear ? today.getMonth() : 11;
 
   function set(day: number, month: number, year: number) {
-    // clamp supaya gak pernah lewat hari ini
     let d = new Date(year, month, day);
     if (d.getTime() > today.getTime()) d = new Date(today);
     onChange(d);
@@ -132,26 +122,20 @@ function DailyPicker({ selectedDate, onChange }: DailyPickerProps) {
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
       <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">📅 Pilih Tanggal</p>
       <div className="grid grid-cols-3 gap-2">
-        <select
-          value={selDay}
-          onChange={(e)=>set(Number(e.target.value), selMonth, selYear)}
-          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-        >
+        <select value={selDay} onChange={(e)=>set(Number(e.target.value), selMonth, selYear)}
+          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (
             <option key={d} value={d} disabled={d > maxDay}>{d}</option>
           ))}
         </select>
-        <select
-          value={selMonth}
+        <select value={selMonth}
           onChange={(e)=>set(Math.min(selDay, new Date(selYear, Number(e.target.value)+1, 0).getDate()), Number(e.target.value), selYear)}
-          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-        >
+          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
           {BULAN_PANJANG.map((b, i) => (
             <option key={b} value={i} disabled={selYear === currentYear && i > maxMonth}>{b}</option>
           ))}
         </select>
-        <select
-          value={selYear}
+        <select value={selYear}
           onChange={(e)=>{
             const y = Number(e.target.value);
             const m = y === currentYear ? Math.min(selMonth, today.getMonth()) : selMonth;
@@ -159,8 +143,7 @@ function DailyPicker({ selectedDate, onChange }: DailyPickerProps) {
             const d = y === currentYear && m === today.getMonth() ? Math.min(selDay, today.getDate()) : Math.min(selDay, dim);
             set(d, m, y);
           }}
-          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-        >
+          className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
@@ -179,9 +162,6 @@ function fmtRange(d: Date) {
   return `${d.getDate()} ${BULAN_PANJANG[d.getMonth()].slice(0,3)}`;
 }
 
-/** Picker Minggu (mingguan) — pilih Bulan+Tahun dulu, lalu pilih Minggu KE BERAPA
- *  di dalam bulan itu (Minggu 1, Minggu 2, dst — reset tiap bulan, bukan minggu
- *  ke-sekian dalam setahun). Tidak bisa melewati bulan/minggu yang belum sampai. */
 function WeeklyPicker({ selectedDate, onChange }: WeeklyPickerProps) {
   const today = new Date(); today.setHours(0,0,0,0);
   const currentYear = today.getFullYear();
@@ -212,35 +192,28 @@ function WeeklyPicker({ selectedDate, onChange }: WeeklyPickerProps) {
       <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">🗓️ Pilih Minggu</p>
       <div className="space-y-2">
         <div className="grid grid-cols-2 gap-2">
-          <select
-            value={selMonth}
-            onChange={(e)=>goToMonth(selYear, Number(e.target.value))}
-            className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-          >
+          <select value={selMonth} onChange={(e)=>goToMonth(selYear, Number(e.target.value))}
+            className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
             {BULAN_PANJANG.map((b, i) => (
               <option key={b} value={i} disabled={selYear === currentYear && i > maxMonth}>{b}</option>
             ))}
           </select>
-          <select
-            value={selYear}
+          <select value={selYear}
             onChange={(e)=>{
               const y = Number(e.target.value);
               const m = y === currentYear ? Math.min(selMonth, today.getMonth()) : selMonth;
               goToMonth(y, m);
             }}
-            className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-          >
+            className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <select
-          value={activeWeek?.weekNum ?? 1}
+        <select value={activeWeek?.weekNum ?? 1}
           onChange={(e)=>{
             const w = weeks.find((w)=>w.weekNum === Number(e.target.value));
             if (w) onChange(new Date(w.start));
           }}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-        >
+          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
           {weeks.map((w) => (
             <option key={w.weekNum} value={w.weekNum}>
               Minggu {w.weekNum} · {fmtRange(w.start)} – {fmtRange(w.end)}
@@ -259,11 +232,10 @@ interface MonthYearPickerProps {
   onChange: (d: Date) => void;
 }
 
-/** Picker Bulan + Tahun untuk mode "bulanan" — tidak bisa melewati bulan berjalan */
 function MonthYearPicker({ selectedDate, onChange }: MonthYearPickerProps) {
   const today = new Date();
   const currentYear = today.getFullYear();
-  const years = Array.from({ length: 6 }, (_, i) => currentYear - i); // 5 tahun terakhir + tahun ini
+  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
   const selYear  = selectedDate.getFullYear();
   const selMonth = selectedDate.getMonth();
   const maxMonth = selYear === currentYear ? today.getMonth() : 11;
@@ -272,27 +244,19 @@ function MonthYearPicker({ selectedDate, onChange }: MonthYearPickerProps) {
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
       <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">📆 Pilih Bulan</p>
       <div className="grid grid-cols-2 gap-2">
-        <select
-          value={selMonth}
-          onChange={(e)=>{
-            const m = Number(e.target.value);
-            onChange(new Date(selYear, m, 1));
-          }}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-        >
+        <select value={selMonth} onChange={(e)=>{ onChange(new Date(selYear, Number(e.target.value), 1)); }}
+          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
           {BULAN_PANJANG.map((b, i) => (
             <option key={b} value={i} disabled={selYear === currentYear && i > maxMonth}>{b}</option>
           ))}
         </select>
-        <select
-          value={selYear}
+        <select value={selYear}
           onChange={(e)=>{
             const y = Number(e.target.value);
             const m = y === currentYear ? Math.min(selMonth, today.getMonth()) : selMonth;
             onChange(new Date(y, m, 1));
           }}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-        >
+          className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
@@ -307,21 +271,18 @@ interface YearPickerProps {
   onChange: (d: Date) => void;
 }
 
-/** Picker Tahun untuk mode "tahunan" — tidak bisa melewati tahun berjalan */
 function YearPicker({ selectedDate, onChange }: YearPickerProps) {
   const today = new Date();
   const currentYear = today.getFullYear();
-  const years = Array.from({ length: 8 }, (_, i) => currentYear - i); // 7 tahun terakhir + tahun ini
+  const years = Array.from({ length: 8 }, (_, i) => currentYear - i);
   const selYear = selectedDate.getFullYear();
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
       <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">🗃️ Pilih Tahun</p>
-      <select
-        value={selYear}
+      <select value={selYear}
         onChange={(e)=>onChange(new Date(Number(e.target.value), selectedDate.getMonth(), selectedDate.getDate()))}
-        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-      >
+        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
         {years.map((y) => <option key={y} value={y}>{y}</option>)}
       </select>
       <button onClick={()=>onChange(new Date())}
@@ -335,26 +296,22 @@ function YearPicker({ selectedDate, onChange }: YearPickerProps) {
 // ══════════════════════════════════════════════════════════
 
 interface ArsipDataManagerProps {
-  /** Dipanggil setelah berhasil hapus arsip suatu tahun, supaya parent
-   *  bisa refresh tabel/statistik kalau tahun itu sedang ditampilkan. */
   onDeleteSuccess?: (tahun: number) => void;
 }
 
 function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
   const tahunSekarang = new Date().getFullYear();
-  const tahunPilihanArsip = Array.from({ length: 11 }, (_, i) => tahunSekarang - i); // tahun ini + 10 tahun lalu
+  const tahunPilihanArsip = Array.from({ length: 11 }, (_, i) => tahunSekarang - i);
 
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [showUploadArsip, setShowUploadArsip] = useState(false);
 
-  // ── Upload ──
   const [uploadTahun, setUploadTahun] = useState<number>(tahunSekarang - 1);
   const [uploadingArsip, setUploadingArsip] = useState(false);
   const [fileArsipTerpilih, setFileArsipTerpilih] = useState<File | null>(null);
   const fileArsipRef = useRef<HTMLInputElement>(null);
 
-  // ── Hapus ──
   const [hapusTahun, setHapusTahun] = useState<number>(tahunSekarang - 1);
   const [deletingArsip, setDeletingArsip] = useState(false);
   const [confirmHapusArsip, setConfirmHapusArsip] = useState(false);
@@ -405,8 +362,6 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
 
       {showUploadArsip && (
         <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2">
-          {/* Pesan sukses/error ditaruh di dalam dropdown ini (bukan cuma
-              di atas tabel), supaya pasti kelihatan tanpa perlu scroll. */}
           {msg && (
             <p className="text-green-700 text-[10px] font-bold px-2 py-1.5 bg-green-50 border border-green-200 rounded">
               ✅ {msg}
@@ -425,18 +380,11 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
             Bisa untuk 1 sampai 10 tahun ke belakang. Selain file Excel tidak
             akan bisa dipilih.
           </p>
-          <select
-            value={uploadTahun}
-            onChange={(e)=>setUploadTahun(Number(e.target.value))}
-            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-dark-header/30"
-          >
+          <select value={uploadTahun} onChange={(e)=>setUploadTahun(Number(e.target.value))}
+            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-dark-header/30">
             {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
           </select>
 
-          {/* Input file asli disembunyikan; label di bawah ini yang jadi
-              tombol pemicunya supaya teks bawaan browser "No file chosen"
-              tidak ikut tampil. accept diperluas dengan MIME type resmi
-              supaya dialog "buka file" lebih ketat menyaring file Excel. */}
           <input
             ref={fileArsipRef}
             type="file"
@@ -444,8 +392,6 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
             onChange={(e)=>{
               const file = e.target.files?.[0];
               if(!file){ setFileArsipTerpilih(null); return; }
-              // Jaga-jaga: validasi ekstensi lagi di sisi klien, kalau2
-              // dialog OS/browser tertentu tetap mengizinkan pilih file lain.
               if(!/\.(xlsx|xls)$/i.test(file.name)){
                 setError("Hanya file Excel (.xlsx / .xls) yang diperbolehkan.");
                 setTimeout(()=>setError(""),5000);
@@ -457,34 +403,26 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
             }}
             className="hidden"
           />
-          <label
-            onClick={()=>fileArsipRef.current?.click()}
-            className="w-full block cursor-pointer text-center text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded py-1.5 px-2"
-          >
+          <label onClick={()=>fileArsipRef.current?.click()}
+            className="w-full block cursor-pointer text-center text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded py-1.5 px-2">
             📁 {fileArsipTerpilih ? fileArsipTerpilih.name : "Pilih File Excel"}
           </label>
 
-          <button
-            onClick={()=>{ if(fileArsipTerpilih) handlePilihFileArsip(fileArsipTerpilih); }}
+          <button onClick={()=>{ if(fileArsipTerpilih) handlePilihFileArsip(fileArsipTerpilih); }}
             disabled={!fileArsipTerpilih || uploadingArsip}
             className="w-full text-[10px] font-bold text-white bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 rounded py-1.5 text-center transition-all">
             {uploadingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"⬆️ Upload"}
           </button>
 
-          {/* Hapus Data Arsip — pilih tahun mana yang mau dihapus dari
-              data yang sudah pernah diupload. Ada konfirmasi dulu
-              sebelum benar-benar terhapus supaya tidak salah pencet. */}
           <div className="border-t border-gray-200 pt-2 mt-2 space-y-2">
             <p className="text-[10px] font-semibold text-red-700 uppercase">🗑️ Hapus Data Arsip</p>
             <p className="text-[9px] text-black leading-snug">
               Pilih tahun datanya, lalu hapus data arsip tahun tsb yang
               sudah pernah diupload sebelumnya.
             </p>
-            <select
-              value={hapusTahun}
+            <select value={hapusTahun}
               onChange={(e)=>{ setHapusTahun(Number(e.target.value)); setConfirmHapusArsip(false); }}
-              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-red-400/30"
-            >
+              className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-black focus:outline-none focus:ring-2 focus:ring-red-400/30">
               {tahunPilihanArsip.map((y)=> <option key={y} value={y}>{y}</option>)}
             </select>
 
@@ -494,24 +432,18 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
                   Yakin hapus semua data arsip tahun {hapusTahun}?
                 </p>
                 <div className="flex gap-1.5">
-                  <button
-                    onClick={handleHapusArsip}
-                    disabled={deletingArsip}
+                  <button onClick={handleHapusArsip} disabled={deletingArsip}
                     className="flex-1 text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
                     {deletingArsip?<span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"Ya, Hapus"}
                   </button>
-                  <button
-                    onClick={()=>setConfirmHapusArsip(false)}
-                    disabled={deletingArsip}
+                  <button onClick={()=>setConfirmHapusArsip(false)} disabled={deletingArsip}
                     className="flex-1 text-[10px] font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded py-1.5 text-center transition-all">
                     Batal
                   </button>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={()=>setConfirmHapusArsip(true)}
-                disabled={deletingArsip}
+              <button onClick={()=>setConfirmHapusArsip(true)} disabled={deletingArsip}
                 className="w-full text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded py-1.5 text-center transition-all">
                 🗑️ Hapus Data Tahun {hapusTahun}
               </button>
@@ -540,8 +472,6 @@ interface DisplayItem {
   rencana: string;
   hasil: string;
   tglPelaksanaan: string;
-  /** ✅ BARU (permintaan user): tanggal Penyebab & Rencana Tindak Lanjut
-   *  diisi Kepala Unit ("tanggal perencanaan"), dilengkapi di Rekap Staf. */
   tglRencana: string;
   statusReview: string;
   statusBoxing: string;
@@ -567,13 +497,10 @@ export default function RecapitulationTable() {
   const [showPicker, setShowPicker] = useState(false);
   const [kaP4M, setKaP4M] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
 
-  // ✅ data arsip (hasil "Upload Data Lama") untuk tahun yang sedang
-  // dipilih di filter "Tahunan" — ikut tampil di tabel/statistik layar.
   const [arsipData, setArsipData] = useState<ArsipItem[]>([]);
   const [loadingArsip, setLoadingArsip] = useState(false);
 
   useEffect(() => {
-    // Ambil data penandatangan (Kepala P4M) untuk ditempel di PDF Rekapitulasi
     userApi.getUsers()
       .then((list: Array<{ role: string; name: string; tandaTangan?: string | null }>) => {
         const kepalaP4M = list.find((u) => u.role === "ka_p4m");
@@ -581,7 +508,7 @@ export default function RecapitulationTable() {
           setKaP4M({ nama: kepalaP4M.name, tandaTangan: kepalaP4M.tandaTangan ?? null });
         }
       })
-      .catch(() => { /* nonfatal — PDF tetap bisa dicetak tanpa TTD */ });
+      .catch(() => { /* nonfatal */ });
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -599,8 +526,8 @@ export default function RecapitulationTable() {
 
   useEffect(()=>{ fetchData(); },[fetchData]);
 
-  // ✅ Setiap kali mode "tahunan" aktif dan tahun yang dipilih berubah,
-  // ambil data arsip tahun itu supaya ikut muncul di tabel & statistik.
+  // ✅ Fetch arsip tahun — dipakai setelah hapus arsip (via onDeleteSuccess)
+  // dan dipanggil di useEffect filterMode tahunan.
   const fetchArsipTahun = useCallback((tahun: number) => {
     setLoadingArsip(true);
     return stafApi.getArsipRekap(tahun)
@@ -620,10 +547,6 @@ export default function RecapitulationTable() {
     return () => { batal = true; };
   }, [filterMode, selectedDate]);
 
-  // ✅ Dipanggil oleh ArsipDataManager setelah berhasil hapus arsip suatu
-  // tahun. Kalau tabel lagi nampilin tahun itu, langsung refresh datanya
-  // juga supaya baris yang terhapus ikut hilang dari tampilan tanpa perlu
-  // staf reload halaman manual.
   function handleArsipDeleted(tahun: number) {
     if (filterMode === "tahunan" && selectedDate.getFullYear() === tahun) {
       fetchArsipTahun(tahun);
@@ -652,30 +575,21 @@ export default function RecapitulationTable() {
       tglRencana: formatTglAman(p.tanggal_perencanaan ?? null),
       statusReview:p.status_review??"", statusBoxing:p.status_boxing??"",
       approvalStaf: p.approval_staf ?? null,
-      tglMasuk:p.created_at??null, isSelesai:false,
+      tglMasuk:p.created_at??null,
+      // ✅ FIX: cek isSelesai juga untuk laporan dipantau, supaya kalau
+      // status_boxing = "selesai", tetap dianggap selesai.
+      isSelesai: p.status_boxing === "selesai",
     })),
-    // ✅ data arsip Excel tahun lalu (hasil "Upload Data Lama") — dikasih
-    // id_boxing negatif berdasar index biar gak tabrakan sama id asli.
-    //
-    // ⚠️ FIX PENTING: tglMasuk TIDAK boleh diambil mentah dari a.tgl_masuk,
-    // karena isinya teks hasil export sebelumnya (mis. "16 Juli 2026"),
-    // BUKAN format ISO. new Date("16 Juli 2026") gagal diparse browser
-    // (nama bulan Indonesia) → jadi Invalid Date → getFullYear() jadi NaN
-    // → item ini SELALU ke-filter keluar dari tabel, walau datanya sendiri
-    // sudah benar tersimpan di server. Makanya kolom "tahun" (integer,
-    // sudah pasti benar) dipakai sebagai sumber kebenaran filter tahun,
-    // bukan hasil parse teks tanggalnya.
     ...arsipData.map((a,i)=>({
       id_boxing:-1000000-i, kode:a.kode_laporan??"—", jenis:a.jenis_laporan??"—",
       uraian:a.uraian_ketidaksesuaian??"—", unit:a.unit??"—",
       penyebab:a.penyebab??"—", rencana:a.rencana_tindakan??"—",
       hasil:a.hasil_tindakan??"—",
       tglPelaksanaan:formatTglAman(a.tgl_pelaksanaan),
-      // Data arsip lama tidak punya tanggal perencanaan tersendiri.
       tglRencana: "—",
       statusReview:a.status_review??"", statusBoxing:a.status_boxing??"selesai",
       approvalStaf: null as string | null,
-      tglMasuk:`${a.tahun}-06-15`, // tanggal sintetis, cuma dipakai buat filter tahun
+      tglMasuk:`${a.tahun}-06-15`,
       isSelesai:a.status_boxing==="selesai",
     })),
   ];
@@ -699,16 +613,7 @@ export default function RecapitulationTable() {
 
   const filteredItems   = allItems.filter(d=>isInFilter(d.tglMasuk));
   const totalAll        = filteredItems.length;
-  // ✅ Disamakan persis dengan Excel: "Ditindaklanjuti" = laporan yang
-  // boxing-nya sudah "selesai" (sama seperti isi sheet "Laporan
-  // Selesai"), "Menunggu / Proses" = sisanya (sama seperti sheet
-  // "Laporan Masih Dipantau"). Tidak lagi lihat raw status_review
-  // per-item, supaya nggak ada laporan yang sebenarnya masih di sheet
-  // "Masih Dipantau" tapi ke-hitung sebagai "Ditindaklanjuti" di sini.
   const ditindakCount   = filteredItems.filter(d=>d.isSelesai).length;
-  // "Tidak Ditindaklanjuti" digabung ke "Menunggu / Proses" — tidak
-  // ditampilkan sebagai kategori terpisah lagi di Rekap Status Tindak
-  // Lanjut maupun di Excel.
   const menungguCount   = filteredItems.filter(d=>!d.isSelesai).length;
 
   const mingguSelected = getWeekOfMonth(selectedDate);
@@ -719,13 +624,6 @@ export default function RecapitulationTable() {
     tahunan:`Tahun ${selectedDate.getFullYear()}`,
   };
 
-  // ✅ Warna & label status di tabel disamakan dengan kategori "Rekap
-  // Status Tindak Lanjut" (statistik atas) dan Excel: Hijau = Ditindak-
-  // lanjuti (laporan yang boxing-nya sudah "selesai" — sama seperti sheet
-  // "Laporan Selesai"), Kuning = Menunggu / Proses (sisanya — sama
-  // seperti sheet "Laporan Masih Dipantau"). `butuhAksiStaf` tetap
-  // diambil dari labelStatusLengkap untuk info status di kolom
-  // "Status Proses".
   function statusFor(item: DisplayItem) {
     const { butuhAksiStaf } = labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
 
@@ -749,7 +647,6 @@ export default function RecapitulationTable() {
     <div className="w-full space-y-4">
       {error &&<p className="text-red-500 text-xs font-bold px-3 py-2 bg-red-50 border border-red-200 rounded">❌ {error}</p>}
 
-      {/* Filter pill — scroll horizontal di HP */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
         {(["harian","mingguan","bulanan","tahunan","semua"] as FilterMode[]).map(mode=>(
           <button key={mode} onClick={()=>{ setFilterMode(mode); setCalendarResetKey(k=>k+1); }}
@@ -760,7 +657,6 @@ export default function RecapitulationTable() {
         ))}
       </div>
 
-      {/* Toggle picker periode — mobile only */}
       <button
         onClick={()=>setShowPicker(v=>!v)}
         className="sm:hidden w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 shadow-sm"
@@ -770,10 +666,6 @@ export default function RecapitulationTable() {
       </button>
 
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Sidebar: kalender kotak-kotak SELALU tampil, ditambah dropdown
-            picker sesuai mode filter yang aktif di bawahnya. Semua opsi
-            dibatasi supaya gak bisa pilih hari/minggu/bulan/tahun yang
-            belum sampai (masih di masa depan). */}
         <div className={`${showPicker ? "block" : "hidden"} sm:block sm:w-56 md:w-60 shrink-0 space-y-3`}>
           {filterMode === "harian" && (
             <DailyPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
@@ -787,9 +679,6 @@ export default function RecapitulationTable() {
           {filterMode === "tahunan" && (
             <div className="flex items-center gap-2">
               <YearPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
-              {/* ✅ FIX no-unused-vars: loadingArsip sebelumnya di-set tapi
-                  tidak pernah ditampilkan — sekarang dipakai buat indikator
-                  kecil saat data arsip tahun tsb lagi diambil. */}
               {loadingArsip && (
                 <span className="text-[10px] text-gray-400 flex items-center gap-1">
                   <span className="w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
@@ -806,7 +695,6 @@ export default function RecapitulationTable() {
           />
         </div>
 
-        {/* Statistik */}
         <div className="flex-1 min-w-0 space-y-3">
           <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
             <p className="text-[11px] font-bold text-gray-500 uppercase mb-3">📋 Rekap Status Tindak Lanjut</p>
@@ -838,7 +726,6 @@ export default function RecapitulationTable() {
         </div>
       </div>
 
-      {/* Export bar */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
         <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold w-full sm:w-auto">📥 Export:</span>
         <button
@@ -850,18 +737,12 @@ export default function RecapitulationTable() {
                 const ids=new Set(rekapData.map(d=>d.id_boxing));
                 return !ids.has(p.id_boxing)&&isInFilter(p.created_at??null);
               });
-              // ✅ Data arsip ikut mengikuti filter di layar — kalau lagi
-              // mode "Tahunan" dan pilih tahun tertentu, cuma arsip tahun
-              // itu yang disertakan (bukan semua tahun) supaya export
-              // Excel sesuai dengan tahun yang lagi dipilih di layar.
-              // Untuk mode lain (Semua/Harian/Mingguan/Bulanan), semua
-              // tahun arsip yang pernah diupload tetap disertakan.
               let arsipExport: ArsipItem[] = [];
               const tahunFilter = filterMode === "tahunan" ? selectedDate.getFullYear() : undefined;
               try{
                 const arsipRes = await stafApi.getArsipRekap(tahunFilter);
                 arsipExport = arsipRes.data ?? [];
-              }catch{ /* nonfatal — export tetap jalan tanpa data arsip */ }
+              }catch{ /* nonfatal */ }
               await exportExcel(filteredRekap, filteredDipantau, arsipExport, tahunFilter);
             } finally {
               setTimeout(()=>setExportingExcelLoading(false),1200);
@@ -937,7 +818,12 @@ export default function RecapitulationTable() {
                   </div>
                 </div>
                 <div className="w-24 p-3 flex flex-col justify-center gap-1.5">
-                  {statusInfo.butuhAksiStaf ? (
+                  {/* ✅ FIX: kalau laporan sudah selesai, tampilkan "Selesai".
+                      Kalau masih butuh aksi staf, tampilkan "Menunggu Keputusan Staff".
+                      Kalau belum, tampilkan "Menunggu proses". */}
+                  {item.isSelesai ? (
+                    <span className="text-[9px] text-green-600 italic text-center font-semibold">✓ Selesai</span>
+                  ) : statusInfo.butuhAksiStaf ? (
                     <span className="text-[9px] text-blue-600 italic text-center font-semibold">⏳ Menunggu Keputusan Staff</span>
                   ) : (
                     <span className="text-[9px] text-gray-400 italic text-center">Menunggu proses</span>
@@ -994,7 +880,10 @@ export default function RecapitulationTable() {
                   </div>
                 </div>
                 <div>
-                  {statusInfo.butuhAksiStaf ? (
+                  {/* ✅ FIX sama seperti desktop */}
+                  {item.isSelesai ? (
+                    <span className="text-[10px] text-green-600 italic font-semibold">✓ Selesai</span>
+                  ) : statusInfo.butuhAksiStaf ? (
                     <span className="text-[10px] text-blue-600 italic font-semibold">⏳ Menunggu Keputusan Staff</span>
                   ) : (
                     <span className="text-[10px] text-gray-400 italic">Menunggu proses</span>

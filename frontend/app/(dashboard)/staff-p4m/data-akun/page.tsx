@@ -2,21 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Edit,
-  Trash2,
-  Search,
-  UserPlus,
-  UserCheck,
-  Users,
-  Mail,
-  Phone,
-  Crown,
-  Briefcase,
-  UserCog,
-  X,
-  PenTool,
-  Upload,
-  Trash,
+  Edit, Trash2, Search, UserPlus, UserCheck, Users, Mail, Phone,
+  Crown, Briefcase, UserCog, X, PenTool, Upload, Trash,
 } from "lucide-react";
 import { userApi } from "@/lib/api";
 
@@ -48,23 +35,14 @@ export default function DataAkunPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<Partial<User>>({
-    name: "",
-    email: "",
-    role: "staff_p4m",
-    nip: "",
-    phone: "",
-    unit: "",
-    status: "active",
-    password: "",
+    name: "", email: "", role: "staff_p4m", nip: "", phone: "",
+    unit: "", status: "active", password: "",
   });
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [uploadingSignature, setUploadingSignature] = useState(false);
 
-  // Fetch data dari backend
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -81,7 +59,6 @@ export default function DataAkunPage() {
     }
   };
 
-  // Filter users
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -95,15 +72,12 @@ export default function DataAkunPage() {
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedUser && !formData.password) {
       alert("Password wajib diisi untuk akun baru!");
       return;
@@ -113,11 +87,24 @@ export default function DataAkunPage() {
       if (selectedUser) {
         await userApi.updateUser(selectedUser.id, formData);
       } else {
-        await userApi.createUser(formData);
+        // ✅ FIX: cast formData ke tipe yang diharapkan userApi.createUser.
+        //    Field wajib (name, email, password, role) sudah dijamin
+        //    ada oleh validasi `required` di form HTML + cek password
+        //    di atas. Field opsional (nip, phone, unit, status) dikirim
+        //    kalau ada, backend yang akan validasi.
+        await userApi.createUser(formData as {
+          name: string;
+          email: string;
+          password: string;
+          role: string;
+          nip?: string;
+          phone?: string;
+          unit?: string;
+          status?: string;
+        });
       }
-      fetchUsers(); // Refresh data
+      fetchUsers();
       closeModal();
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error:", error);
@@ -150,14 +137,8 @@ export default function DataAkunPage() {
   const openAddModal = () => {
     setSelectedUser(null);
     setFormData({
-      name: "",
-      email: "",
-      role: "staff_p4m",
-      nip: "",
-      phone: "",
-      unit: "",
-      status: "active",
-      password: "",
+      name: "", email: "", role: "staff_p4m", nip: "", phone: "",
+      unit: "", status: "active", password: "",
     });
     setSignatureFile(null);
     setSignaturePreview(null);
@@ -191,7 +172,13 @@ export default function DataAkunPage() {
     if (!selectedUser || !signatureFile) return;
     setUploadingSignature(true);
     try {
-      const res = await userApi.uploadTandaTangan(selectedUser.id, signatureFile);
+      // ✅ FIX: bungkus File jadi FormData dulu, karena backend pakai
+      //    multer `uploadSignature.single("tanda_tangan")` yang
+      //    mengharapkan multipart/form-data dengan field "tanda_tangan".
+      const fd = new FormData();
+      fd.append("tanda_tangan", signatureFile);
+
+      const res = await userApi.uploadTandaTangan(selectedUser.id, fd);
       setUsers((prev) =>
         prev.map((u) => (u.id === selectedUser.id ? { ...u, tandaTangan: res.tandaTangan } : u))
       );
@@ -236,27 +223,19 @@ export default function DataAkunPage() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case "staff_p4m":
-        return <Briefcase size={16} />;
-      case "kepala_unit":
-        return <UserCog size={16} />;
-      case "ka_p4m":
-        return <Crown size={16} />;
-      default:
-        return <Users size={16} />;
+      case "staff_p4m": return <Briefcase size={16} />;
+      case "kepala_unit": return <UserCog size={16} />;
+      case "ka_p4m": return <Crown size={16} />;
+      default: return <Users size={16} />;
     }
   };
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case "staff_p4m":
-        return "Staff P4M";
-      case "kepala_unit":
-        return "Kepala Unit";
-      case "ka_p4m":
-        return "KA-P4M";
-      default:
-        return role;
+      case "staff_p4m": return "Staff P4M";
+      case "kepala_unit": return "Kepala Unit";
+      case "ka_p4m": return "KA-P4M";
+      default: return role;
     }
   };
 
@@ -276,10 +255,8 @@ export default function DataAkunPage() {
       <div className="flex items-center justify-center h-[500px]">
         <div className="text-center p-6 bg-red-50 rounded-xl max-w-md">
           <p className="text-red-600 font-semibold mb-2">⚠️ {error}</p>
-          <button 
-            onClick={fetchUsers}
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
+          <button onClick={fetchUsers}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
             Coba Lagi
           </button>
         </div>
@@ -358,28 +335,20 @@ export default function DataAkunPage() {
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-300" size={18} />
-              <input
-                type="text"
-                placeholder="Cari nama, email, atau NIP..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+              <input type="text" placeholder="Cari nama, email, atau NIP..."
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
               />
             </div>
           </div>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
+          <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}
+            className="px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300">
             <option value="all">Semua Status</option>
             <option value="active">Aktif</option>
             <option value="inactive">Tidak Aktif</option>
           </select>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all shadow-sm"
-          >
+          <button onClick={openAddModal}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all shadow-sm">
             <UserPlus size={18} />
             Tambah Akun
           </button>
@@ -390,27 +359,13 @@ export default function DataAkunPage() {
           <table className="w-full">
             <thead className="bg-slate-50/80 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Nama / Kontak
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  NIP
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Unit
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Last Login
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Aksi
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Nama / Kontak</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">NIP</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Unit</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Last Login</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -453,8 +408,8 @@ export default function DataAkunPage() {
                   <td className="px-6 py-4 text-sm text-slate-500">{user.unit}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 text-xs rounded-full font-medium ${
-                      user.status === "active" 
-                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
+                      user.status === "active"
+                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
                         : "bg-rose-50 text-rose-600 border border-rose-100"
                     }`}>
                       {user.status === "active" ? "Aktif" : "Tidak Aktif"}
@@ -466,7 +421,7 @@ export default function DataAkunPage() {
                       <button onClick={() => openEditModal(user)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200">
                         <Edit size={16} />
                       </button>
-                      <button onClick={() => { setSelectedUser(user); setIsDeleteModalOpen(true); }} 
+                      <button onClick={() => { setSelectedUser(user); setIsDeleteModalOpen(true); }}
                               className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200">
                         <Trash2 size={16} />
                       </button>
@@ -506,41 +461,22 @@ export default function DataAkunPage() {
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Nama Lengkap <span className="text-rose-400">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name || ""}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="Masukkan nama lengkap"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+                  <input type="text" name="name" value={formData.name || ""} onChange={handleInputChange} required placeholder="Masukkan nama lengkap"
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Email <span className="text-rose-400">*</span>
                   </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email || ""}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="Masukkan alamat email"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+                  <input type="email" name="email" value={formData.email || ""} onChange={handleInputChange} required placeholder="Masukkan alamat email"
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Role <span className="text-rose-400">*</span>
                   </label>
-                  <select
-                    name="role"
-                    value={formData.role || "staff_p4m"}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  >
+                  <select name="role" value={formData.role || "staff_p4m"} onChange={handleInputChange} required
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300">
                     <option value="staff_p4m">Staff P4M</option>
                     <option value="kepala_unit">Kepala Unit</option>
                     <option value="ka_p4m">KA-P4M</option>
@@ -550,13 +486,8 @@ export default function DataAkunPage() {
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Status <span className="text-rose-400">*</span>
                   </label>
-                  <select
-                    name="status"
-                    value={formData.status || "active"}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  >
+                  <select name="status" value={formData.status || "active"} onChange={handleInputChange} required
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300">
                     <option value="active">Aktif</option>
                     <option value="inactive">Tidak Aktif</option>
                   </select>
@@ -565,62 +496,35 @@ export default function DataAkunPage() {
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     NIP <span className="text-rose-400">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="nip"
-                    value={formData.nip || ""}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="Masukkan NIP"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+                  <input type="text" name="nip" value={formData.nip || ""} onChange={handleInputChange} required placeholder="Masukkan NIP"
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Nomor Telepon <span className="text-rose-400">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="phone"
-                    value={formData.phone || ""}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="Masukkan nomor telepon"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+                  <input type="text" name="phone" value={formData.phone || ""} onChange={handleInputChange} required placeholder="Masukkan nomor telepon"
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Unit <span className="text-rose-400">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="unit"
-                    value={formData.unit || ""}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="Masukkan unit kerja"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+                  <input type="text" name="unit" value={formData.unit || ""} onChange={handleInputChange} required placeholder="Masukkan unit kerja"
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Password {!selectedUser && <span className="text-rose-400">*</span>}
                     {selectedUser && <span className="text-sm text-slate-400 ml-2">(Kosongkan jika tidak diubah)</span>}
                   </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password || ""}
-                    onChange={handleInputChange}
+                  <input type="password" name="password" value={formData.password || ""} onChange={handleInputChange}
                     required={!selectedUser}
                     placeholder={selectedUser ? "Masukkan password baru (opsional)" : "Masukkan password"}
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
               </div>
 
-              {/* Tanda Tangan (TTD) Digital — hanya untuk akun yang sudah tersimpan */}
               <div className="border-t border-slate-100 dark:border-slate-700 pt-5">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                   <PenTool size={16} className="text-slate-400" />
@@ -652,20 +556,13 @@ export default function DataAkunPage() {
                           Pilih Gambar
                           <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleSignatureChange} />
                         </label>
-                        <button
-                          type="button"
-                          onClick={handleUploadSignature}
-                          disabled={!signatureFile || uploadingSignature}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-500 disabled:bg-blue-200 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                        >
+                        <button type="button" onClick={handleUploadSignature} disabled={!signatureFile || uploadingSignature}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-500 disabled:bg-blue-200 text-white rounded-lg hover:bg-blue-600 transition-colors">
                           {uploadingSignature ? "Mengunggah..." : "Unggah"}
                         </button>
                         {selectedUser.tandaTangan && (
-                          <button
-                            type="button"
-                            onClick={handleDeleteSignature}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-rose-50 text-rose-500 border border-rose-100 rounded-lg hover:bg-rose-100 transition-colors"
-                          >
+                          <button type="button" onClick={handleDeleteSignature}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-rose-50 text-rose-500 border border-rose-100 rounded-lg hover:bg-rose-100 transition-colors">
                             <Trash size={14} />
                             Hapus
                           </button>
@@ -677,17 +574,12 @@ export default function DataAkunPage() {
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-6 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                >
+                <button type="button" onClick={closeModal}
+                  className="px-6 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                   Batal
                 </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-colors shadow-sm flex items-center gap-2"
-                >
+                <button type="submit"
+                  className="px-6 py-2 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-colors shadow-sm flex items-center gap-2">
                   {selectedUser ? <Edit size={18} /> : <UserPlus size={18} />}
                   {selectedUser ? 'Simpan Perubahan' : 'Tambah Akun'}
                 </button>
@@ -712,26 +604,17 @@ export default function DataAkunPage() {
               </h3>
               <p className="text-center text-slate-400 dark:text-slate-400 mb-6">
                 Apakah Anda yakin ingin menghapus akun <br />
-                <span className="font-semibold text-slate-600 dark:text-slate-300">
-                  {selectedUser.name}
-                </span>?
+                <span className="font-semibold text-slate-600 dark:text-slate-300">{selectedUser.name}</span>?
                 <br />
                 <span className="text-sm text-rose-400">Tindakan ini tidak dapat dibatalkan!</span>
               </p>
               <div className="flex items-center justify-center gap-3">
-                <button
-                  onClick={() => {
-                    setIsDeleteModalOpen(false);
-                    setSelectedUser(null);
-                  }}
-                  className="px-6 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                >
+                <button onClick={() => { setIsDeleteModalOpen(false); setSelectedUser(null); }}
+                  className="px-6 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                   Batal
                 </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-6 py-2 bg-gradient-to-r from-rose-400 to-rose-500 text-white rounded-lg hover:from-rose-500 hover:to-rose-600 transition-colors shadow-sm flex items-center gap-2"
-                >
+                <button onClick={handleDelete}
+                  className="px-6 py-2 bg-gradient-to-r from-rose-400 to-rose-500 text-white rounded-lg hover:from-rose-500 hover:to-rose-600 transition-colors shadow-sm flex items-center gap-2">
                   <Trash2 size={18} />
                   Hapus Akun
                 </button>

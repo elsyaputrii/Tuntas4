@@ -1,14 +1,5 @@
 // FILE: frontend/lib/exportTypes.ts
 // Tipe data bersama untuk exportExcel.ts dan exportPdf.ts
-//
-// ✅ FIX: ditambahkan field `approval_staf` pada ProsesItem.
-// Backend (stafController.js → getProsesMonitor) SUDAH mengirim kolom
-// b.approval_staf di setiap baris, tapi tipe TypeScript di sini belum
-// mendeklarasikannya — akibatnya RecapitulationTable.tsx tidak bisa
-// membaca status approval Staf P4M sama sekali dan menampilkan semua
-// laporan yang belum "selesai" dengan label generik "Dipantau", padahal
-// banyak di antaranya sebenarnya sudah berada di tahap "menunggu approval
-// Staf P4M" (status_boxing = 'di_staff', approval_staf = 'menunggu').
 
 export interface RekapItem {
   id_laporan: number;
@@ -27,6 +18,9 @@ export interface RekapItem {
   lampiran_hasil: string | null;
   tanggal_pelaksanaan: string | null;
   created_at?: string | null;
+  /** ✅ FIX: tanggal perencanaan (Penyebab & Rencana diisi Kepala Unit).
+   *  Dikirim backend lewat getRekapitulasi (r.created_at AS tanggal_perencanaan). */
+  tanggal_perencanaan?: string | null;
 }
 
 export interface ProsesItem {
@@ -48,14 +42,12 @@ export interface ProsesItem {
   lampiran_hasil: string | null;
   tanggal_pelaksanaan: string | null;
   created_at?: string | null;
-  /** ✅ BARU: "menunggu" | "diterima" | "ditolak" — dikirim backend tapi sebelumnya tidak ada di tipe ini */
+  /** ✅ "menunggu" | "diterima" | "ditolak" — dikirim backend lewat getProsesMonitor */
   approval_staf?: string | null;
+  /** ✅ FIX: tanggal perencanaan (Penyebab & Rencana diisi Kepala Unit). */
+  tanggal_perencanaan?: string | null;
 }
 
-/** ✅ BARU: data arsip tahun lalu hasil upload Excel (fitur "Upload Data Lama"
- *  di halaman Rekapitulasi). Datang dari tabel arsip_rekapitulasi lewat
- *  GET /api/staf/rekap/arsip — kolom tanggal disimpan sbg teks karena
- *  formatnya bisa bermacam-macam dari file lama. */
 export interface ArsipItem {
   tahun: number;
   kode_laporan: string | null;
