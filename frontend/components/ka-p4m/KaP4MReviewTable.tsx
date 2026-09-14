@@ -659,7 +659,7 @@ export default function KaP4MReviewTable() {
                       <p className="text-[10px] text-gray-400 mb-1">
                         {group.kode_laporan}
                       </p>
-                      <div className="border border-black p-2 min-h-24 text-[11px] whitespace-pre-wrap break-words">
+                      <div className="border border-black p-2 min-h-18 text-[11px] whitespace-pre-wrap break-words">
                         {group.isi_laporan}
                       </div>
                       {group.lampiran_laporan && (
@@ -703,7 +703,7 @@ export default function KaP4MReviewTable() {
 
                           {/* Penyebab */}
                           <div className={`border-r-2 border-black p-4 ${rowBorder}`}>
-                            <div className="border border-black p-2 min-h-20 text-[10px] whitespace-pre-wrap break-words">
+                            <div className="border border-black p-2 min-h-18 text-[10px] whitespace-pre-wrap break-words">
                               {item.penyebab || "—"}
                             </div>
                           </div>

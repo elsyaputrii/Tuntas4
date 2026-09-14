@@ -329,6 +329,13 @@ export async function exportPDFProses(
   const qrTextProses = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nPenandatangan: ${jabatanPenandatanganProses}\nDicetak: ${tglCetakProses}`;
   const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
+  const hasilTindakLanjutPdf =
+  item.hasil_tindakan
+    ? item.hasil_tindakan
+    : item.status_boxing === "selesai"
+      ? `<em style="color:#9ca3af">Sudah sesuai, tidak ditindaklanjuti</em>`
+      : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
 <title>Laporan ${item.kode_laporan}</title>
@@ -389,7 +396,7 @@ ${item.aksi_masukan ? `
     ? `<div class="field"><span class="lbl">Tanggal Pelaksanaan</span><span class="val">${fmtTgl(item.tanggal_pelaksanaan)}</span></div>`
     : ""}
   <div class="box">
-    ${item.hasil_tindakan ?? "<em style='color:#9ca3af'>Belum ada hasil</em>"}
+    ${hasilTindakLanjutPdf}
     ${gambarHasilUrl ? `
       <img src="${gambarHasilUrl}" class="box-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
       <span class="box-img-cap">Foto hasil perbaikan dari Kepala Unit</span>
@@ -452,6 +459,13 @@ export async function exportPDFRiwayatKepalaUnit(
   const jabatanPenandatangan = `Kepala Unit — ${namaUnit}`;
   void penandatangan; // tersedia untuk pemakaian di masa depan (nama individu), tidak dipakai sekarang
   const isSelesai = item.status_boxing === "selesai";
+  const hasilTindakLanjutPdf =
+  item.hasil_tindakan
+    ? item.hasil_tindakan
+    : isSelesai
+      ? `<em style="color:#9ca3af">Sudah sesuai, tidak ditindaklanjuti</em>`
+      : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+
   const statusLabel = isSelesai
     ? "Selesai — Disetujui Staf P4M"
     : "Menunggu Approval Staf P4M";
@@ -520,7 +534,7 @@ ${item.aksi_masukan ? `
     ? `<div class="field"><span class="lbl">Tanggal Pelaksanaan</span><span class="val">${fmtTgl(item.tanggal_pelaksanaan)}</span></div>`
     : ""}
   <div class="box">
-    ${item.hasil_tindakan ?? "<em style='color:#9ca3af'>Belum ada hasil</em>"}
+  ${hasilTindakLanjutPdf}
     ${gambarHasilUrl ? `
       <img src="${gambarHasilUrl}" class="box-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
       <span class="box-img-cap">Foto bukti pelaksanaan dari Kepala Unit</span>

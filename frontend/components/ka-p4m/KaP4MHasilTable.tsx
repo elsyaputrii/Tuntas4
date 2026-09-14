@@ -208,8 +208,8 @@ export default function KaP4MHasilTable() {
 
         <table className="w-full border-collapse text-[10px]" style={{ tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: "40%" }} />
-            <col style={{ width: "20%" }} />
+            <col style={{ width: "35%" }} />
+            <col style={{ width: "25%" }} />
             <col style={{ width: "24%" }} />
             <col style={{ width: "16%" }} />
           </colgroup>
@@ -283,7 +283,7 @@ export default function KaP4MHasilTable() {
                           {/* ✅ Rencana / Aksi Masukan — kotak di atas, label unit di BAWAH kotak.
                               Warna label abu-abu bold (bukan biru), biar gak nyakitin mata. */}
                           <td className={`border-r-2 border-black p-3 align-middle ${isLastUnit ? "border-b-2" : "border-b"}`}>
-                            <div className="border border-gray-300 p-2 min-h-16 text-[10px] text-gray-600 flex items-center">
+                            <div className="border border-gray-400 p-2 min-h-16 text-[10px] text-gray-800 flex ">
                               <span className="w-full">{item.aksi_masukan || item.rencana_tindakan || "—"}</span>
                             </div>
                             {/* Label unit di BAWAH kotak */}
@@ -299,8 +299,8 @@ export default function KaP4MHasilTable() {
                           </td>
 
                           {/* ✅ Hasil Tindak Lanjut Unit — TANPA label unit (udah ada di kolom Rencana) */}
-                          <td className={`border-r-2 border-black p-3 align-middle ${isLastUnit ? "border-b-2" : "border-b"}`}>
-                            <div className="border border-gray-300 min-h-16 p-2 text-[10px] flex items-center">
+                          <td className={`border-r-2 border-black p-3 align-top ${isLastUnit ? "border-b-2" : "border-b"}`}>
+                            <div className="border border-gray-400 min-h-16 p-2 text-[10px] flex ">
                               <span className="w-full">
                                 {item.hasil_tindakan ? (
                                   item.hasil_tindakan

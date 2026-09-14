@@ -188,7 +188,7 @@ useEffect(() => {
             )}
           </div>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-slate-400 hover:text-white">
-            {sidebarOpen ? <X size={17} /> : <Menu size={17} />}
+            {sidebarOpen ? <X size={20} className="relative -top-1 left-2" />  : <Menu size={20} />}
           </button>
         </div>
 

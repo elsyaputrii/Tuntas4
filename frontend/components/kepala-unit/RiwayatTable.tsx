@@ -215,6 +215,11 @@ export default function RiwayatTable() {
     </div>
   );
 
+  function isHasilTerselesaikan(item: RiwayatItem): boolean {
+    return !item.hasil_tindakan && item.status_boxing === "selesai";
+  }
+
+
   return (
     <>
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
@@ -281,12 +286,20 @@ export default function RiwayatTable() {
                   <div className="border border-gray-400 p-2 min-h-16">{item.isi_laporan}</div>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3">
-                  <p className="italic text-gray-500 text-[10px] min-h-16">{item.rencana_tindakan ?? "—"}</p>
+                  <p className="text-gray-800 text-[10px] min-h-16">{item.rencana_tindakan ?? "—"}</p>
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
-                  <div className="border border-gray-300 p-2 min-h-16">
-                    {hasilTindakLanjutText(item)}
-                  </div>
+                  <div className="border border-gray-400 p-2 min-h-16">
+  {isHasilTerselesaikan(item) ? (
+    <span className="italic text-gray-400">
+      Sudah Terselesaikan
+    </span>
+  ) : (
+    hasilTindakLanjutText(item)
+  )}
+</div>
+
+
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
                   {item.lampiran_hasil && (
                     <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
@@ -345,9 +358,16 @@ export default function RiwayatTable() {
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
-                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16 ">
-                    {hasilTindakLanjutText(item)}
-                  </div>
+                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16">
+  {isHasilTerselesaikan(item) ? (
+    <span className="italic text-gray-400">
+      Sudah Terselesaikan
+    </span>
+  ) : (
+    hasilTindakLanjutText(item)
+  )}
+</div>
+
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
                   {item.lampiran_hasil && (
                     <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
