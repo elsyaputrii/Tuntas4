@@ -58,22 +58,12 @@ interface ProsesItem {
   created_at?: string | null;
 }
 
-// ✅ STATUS KEPUTUSAN KA — dipakai buat kolom "Keputusan Ka" di
-// Proses & Pantau. Ini murni soal keputusan Ka P4M atas RENCANA
-// (rancangan_tindakan.status_review), bukan soal keputusan akhir atas
-// HASIL (approval_staf, itu beda kolom/tahap).
 const reviewBadge: Record<string, { label: string; cls: string }> = {
   menunggu_keputusan_ka: { label: "⏳ Menunggu Review", cls: "text-blue-600 bg-blue-50 border-blue-200" },
   ditindaklanjuti:       { label: "🔄 Perbaikan Berkelanjutan", cls: "text-red-600 bg-red-50 border-red-200" },
   tidak_ditindaklanjuti: { label: "✅ Sesuai", cls: "text-green-600 bg-green-50 border-green-200" },
 };
 
-// ✅ FIX: sebelumnya kalau status_review masih NULL (laporan baru
-// terdistribusi, Kepala Unit belum isi rencana sama sekali), badge ini
-// gak muncul apa-apa alias kolom "Keputusan Ka" keliatan kosong —
-// padahal statusnya jelas: Ka P4M memang belum ada apa-apa buat
-// direview. Sekarang selalu fallback ke "⏳ Menunggu Review" biar
-// kolomnya gak pernah blank.
 function getKeputusanKaBadge(item: ProsesItem): { label: string; cls: string } {
   if (item.status_review && reviewBadge[item.status_review]) {
     return reviewBadge[item.status_review];
@@ -100,9 +90,6 @@ export default function ProcessMonitorTable() {
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // ✅ KEPUTUSAN STAFF: state modal konfirmasi ✅ Siap / ❌ Belum Siap.
-  // Keputusan ini dikembalikan jadi wewenang Staf P4M (bukan lagi Ka
-  // P4M / Kepala Unit) — lihat stafApi.setApprovalHasil di lib/api.ts.
   const [modal, setModal] = useState<{
     open: boolean;
     id_boxing: number | null;
@@ -114,8 +101,6 @@ export default function ProcessMonitorTable() {
   useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
-    // Ambil TTD digital Staf P4M yang sedang login, buat ditempel di PDF
-    // "Proses & Pantau" (bukan TTD Kepala P4M — beda dari PDF Rekapitulasi).
     (async () => {
       try {
         const me = await authApi.getMe();
@@ -127,7 +112,7 @@ export default function ProcessMonitorTable() {
           setMeSignature({ nama: myAccount.name, tandaTangan: myAccount.tandaTangan ?? null });
         }
       } catch {
-        /* nonfatal — PDF tetap bisa dicetak tanpa TTD */
+        /* nonfatal */
       }
     })();
   }, []);
@@ -172,10 +157,6 @@ export default function ProcessMonitorTable() {
     setExportingId(null);
   }
 
-  // ✅ KEPUTUSAN STAFF: Staf P4M yang memutuskan ✅ Siap / ❌ Belum Siap
-  // atas hasil tindak lanjut unit (dulu wewenang ini dipindah ke Ka
-  // P4M, sekarang dikembalikan lagi ke sini). Kalau sudah diputuskan,
-  // tampilkan badge status; kalau belum, tampilkan tombol keputusan.
   function openModal(item: ProsesItem, keputusan: "diterima" | "ditolak") {
     if (item.status_boxing !== "di_staff") {
       setError(
@@ -183,10 +164,9 @@ export default function ProcessMonitorTable() {
       );
       return;
     }
-    if (!item.hasil_tindakan) {
-      setError("Hasil tindak lanjut belum diisi Kepala Unit.");
-      return;
-    }
+    // ✅ HAPUS validasi "harus ada hasil_tindakan" — karena untuk
+    // kasus "Sesuai / Tidak Ditindaklanjuti", hasil_tindakan memang
+    // NULL (Kepala Unit gak perlu isi hasil kalau gak ada yang dikerjakan).
     setModal({ open: true, id_boxing: item.id_boxing, keputusan, catatan: "" });
     setError("");
   }
@@ -213,22 +193,44 @@ export default function ProcessMonitorTable() {
     }
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // ✅ FIX UTAMA: renderKeputusanStaf
+  //
+  // Aturannya SIMPLE:
+  //   1. Belum sampai tahap staf → "Menunggu tahap sebelumnya"
+  //   2. Sudah diputuskan (approval_staf != "menunggu") → badge hasil
+  //   3. Sudah di staf, belum diputuskan → TOMBOL ✅❌ (selalu!)
+  //
+  // YANG DIHAPUS: cabang `if (!item.hasil_tindakan) return "Selesai"`
+  // — karena itu bikin tombol gak muncul untuk kasus "Sesuai / Tidak
+  // Ditindaklanjuti" (yang memang gak punya hasil_tindakan).
+  // ══════════════════════════════════════════════════════════════════════
   function renderKeputusanStaf(item: ProsesItem) {
+    // 1. Belum sampai tahap staf
     if (item.status_boxing !== "di_staff" && item.status_boxing !== "selesai") {
-      return <span className="text-[9px] text-gray-400 italic text-center">Menunggu tahap sebelumnya</span>;
-    }
-    if (!item.hasil_tindakan) {
-      return <span className="text-[10px] text-gray-400 italic text-center">Selesai</span>;
+      return (
+        <span className="text-[9px] text-gray-400 italic text-center">
+          Menunggu tahap sebelumnya
+        </span>
+      );
     }
 
-    const apprVal = item.approval_staf && item.approval_staf !== "menunggu" ? item.approval_staf : null;
+    // 2. Sudah diputuskan — tampilkan badge hasil
+    const apprVal =
+      item.approval_staf && item.approval_staf !== "menunggu"
+        ? item.approval_staf
+        : null;
 
     if (apprVal) {
       return (
         <div className="flex flex-col items-center gap-1">
-          <span className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
-            apprVal === "diterima" ? "text-green-700 bg-green-50 border-green-300" : "text-red-700 bg-red-50 border-red-300"
-          }`}>
+          <span
+            className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
+              apprVal === "diterima"
+                ? "text-green-700 bg-green-50 border-green-300"
+                : "text-red-700 bg-red-50 border-red-300"
+            }`}
+          >
             {apprVal === "diterima" ? "✅ Siap — Selesai" : "❌ Belum Siap"}
           </span>
           {item.catatan_approval && (
@@ -240,30 +242,32 @@ export default function ProcessMonitorTable() {
       );
     }
 
-    // Belum diputuskan — hanya bisa diputuskan kalau status_boxing
-    // sudah 'di_staff' (item 'selesai' mestinya sudah punya apprVal).
-    if (item.status_boxing !== "di_staff") {
-      return <span className="text-[9px] text-gray-400 italic text-center">—</span>;
-    }
-
+    // 3. Sudah di staf, belum diputuskan → TOMBOL ✅❌ SELALU MUNCUL
     return (
-      <div className="flex gap-3 justify-center">
-        <button
-          type="button"
-          onClick={() => openModal(item, "diterima")}
-          title="Siap — laporan otomatis Selesai"
-          className="w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow"
-        >
-          ✅
-        </button>
-        <button
-          type="button"
-          onClick={() => openModal(item, "ditolak")}
-          title="Belum Siap — kembalikan ke unit untuk revisi hasil"
-          className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow"
-        >
-          ❌
-        </button>
+      <div className="flex flex-col items-center gap-2">
+        {!item.hasil_tindakan && (
+          <p className="text-[9px] text-gray-400 italic text-center max-w-55">
+            Tidak ada hasil tindak lanjut (Sesuai)
+          </p>
+        )}
+        <div className="flex gap-3 justify-center">
+          <button
+            type="button"
+            onClick={() => openModal(item, "diterima")}
+            title="Siap — laporan otomatis Selesai"
+            className="w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 text-white text-base font-bold flex items-center justify-center shadow"
+          >
+            ✅
+          </button>
+          <button
+            type="button"
+            onClick={() => openModal(item, "ditolak")}
+            title="Belum Siap — kembalikan ke unit untuk revisi hasil"
+            className="w-9 h-9 rounded-full bg-red-500 hover:bg-red-600 text-white text-base font-bold flex items-center justify-center shadow"
+          >
+            ❌
+          </button>
+        </div>
       </div>
     );
   }
@@ -386,15 +390,13 @@ export default function ProcessMonitorTable() {
 
   return (
     <>
-      {/* ── IMAGE MODAL ── */}
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
 
-      {/* ── MODAL KEPUTUSAN STAFF (✅ Siap / ❌ Belum Siap) ── */}
       {modal.open && modal.id_boxing && modal.keputusan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white border-2 border-black w-full max-w-md p-6 shadow-2xl">
             <h3 className="font-bold text-sm uppercase border-b-2 border-black pb-2 mb-3">
-              {modal.keputusan === "diterima" ? "✅ selesai" : "❌ ditindak lanjutin"} — Konfirmasi
+              {modal.keputusan === "diterima" ? "✅ Selesai" : "❌ Tindak Lanjutin"} — Konfirmasi
             </h3>
             <p className="text-[11px] text-gray-500 mb-3">
               ID Boxing: <strong>{modal.id_boxing}</strong>
@@ -457,7 +459,6 @@ export default function ProcessMonitorTable() {
         </div>
       )}
 
-      {/* ── FILTER PERIODE ── */}
       <div className="mb-3">
         <PeriodFilterBar
           filterMode={filterMode}
@@ -479,7 +480,7 @@ export default function ProcessMonitorTable() {
         {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
         {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
 
-        {/* ── DESKTOP ── */}
+        {/* DESKTOP */}
         <div className="hidden lg:block">
           <div
             className="min-w-215 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]"
@@ -507,7 +508,6 @@ export default function ProcessMonitorTable() {
                     style={{ display: "table", tableLayout: "fixed", width: "100%" }}
                   >
                     <div style={{ display: "table-row" }}>
-                      {/* Kolom Laporan + Tanggal + Gambar */}
                       <div style={{ display: "table-cell", width: "40%" }} className="border-r-2 border-black p-3 align-top">
                         <p className="text-[9px] text-gray-400 mb-1 leading-tight">
                           <span className="font-bold">{item.kode_laporan}</span><br />
@@ -560,8 +560,6 @@ export default function ProcessMonitorTable() {
                         )}
                       </div>
 
-                      {/* ✅ KEPUTUSAN STAFF: ✅ Siap / ❌ Belum Siap — wewenang
-                          Staf P4M (bukan lagi Ka P4M / Kepala Unit). */}
                       <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
                         <div className="flex items-center justify-center h-full">
                           {renderKeputusanStaf(item)}
@@ -675,7 +673,7 @@ export default function ProcessMonitorTable() {
           )}
         </div>
 
-        {/* ── MOBILE ── */}
+        {/* MOBILE */}
         <div className="lg:hidden">
           {aktif.length === 0 && selesai.length === 0 ? (
             <div className="p-8 text-center text-gray-400 italic">Belum ada laporan diproses.</div>
