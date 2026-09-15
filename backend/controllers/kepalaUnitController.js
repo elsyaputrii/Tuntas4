@@ -268,7 +268,16 @@ async function getLaporanHasil(req, res) {
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
         AND (
-          r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan'
+          (r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan')
+          -- ✅ FIX: laporan yang DITOLAK ("Belum Siap") oleh Staf P4M
+          -- (status_boxing tetap 'di_staff', approval_staf = 'ditolak')
+          -- HARUS tetap muncul di sini supaya Kepala Unit bisa langsung
+          -- revisi bagian Laporan Hasil-nya saja — tanpa ini, laporan
+          -- ditolak "hilang" dari tab Laporan Hasil sehingga siklus
+          -- revisi tidak pernah menyentuh submitPelaksanaan (yang me-reset
+          -- approval_staf balik ke 'menunggu'), dan saat kembali ke Staf
+          -- P4M tombol ✅❌ tidak muncul, cuma teks "❌ Belum Siap".
+          OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
         )
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],

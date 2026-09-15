@@ -129,8 +129,15 @@ export default function ResultReportTable() {
 
       {laporanList.map((item, idx) => {
         const sesuaiTanpaTindakLanjut = item.status_review === "tidak_ditindaklanjuti";
+        // ✅ FIX: status_boxing 'di_staff' dipakai untuk DUA kondisi beda —
+        // (a) sudah dikirim & lagi nunggu keputusan Staf P4M, ATAU
+        // (b) DITOLAK Staf P4M & perlu direvisi. Tanpa cek approval_staf,
+        // kondisi (b) ikut kebaca "sudah terkirim" sehingga form revisi
+        // ketutup dan laporan ditolak jadi gak bisa diperbaiki lagi.
         const sudahTerkirim =
-          !!item.id_pelaksanaan && item.status_boxing !== "menunggu_pelaksanaan";
+          !!item.id_pelaksanaan &&
+          item.status_boxing !== "menunggu_pelaksanaan" &&
+          item.approval_staf !== "ditolak";
         const showForm = !sudahTerkirim && !sesuaiTanpaTindakLanjut;
         // ✅ BARU (permintaan user): kondisi "perlu revisi" — laporan ini
         // SEBELUMNYA pernah dikirim tapi DITOLAK ("Belum Siap") oleh Staf
