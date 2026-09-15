@@ -290,15 +290,11 @@ export default function RiwayatTable() {
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
                   <div className="border border-gray-400 p-2 min-h-16">
-  {isHasilTerselesaikan(item) ? (
-    <span className="italic text-gray-400">
-      Sudah Terselesaikan
-    </span>
-  ) : (
-    hasilTindakLanjutText(item)
-  )}
-</div>
-
+                    {isHasilTerselesaikan(item) ? (
+                      <span className="italic text-gray-400"> Sudah Terselesaikan</span>
+                    ) : (
+                      hasilTindakLanjutText(item)
+                    )} </div>
 
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
                   {item.lampiran_hasil && (

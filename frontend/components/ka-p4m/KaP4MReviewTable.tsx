@@ -4,23 +4,10 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { kaP4MApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
-import {
-  Pencil,
-  Eye,
-  Clock,
-  RefreshCw,
-  CheckCircle2,
-  Calendar,
-  CalendarDays,
-  CalendarRange,
-  CalendarCheck,
-  Archive,
-  ClipboardList,
-  XCircle,
-  Image as ImageIcon,
-  Mail,
-  Target,
+import { Pencil, Eye, Clock, RefreshCw, CheckCircle2, Calendar, XCircle, Image as ImageIcon, Mail, Target,
 } from "lucide-react";
+import { PeriodFilterBar, isInPeriodFilter, type FilterMode,
+} from "@/components/shared/PeriodFilterBar";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -61,45 +48,7 @@ const statusBadge: Record<string, { label: string; cls: string; Icon: typeof Clo
   },
 };
 
-const FILTER_OPTIONS: { id: FilterPeriod; label: string; Icon: typeof Calendar }[] = [
-  { id: "harian",   label: "Harian",   Icon: Calendar },
-  { id: "mingguan", label: "Mingguan", Icon: CalendarDays },
-  { id: "bulanan",  label: "Bulanan",  Icon: CalendarRange },
-  { id: "tahunan",  label: "Tahunan",  Icon: Archive },
-  { id: "semua",    label: "Semua",    Icon: ClipboardList },
-];
 
-function isInPeriod(dateStr: string | null | undefined, period: FilterPeriod): boolean {
-  if (period === "semua") return true;
-  if (!dateStr) return false;
-
-  const now = new Date();
-  const d = new Date(dateStr);
-
-  if (period === "harian") {
-    return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
-    );
-  }
-  if (period === "mingguan") {
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
-    return d >= startOfWeek && d <= endOfWeek;
-  }
-  if (period === "bulanan") {
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  }
-  if (period === "tahunan") {
-    return d.getFullYear() === now.getFullYear();
-  }
-  return true;
-}
 
 /**
  * ✅ HELPER BARU: pecah string rencana jadi array item list.
@@ -168,7 +117,15 @@ export default function KaP4MReviewTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [msgOk, setMsgOk] = useState("");
-  const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>("semua");
+  const [filterMode, setFilterMode] = useState<FilterMode>("semua");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const filterModeLabel: Record<FilterMode, string> = {
+  semua: "semua waktu",
+  harian: "harian",
+  mingguan: "mingguan",
+  bulanan: "bulanan",
+  tahunan: "tahunan",
+};
 
   const [modal, setModal] = useState<{ open: boolean; item: RancanganItem | null; mode: 'view' | 'edit' }>({
     open: false,
@@ -199,8 +156,42 @@ export default function KaP4MReviewTable() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const filteredData = useMemo(() => {
-    return data.filter((item) => isInPeriod(item.created_at, filterPeriod));
-  }, [data, filterPeriod]);
+  return data.filter((item) =>
+    isInPeriodFilter(
+      filterMode,
+      selectedDate,
+      (value) => new Date(value),
+      item.created_at
+    )
+  );
+}, [data, filterMode, selectedDate]);
+
+const highlightedDates = useMemo(() => {
+  const filterModeLabel: Record<FilterMode, string> = {
+  semua: "semua waktu",
+  harian: "harian",
+  mingguan: "mingguan",
+  bulanan: "bulanan",
+  tahunan: "tahunan",
+};
+
+  const dates = new Set<string>();
+    data.forEach((item) => {
+      if (!item.created_at) return;
+
+      const d = new Date(item.created_at);
+
+      const key = [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, "0"),
+        String(d.getDate()).padStart(2, "0"),
+      ].join("-");
+
+      dates.add(key);
+    });
+
+    return dates;
+  }, [data]);
 
   const groupedData = useMemo(() => {
     const map = new Map<number, {
@@ -272,14 +263,6 @@ export default function KaP4MReviewTable() {
     }
   }
 
-  const now = new Date();
-  const periodLabel: Record<FilterPeriod, string> = {
-    semua:    "Semua Laporan",
-    harian:   `Hari ini, ${now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
-    mingguan: `Minggu ini (${new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toLocaleDateString("id-ID", { day: "numeric", month: "short" })} – ${new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 6).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })})`,
-    bulanan:  `${now.toLocaleDateString("id-ID", { month: "long", year: "numeric" })}`,
-    tahunan:  `Tahun ${now.getFullYear()}`,
-  };
 
   if (loading) {
     return (
@@ -455,35 +438,25 @@ export default function KaP4MReviewTable() {
         </div>
       )}
 
-      {/* ── FILTER BAR ── */}
+      {/* ── FILTER PERIODE ── */}
       <div className="mb-4">
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {FILTER_OPTIONS.map((opt) => {
-            const { Icon } = opt;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setFilterPeriod(opt.id)}
-                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all
-                  ${filterPeriod === opt.id
-                    ? "bg-[#4E617A] text-white border-[#4E617A] shadow"
-                    : "bg-white text-[#4E617A] border-[#4E617A]/30 hover:bg-[#4E617A]/10"
-                  }`}
-              >
-                <Icon size={14} />
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <PeriodFilterBar
+          filterMode={filterMode}
+          onFilterModeChange={setFilterMode}
+          selectedDate={selectedDate}
+          onSelectedDateChange={setSelectedDate}
+          highlightedDates={highlightedDates}
+          showCalendar={false}
+        />
+  
         <p className="mt-2 text-[11px] text-gray-500 italic">
-          Menampilkan: <span className="font-semibold text-[#4E617A]">{periodLabel[filterPeriod]}</span>
-          <span className="ml-2 bg-[#4E617A] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+          Menampilkan{" "}
+          <span className="bg-[#4E617A] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
             {filteredData.length} laporan
           </span>
         </p>
       </div>
+
 
       {/* ── TABEL ── */}
       <div className="w-full border-2 border-black bg-white text-xs">
@@ -502,11 +475,12 @@ export default function KaP4MReviewTable() {
         <div className="sm:hidden">
           {groupedData.length === 0 ? (
             <div className="p-12 text-center text-gray-400 italic text-sm">
-              {filterPeriod === "semua"
+              {filterMode === "semua"
                 ? "Belum ada rancangan dari Kepala Unit."
-                : `Tidak ada laporan untuk periode ${FILTER_OPTIONS.find(o => o.id === filterPeriod)?.label.toLowerCase()}.`}
+                : `Tidak ada laporan untuk periode ${filterModeLabel[filterMode]}.`}
             </div>
           ) : (
+
             groupedData.map((group, gIdx) => (
               <div
                 key={group.id_laporan}
@@ -642,9 +616,9 @@ export default function KaP4MReviewTable() {
 
             {groupedData.length === 0 ? (
               <div className="col-span-6 p-12 text-center text-gray-400 italic text-sm">
-                {filterPeriod === "semua"
+                {filterMode === "semua"
                   ? "Belum ada rancangan dari Kepala Unit."
-                  : `Tidak ada laporan untuk periode ${FILTER_OPTIONS.find(o => o.id === filterPeriod)?.label.toLowerCase()}.`}
+                  : `Tidak ada laporan untuk periode ${filterModeLabel[filterMode]}.`}
               </div>
             ) : (
               groupedData.map((group) => {
