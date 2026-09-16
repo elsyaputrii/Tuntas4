@@ -2,10 +2,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
+import RencanaPanel from "@/components/kepala-unit/RencanaPanel";
 import {
   Image as ImageIcon,
   XCircle,
-  CheckCircle2,
   StickyNote,
 } from "lucide-react";
 
@@ -36,16 +38,30 @@ export default function StafDecisionTable() {
   const [errMsg, setErrMsg] = useState("");
   const [modalSrc, setModalSrc] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<Record<number, boolean>>({});
+  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   // FORM REVISI RANCANGAN
   const [penyebab, setPenyebab] = useState<Record<number, string>>({});
-  const [rencana, setRencana] = useState<Record<number, string>>({});
+
+  // ✅ FIX: dulu ada state `rencana` (plain textarea) yang isinya tidak
+  // pernah dibaca backend — sekarang rencana tindak lanjut dikelola lewat
+  // RencanaPanel yang sama dengan tab "Ketidaksesuaian Masuk" (tersambung
+  // ke tabel rencana_tindak_lanjut yang sesungguhnya dipakai backend saat
+  // submitRancangan). rencanaCount dipakai untuk validasi sebelum kirim.
+  const [rencanaCount, setRencanaCount] = useState<Record<number, number>>({});
+
+  const handleCountChange = useCallback((idBoxing: number, count: number) => {
+    setRencanaCount((prev) => {
+      if (prev[idBoxing] === count) return prev;
+      return { ...prev, [idBoxing]: count };
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setErrMsg("");
     try {
-      // ✅ FIX: tidak ada endpoint terpisah untuk "laporan ditolak staf".
+      // Tidak ada endpoint terpisah untuk "laporan ditolak staf".
       // Data ini sudah termasuk dalam getLaporanMasuk (lihat kepalaUnitController.js),
       // jadi kita filter sendiri di frontend berdasarkan approval_staf === "ditolak".
       const result = await kepalaUnitApi.getLaporanMasuk();
@@ -56,13 +72,10 @@ export default function StafDecisionTable() {
 
         setData(ditolakStaf);
         const initP: Record<number, string> = {};
-        const initR: Record<number, string> = {};
         ditolakStaf.forEach((item: StafDecisionItem) => {
           initP[item.id_boxing] = item.penyebab || "";
-          initR[item.id_boxing] = item.rencana_tindakan || "";
         });
         setPenyebab(initP);
-        setRencana(initR);
       } else {
         setErrMsg(result.message || "Gagal memuat data.");
       }
@@ -77,26 +90,32 @@ export default function StafDecisionTable() {
     fetchData();
   }, [fetchData]);
 
-  const handleSubmitRevisi = async (id_boxing: number) => {
+  const handleSubmitRevisi = (id_boxing: number) => {
     if (!penyebab[id_boxing]?.trim()) {
       alert("Penyebab wajib diisi!");
       return;
     }
-    if (!rencana[id_boxing]?.trim()) {
-      alert("Rencana tindak lanjut wajib diisi!");
+    if ((rencanaCount[id_boxing] || 0) === 0) {
+      alert("Minimal 1 rencana tindak lanjut harus ditambahkan.");
       return;
     }
+    setConfirmId(id_boxing);
+  };
 
+  const handleConfirmSend = async () => {
+    if (confirmId === null) return;
+    const id_boxing = confirmId;
     setSubmitting((prev) => ({ ...prev, [id_boxing]: true }));
     try {
-      // ✅ FIX: backend menangani resubmit setelah ditolak lewat endpoint
+      // Backend menangani resubmit setelah ditolak lewat endpoint
       // /kepala-unit/rancangan yang sama (lihat submitRancangan di
       // kepalaUnitController.js — sudah menerima kasus status='di_staff'
-      // AND approval_staf='ditolak'), jadi tidak perlu endpoint terpisah.
+      // AND approval_staf='ditolak'), dan mengambil daftar rencana
+      // langsung dari tabel rencana_tindak_lanjut (diisi lewat RencanaPanel
+      // di atas), jadi tidak perlu kirim field rencana_tindakan manual lagi.
       await kepalaUnitApi.submitRancangan({
         id_boxing,
         penyebab: penyebab[id_boxing].trim(),
-        rencana_tindakan: rencana[id_boxing].trim(),
       });
       alert("Revisi rancangan dikirim ke Ka P4M untuk keputusan!");
       fetchData();
@@ -104,6 +123,7 @@ export default function StafDecisionTable() {
       alert(err instanceof Error ? err.message : "Gagal mengirim revisi. Coba lagi.");
     } finally {
       setSubmitting((prev) => ({ ...prev, [id_boxing]: false }));
+      setConfirmId(null);
     }
   };
 
@@ -157,85 +177,144 @@ export default function StafDecisionTable() {
     <>
       {modalSrc && <ImageModal src={modalSrc} onClose={() => setModalSrc(null)} />}
 
+      <ConfirmDialog
+        open={confirmId !== null}
+        title="Konfirmasi Kirim Revisi"
+        message="Yakin ingin mengirim revisi ini ke Ka P4M? Penyebab dan semua Rencana Tindak Lanjut akan diteruskan."
+        confirmLabel="Kirim"
+        cancelLabel="Batal"
+        loading={confirmId !== null && !!submitting[confirmId]}
+        onConfirm={handleConfirmSend}
+        onCancel={() => setConfirmId(null)}
+      />
+
       <div className="w-full border-2 border-black bg-white overflow-hidden text-sm">
         {/* HEADER */}
-        <div className="flex font-semibold uppercase bg-gray-50 border-b-2 border-black text-center">
+        <div className="hidden sm:flex font-semibold uppercase bg-gray-50 border-b-2 border-black text-center">
           <div className="w-[18%] border-r-2 border-black p-3 text-[10px]">Kritik atau Pengaduan</div>
           <div className="w-[10%] border-r-2 border-black p-3 text-[10px]">Tanggal Masuk</div>
-          <div className="w-[14%] border-r-2 border-black p-3 text-[10px]">Penyebab</div>
-          <div className="w-[14%] border-r-2 border-black p-3 text-[10px]">Rencana Tindak Lanjut</div>
+          <div className="w-[20%] border-r-2 border-black p-3 text-[10px]">Penyebab</div>
+          <div className="w-[20%] border-r-2 border-black p-3 text-[10px]">Rencana Tindak Lanjut</div>
           <div className="w-[10%] border-r-2 border-black p-3 text-[10px]">Status Staf</div>
           <div className="flex-1 p-3 text-[10px]">Revisi Rancangan (Kirim ke Ka P4M)</div>
         </div>
 
         {data.map((item, idx) => (
-          <div key={item.id_boxing} className={`flex min-h-50 ${idx > 0 ? "border-t-2 border-black" : ""}`}>
-            {/* Kolom 1: Laporan + Gambar */}
-            <div className="w-[18%] border-r-2 border-black p-4">
-              <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded block mb-2">
-                {item.kode_laporan}
-              </span>
-              <p className="text-[11px] text-black leading-relaxed">{item.isi_laporan}</p>
+          <div key={item.id_boxing} className={`${idx > 0 ? "border-t-2 border-black" : ""}`}>
+            {/* MOBILE */}
+            <div className="sm:hidden p-4 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                  {item.kode_laporan}
+                </span>
+                <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-300 px-2 py-0.5 rounded flex items-center gap-1">
+                  <XCircle size={11} /> Ditolak Staf P4M
+                </span>
+              </div>
+              <p className="text-xs text-black leading-relaxed">{item.isi_laporan}</p>
               {item.lampiran_laporan && (
                 <button
                   onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran_laporan}`)}
-                  className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
+                  className="text-[10px] text-blue-500 hover:underline flex items-center gap-1"
                 >
                   <ImageIcon size={12} /> Lihat Gambar
                 </button>
               )}
-            </div>
-
-            {/* Kolom 2: Tanggal Masuk */}
-            <div className="w-[10%] border-r-2 border-black p-4 flex items-center justify-center">
-              <span className="text-[10px] text-gray-500">{formatTanggal(item.created_at)}</span>
-            </div>
-
-            {/* Kolom 3: Penyebab (Input) */}
-            <div className="w-[14%] border-r-2 border-black p-4">
-              <textarea
-                className="w-full h-20 border border-black p-2 text-[10px] outline-none focus:border-blue-500 resize-none"
-                placeholder="Penyebab revisi..."
-                value={penyebab[item.id_boxing] || ""}
-                onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-              />
-            </div>
-
-            {/* Kolom 4: Rencana (Input) */}
-            <div className="w-[14%] border-r-2 border-black p-4">
-              <textarea
-                className="w-full h-20 border border-black p-2 text-[10px] outline-none focus:border-blue-500 resize-none"
-                placeholder="Rencana revisi..."
-                value={rencana[item.id_boxing] || ""}
-                onChange={(e) => setRencana((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
-              />
-            </div>
-
-            {/* Kolom 5: Status Staf + Catatan */}
-            <div className="w-[10%] border-r-2 border-black p-4 flex flex-col items-center justify-center gap-1">
-              <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-300 px-2 py-0.5 rounded flex items-center gap-1">
-                <XCircle size={11} /> Ditolak
-              </span>
               {item.catatan_approval && (
-                <p className="text-[9px] text-gray-500 italic text-center mt-1 max-w-full break-words flex items-start gap-1 justify-center">
-                  <StickyNote size={10} className="shrink-0 mt-0.5" />
-                  {item.catatan_approval}
-                </p>
+                <div className="p-2 bg-yellow-50 border border-yellow-300 rounded text-[10px] text-yellow-800 flex items-start gap-1">
+                  <StickyNote size={11} className="shrink-0 mt-0.5" />
+                  <span><span className="font-semibold">Catatan Staf P4M:</span> {item.catatan_approval}</span>
+                </div>
               )}
-            </div>
-
-            {/* Kolom 6: Tombol Kirim */}
-            <div className="flex-1 p-5 flex flex-col justify-center items-center">
+              <div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Penyebab</p>
+                <AutoResizeTextarea
+                  minHeight={80}
+                  className="w-full border border-black p-2 text-xs outline-none focus:border-blue-500 rounded"
+                  placeholder="Penyebab revisi..."
+                  value={penyebab[item.id_boxing] || ""}
+                  onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Tindak Lanjut</p>
+                <RencanaPanel idBoxing={item.id_boxing} onCountChange={handleCountChange} />
+              </div>
               <button
                 onClick={() => handleSubmitRevisi(item.id_boxing)}
                 disabled={submitting[item.id_boxing]}
-                className="bg-blue-500 text-white px-8 py-2 rounded font-bold uppercase text-[10px] hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-blue-500 text-white py-2.5 rounded font-bold uppercase text-[11px] shadow hover:bg-blue-600 transition-all disabled:opacity-50"
               >
                 {submitting[item.id_boxing] ? "Mengirim..." : "Kirim Revisi ke Ka P4M"}
               </button>
-              <p className="text-[8px] text-gray-400 mt-2 text-center">
-                Revisi akan dikirim ke Ka P4M untuk keputusan
-              </p>
+            </div>
+
+            {/* DESKTOP */}
+            <div className="hidden sm:flex min-h-40">
+              {/* Kolom 1: Laporan + Gambar */}
+              <div className="w-[18%] border-r-2 border-black p-4">
+                <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded block mb-2">
+                  {item.kode_laporan}
+                </span>
+                <p className="text-[11px] text-black leading-relaxed">{item.isi_laporan}</p>
+                {item.lampiran_laporan && (
+                  <button
+                    onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran_laporan}`)}
+                    className="mt-1 text-[10px] text-blue-500 hover:underline flex items-center gap-1"
+                  >
+                    <ImageIcon size={12} /> Lihat Gambar
+                  </button>
+                )}
+              </div>
+
+              {/* Kolom 2: Tanggal Masuk */}
+              <div className="w-[10%] border-r-2 border-black p-4 flex items-center justify-center">
+                <span className="text-[10px] text-gray-500">{formatTanggal(item.created_at)}</span>
+              </div>
+
+              {/* Kolom 3: Penyebab (Input, auto-resize — sama seperti tab Laporan Baru) */}
+              <div className="w-[20%] border-r-2 border-black p-4">
+                <AutoResizeTextarea
+                  minHeight={112}
+                  className="w-full border border-black p-2.5 text-xs text-black leading-relaxed outline-none focus:border-blue-500"
+                  placeholder="Penyebab revisi..."
+                  value={penyebab[item.id_boxing] || ""}
+                  onChange={(e) => setPenyebab((prev) => ({ ...prev, [item.id_boxing]: e.target.value }))}
+                  spellCheck={false}
+                />
+              </div>
+
+              {/* Kolom 4: Rencana Tindak Lanjut — sama seperti tab Laporan Baru */}
+              <div className="w-[20%] border-r-2 border-black p-3">
+                <RencanaPanel idBoxing={item.id_boxing} onCountChange={handleCountChange} />
+              </div>
+
+              {/* Kolom 5: Status Staf + Catatan */}
+              <div className="w-[10%] border-r-2 border-black p-4 flex flex-col items-center justify-center gap-1">
+                <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-300 px-2 py-0.5 rounded flex items-center gap-1">
+                  <XCircle size={11} /> Ditolak
+                </span>
+                {item.catatan_approval && (
+                  <p className="text-[9px] text-gray-500 italic text-center mt-1 max-w-full break-words flex items-start gap-1 justify-center">
+                    <StickyNote size={10} className="shrink-0 mt-0.5" />
+                    {item.catatan_approval}
+                  </p>
+                )}
+              </div>
+
+              {/* Kolom 6: Tombol Kirim */}
+              <div className="flex-1 p-5 flex flex-col justify-center items-center">
+                <button
+                  onClick={() => handleSubmitRevisi(item.id_boxing)}
+                  disabled={submitting[item.id_boxing]}
+                  className="bg-blue-500 text-white px-8 py-2 rounded font-bold uppercase text-[10px] hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting[item.id_boxing] ? "Mengirim..." : "Kirim Revisi ke Ka P4M"}
+                </button>
+                <p className="text-[8px] text-gray-400 mt-2 text-center">
+                  Revisi akan dikirim ke Ka P4M untuk keputusan
+                </p>
+              </div>
             </div>
           </div>
         ))}
