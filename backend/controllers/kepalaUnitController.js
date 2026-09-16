@@ -172,9 +172,9 @@ async function submitRancangan(req, res) {
           month: "2-digit",
           year: "numeric",
         });
-        return `${i + 1}. ${r.teks} (${tgl})`;
+        return `Rencana ${i + 1}: ${r.teks} (${tgl})`;
       })
-      .join("; ");
+      .join("\n");
 
     // Tanggal rencana = tanggal paling akhir dari semua item
     const tanggalTerakhir = rencanaRows.reduce((max, r) => {

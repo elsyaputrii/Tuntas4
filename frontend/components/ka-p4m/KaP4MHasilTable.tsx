@@ -51,6 +51,58 @@ interface HasilItem {
 
 type LucideIcon = typeof Clock;
 
+/**
+ * HELPER PARSING RENCANA
+ * Hapus enter liar, lalu pisah baris HANYA bila menemukan kata "Rencana".
+ */
+function parseRencana(rencana: string | null | undefined): string[] {
+  if (!rencana) return [];
+
+  const cleanText = rencana.replace(/\r?\n|\r/g, " ").trim();
+
+  const items = cleanText
+    .split(/(?=Rencana\s*\d+:?)/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return items;
+}
+
+/**
+ * KOMPONEN RENCANA LIST (Tampilan Rapat & Rapi)
+ */
+function RencanaList({
+  rencana,
+  emptyText = "—",
+  textClass = "text-[10px]",
+}: {
+  rencana: string | null | undefined;
+  emptyText?: string;
+  textClass?: string;
+}) {
+  const items = parseRencana(rencana);
+
+  if (items.length === 0) {
+    return (
+      <div className={`border border-gray-400 p-2 min-h-16 ${textClass} text-gray-400`}>
+        {emptyText}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`border border-gray-400 p-2 min-h-16 ${textClass} text-gray-800`}>
+      <div>
+        {items.map((item, i) => (
+          <div key={i} className="whitespace-normal break-words leading-tight mb-1 last:mb-0">
+            {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function KaP4MHasilTable() {
   const [data, setData] = useState<HasilItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -282,10 +334,11 @@ export default function KaP4MHasilTable() {
 
                           {/* ✅ Rencana / Aksi Masukan — kotak di atas, label unit di BAWAH kotak.
                               Warna label abu-abu bold (bukan biru), biar gak nyakitin mata. */}
+                          {/* Rencana / Aksi Masukan */}
                           <td className={`border-r-2 border-black p-3 align-middle ${isLastUnit ? "border-b-2" : "border-b"}`}>
-                            <div className="border border-gray-400 p-2 min-h-16 text-[10px] text-gray-800 flex ">
-                              <span className="w-full">{item.aksi_masukan || item.rencana_tindakan || "—"}</span>
-                            </div>
+                            {/* GANTI DENGAN KOMPONEN INI */}
+                            <RencanaList rencana={item.aksi_masukan || item.rencana_tindakan} />
+                            
                             {/* Label unit di BAWAH kotak */}
                             <p className="text-[9px] text-gray-500 font-bold mt-1.5 flex items-center gap-1">
                               <Building2 size={10} className="shrink-0" />

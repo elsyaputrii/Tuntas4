@@ -76,6 +76,56 @@ function statusBadge(item: RiwayatItem): { label: string; cls: string } {
   return { label: "🔄 Diproses", cls: "bg-blue-100 text-blue-700" };
 }
 
+/**
+ * HELPER PARSING RENCANA
+ * Hapus enter liar, lalu pisah baris HANYA bila menemukan kata "Rencana".
+ */
+function parseRencana(rencana: string | null | undefined): string[] {
+  if (!rencana) return [];
+
+  const cleanText = rencana.replace(/\r?\n|\r/g, " ").trim();
+
+  const items = cleanText
+    .split(/(?=Rencana\s*\d+:?)/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return items;
+}
+
+/**
+ * KOMPONEN RENCANA LIST (Dengan spasi mb-1 antar poin rencana)
+ */
+function RencanaList({
+  rencana,
+  emptyText = "—",
+  textClass = "text-[10px]",
+}: {
+  rencana: string | null | undefined;
+  emptyText?: string;
+  textClass?: string;
+}) {
+  const items = parseRencana(rencana);
+
+  if (items.length === 0) {
+    return (
+      <p className={`italic text-gray-400 ${textClass}`}>
+        {emptyText}
+      </p>
+    );
+  }
+
+  return (
+    <div className={`${textClass} text-gray-800`}>
+      {items.map((item, i) => (
+        <div key={i} className="whitespace-normal break-words leading-tight mb-1 last:mb-0">
+          {item}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ✅ FIX (permintaan user): kolom "Hasil Tindak Lanjut" sebelumnya
 // menampilkan "—" polos kalau hasil_tindakan kosong — termasuk untuk
 // laporan yang statusnya SUDAH "selesai" (mis. kasus "Sesuai, tidak
@@ -286,7 +336,9 @@ export default function RiwayatTable() {
                   <div className="border border-gray-400 p-2 min-h-16">{item.isi_laporan}</div>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3">
-                  <p className="text-gray-800 text-[10px] min-h-16">{item.rencana_tindakan ?? "—"}</p>
+                  <div className="min-h-16">
+                    <RencanaList rencana={item.rencana_tindakan} />
+                  </div>
                 </div>
                 <div className="flex-1 border-r-2 border-black p-3">
                   <div className="border border-gray-400 p-2 min-h-16">
@@ -350,19 +402,21 @@ export default function RiwayatTable() {
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana Tindakan</p>
-                  <p className="text-[10px] italic text-gray-600 border border-gray-200 p-1.5 rounded">{item.rencana_tindakan ?? "—"}</p>
+                  <div className="border border-gray-200 p-1.5 rounded">
+                    <RencanaList rencana={item.rencana_tindakan} />
+                  </div>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
                   <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16">
-  {isHasilTerselesaikan(item) ? (
-    <span className="italic text-gray-400">
-      Sudah Terselesaikan
-    </span>
-  ) : (
-    hasilTindakLanjutText(item)
-  )}
-</div>
+                    {isHasilTerselesaikan(item) ? (
+                      <span className="italic text-gray-400">
+                        Sudah Terselesaikan
+                      </span>
+                    ) : (
+                      hasilTindakLanjutText(item)
+                    )}
+                  </div>
 
                   <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
                   {item.lampiran_hasil && (

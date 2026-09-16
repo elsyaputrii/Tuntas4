@@ -61,19 +61,16 @@ const statusBadge: Record<string, { label: string; cls: string; Icon: typeof Clo
 function parseRencana(rencana: string | null | undefined): string[] {
   if (!rencana) return [];
 
-  // Pisah berdasarkan ';' atau newline, lalu buang item kosong
-  const raw = rencana
-    .split(/;|\r?\n/)
+  // 1. Hapus dulu semua enter/newline liar di dalam teks agar tidak bikin baris baru sembarangan
+  const cleanText = rencana.replace(/\r?\n|\r/g, " ").trim();
+
+  // 2. Split teks berdasarkan kata "Rencana" (menggunakan Lookahead regex agar kata "Rencana" tidak ikut terhapus)
+  const items = cleanText
+    .split(/(?=Rencana\s*\d+:?)/i)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // Buang prefix numbering lama (contoh: "1.", "2)", "1 -", dll)
-  const cleaned = raw.map((s) =>
-    s.replace(/^\s*\d+\s*[\.\)\-:]\s*/, "").trim()
-  ).filter(Boolean);
-
-  // Kalau ternyata cuma ada 1 item (tidak ada pemisah), balikkan apa adanya
-  return cleaned.length > 0 ? cleaned : [rencana.trim()];
+  return items;
 }
 
 /**
@@ -101,13 +98,14 @@ function RencanaList({
 
   return (
     <div className={`border border-black p-2 min-h-15 ${textClass}`}>
-      <ol className="list-decimal list-inside space-y-1">
+      <div className="space-y-1">
         {items.map((item, i) => (
-          <li key={i} className="whitespace-pre-wrap break-words leading-snug">
+          // Gunakan whitespace-normal agar enter bawaan teks diabaikan total
+          <div key={i} className="whitespace-normal break-words leading-tight">
             {item}
-          </li>
+          </div>
         ))}
-      </ol>
+      </div>
     </div>
   );
 }
