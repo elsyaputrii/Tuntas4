@@ -13,9 +13,9 @@
 const rateLimit = require("express-rate-limit");
 
 const laporanLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 menit
-  max: 5,                   // maksimal 5 laporan per IP per 10 menit
-  standardHeaders: true,    // kirim info limit lewat header RateLimit-*
+ windowMs: 24 * 60 * 60 * 1000, // 24 jam
+  max: 20,                        // maksimal 20 laporan per IP per 24 jam
+  standardHeaders: true,    // 
   legacyHeaders: false,
   statusCode: 429,
   message: {
