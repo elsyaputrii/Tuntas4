@@ -20,7 +20,7 @@ const laporanLimiter = rateLimit({
   statusCode: 429,
   message: {
     success: false,
-    message: "Terlalu banyak laporan dikirim dari perangkat ini. Coba lagi dalam beberapa menit.",
+    message: "Terlalu banyak laporan dikirim dari perangkat ini. Coba lagi dalam beberapa waktu.",
   },
   // Kalau trust proxy di server.js SALAH konfigurasi, express-rate-limit
   // akan melempar error validasi saat start-up daripada diam-diam rate
