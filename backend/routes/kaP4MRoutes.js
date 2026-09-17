@@ -115,8 +115,19 @@ router.patch("/keputusan", async (req, res) => {
          WHERE id_rancangan = ?`,
         [aksi_masukan.trim(), id_rancangan]
       );
+      // ✅ FIX: reset approval_staf & catatan_approval setiap kali Ka P4M
+      // mengambil keputusan baru (termasuk saat ini adalah keputusan
+      // ULANG setelah laporan sempat DITOLAK Staf P4M lalu direvisi
+      // Kepala Unit di tab "Keputusan Staf"). Tanpa reset ini,
+      // approval_staf lama ('ditolak') tetap nyangkut sampai ke siklus
+      // berikutnya — bikin tombol ✅❌ Staf P4M di "Proses & Pantau"
+      // tidak muncul lagi (ketutup badge "❌ Belum Siap" lama) dan badge
+      // status di "Riwayat" Kepala Unit ikut salah nampilin "Perbaikan
+      // Berkelanjutan" padahal seharusnya "Menunggu Keputusan Akhir Staf".
       await conn.query(
-        `UPDATE boxing_ketidaksesuaian SET status = 'menunggu_pelaksanaan' WHERE id_boxing = ?`,
+        `UPDATE boxing_ketidaksesuaian
+         SET status = 'menunggu_pelaksanaan', approval_staf = 'menunggu', catatan_approval = NULL
+         WHERE id_boxing = ?`,
         [row.id_boxing]
       );
     } else {
@@ -126,8 +137,17 @@ router.patch("/keputusan", async (req, res) => {
          WHERE id_rancangan = ?`,
         [aksi_masukan?.trim() || null, id_rancangan]
       );
+      // ✅ FIX: sama seperti di atas — reset approval_staf & catatan_approval.
+      // Kasus ini ("Sesuai" / tidak ditindaklanjuti) langsung lompat ke
+      // status_boxing 'di_staff' TANPA lewat submitPelaksanaan (yang
+      // biasanya me-reset approval_staf), jadi kalau tidak direset di
+      // sini, laporan yang tadinya ditolak Staf P4M lalu direvisi &
+      // diputuskan ulang oleh Ka P4M akan langsung ketemu approval_staf
+      // 'ditolak' yang basi begitu sampai lagi di Staf P4M.
       await conn.query(
-        `UPDATE boxing_ketidaksesuaian SET status = 'di_staff' WHERE id_boxing = ?`,
+        `UPDATE boxing_ketidaksesuaian
+         SET status = 'di_staff', approval_staf = 'menunggu', catatan_approval = NULL
+         WHERE id_boxing = ?`,
         [row.id_boxing]
       );
     }

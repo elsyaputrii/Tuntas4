@@ -267,18 +267,22 @@ async function getLaporanHasil(req, res) {
       JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
-        AND (
-          (r.status_review = 'ditindaklanjuti' AND b.status = 'menunggu_pelaksanaan')
-          -- ✅ FIX: laporan yang DITOLAK ("Belum Siap") oleh Staf P4M
-          -- (status_boxing tetap 'di_staff', approval_staf = 'ditolak')
-          -- HARUS tetap muncul di sini supaya Kepala Unit bisa langsung
-          -- revisi bagian Laporan Hasil-nya saja — tanpa ini, laporan
-          -- ditolak "hilang" dari tab Laporan Hasil sehingga siklus
-          -- revisi tidak pernah menyentuh submitPelaksanaan (yang me-reset
-          -- approval_staf balik ke 'menunggu'), dan saat kembali ke Staf
-          -- P4M tombol ✅❌ tidak muncul, cuma teks "❌ Belum Siap".
-          OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
-        )
+        -- ✅ FIX (permintaan user): tab "Laporan Hasil" HANYA untuk laporan
+        -- yang benar-benar sedang/pernah diminta mengisi hasil tindak lanjut
+        -- (Ka P4M memutuskan 'ditindaklanjuti' dan menunggu pelaksanaan unit).
+        -- Sebelumnya ada tambahan "OR (b.status = 'di_staff' AND
+        -- b.approval_staf = 'ditolak')" yang membuat laporan yang DITOLAK
+        -- Staf P4M ikut nongol di sini — termasuk laporan "Sesuai / tidak
+        -- ditindaklanjuti" yang MEMANG TIDAK PERNAH punya laporan hasil sama
+        -- sekali. Laporan yang ditolak Staf P4M sekarang HANYA muncul di tab
+        -- "Ketidaksesuaian Masuk" → "Keputusan Staf" (lihat StafDecisionTable
+        -- & getLaporanMasuk) untuk direvisi Penyebab & Rencana lalu dikirim
+        -- ulang ke Ka P4M. Kalau Ka P4M memutuskan 'ditindaklanjuti' lagi,
+        -- laporan itu baru akan muncul lagi di sini secara alami lewat
+        -- kondisi di bawah (status_review='ditindaklanjuti' AND
+        -- status_boxing='menunggu_pelaksanaan').
+        AND r.status_review = 'ditindaklanjuti'
+        AND b.status = 'menunggu_pelaksanaan'
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],
     );
@@ -327,10 +331,15 @@ async function submitPelaksanaan(req, res) {
        JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
        WHERE b.id_boxing = ? AND b.id_kepala = ?
          AND r.status_review = 'ditindaklanjuti'
-         AND (
-           b.status = 'menunggu_pelaksanaan'
-           OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
-         )`,
+         -- ✅ FIX (sinkron dengan getLaporanHasil): cabang
+         -- "OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')"
+         -- yang lama sudah tidak pernah tercapai — begitu Staf P4M
+         -- menolak, setApprovalStaf mereset status_review balik ke
+         -- 'menunggu_keputusan_ka' (bukan tetap 'ditindaklanjuti'), jadi
+         -- laporan yang ditolak justru wajib lewat revisi Penyebab &
+         -- Rencana di tab "Keputusan Staf" dulu, baru bisa isi Laporan
+         -- Hasil baru lewat jalur normal di bawah ini.
+         AND b.status = 'menunggu_pelaksanaan'`,
       [id_boxing, kepala.id_kepala],
     );
 
