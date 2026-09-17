@@ -30,6 +30,21 @@ function getTodayLocalDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+function parseRencana(rencana: string | null | undefined): string[] {
+  if (!rencana) return [];
+
+  // Hapus baris baru (enter liar) dan ubah jadi spasi
+  const cleanText = rencana.replace(/\r?\n|\r/g, " ").trim();
+
+  // Split (pisah) HANYA jika menemukan pola kata "Rencana 1", "Rencana 2", dst.
+  const items = cleanText
+    .split(/(?=Rencana\s*\d+:?)/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return items;
+}
+
 export default function ResultReportTable() {
   const [laporanList, setLaporanList] = useState<LaporanHasilItem[]>([]);
   const [tanggal,     setTanggal]     = useState<Record<number, string>>({});
@@ -153,11 +168,16 @@ export default function ResultReportTable() {
               <p className="text-[11px] text-black leading-relaxed">{item.isi_laporan}</p>
             </div>
             <div className="w-[15%] border-r-2 border-black p-4 bg-gray-50">
-              <p className="text-[11px] text-gray-700 whitespace-pre-wrap wrap-break-words">{item.penyebab}</p>
+              <div className="text-[11px] text-gray-700 space-y-1">{parseRencana(item.penyebab).map((line, i) => 
+                <p key={i} className="wrap-break-words">{line}</p>)}
+              </div>
             </div>
             <div className="w-[15%] border-r-2 border-black p-4 bg-gray-50">
-              <p className="text-[11px] text-gray-700 whitespace-pre-wrap wrap-break-words">{item.rencana_tindakan}</p>
+              <div className="text-[11px] text-gray-700 space-y-1">{parseRencana(item.rencana_tindakan).map((line, i) => 
+                <p key={i} className="wrap-break-words">{line}</p>)}
+              </div>
             </div>
+
             {/*
               ✅ FIX (permintaan user, "bagian status untuk apa?"): kolom
               ini menandakan TAHAP laporan hasil tindak lanjut unit ini:

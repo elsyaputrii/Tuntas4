@@ -25,6 +25,53 @@ function formatTglAman(v: string | null): string {
   return isNaN(d.getTime()) ? v : fmtTgl(v);
 }
 
+// 1. Helper untuk memisahkan teks rencana berdasarkan kata "Rencana 1", "Rencana 2", dst.
+function parseRencana(rencana: string | null | undefined): string[] {
+  if (!rencana) return [];
+
+  // Hapus baris baru (enter liar) dan ubah jadi spasi
+  const cleanText = rencana.replace(/\r?\n|\r/g, " ").trim();
+
+  // Split (pisah) HANYA jika menemukan pola kata "Rencana 1", "Rencana 2", dst.
+  const items = cleanText
+    .split(/(?=Rencana\s*\d+:?)/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return items;
+}
+
+// 2. Komponen UI untuk merender daftar poin rencana tindakan dengan margin bawah (mb-1)
+function RencanaList({
+  rencana,
+  emptyText = "—",
+  textClass = "text-[10px]",
+}: {
+  rencana: string | null | undefined;
+  emptyText?: string;
+  textClass?: string;
+}) {
+  const items = parseRencana(rencana);
+
+  if (items.length === 0) {
+    return (
+      <p className={`italic text-gray-400 ${textClass}`}>
+        {emptyText}
+      </p>
+    );
+  }
+
+  return (
+    <div className={`${textClass} text-gray-800`}>
+      {items.map((item, i) => (
+        <div key={i} className="whitespace-normal break-words leading-tight mb-1 last:mb-0">
+          {item}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════
 // KOMPONEN KALENDER & PICKER PERIODE
 // ══════════════════════════════════════════════════════════
@@ -801,12 +848,12 @@ export default function RecapitulationTable() {
                   <span className=" text-gray-600 text-center text-[10px]">{item.penyebab}</span>
                 </div>
                 <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
-                  <span className="text-gray-600 text-center text-[10px]">
-                    {item.rencana}
+                  <div className="text-gray-600 text-left text-[10px] w-full">
+                    <RencanaList rencana={item.rencana} textClass="text-[10px]" />
                     {item.tglRencana !== "—" && (
                       <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 Direncanakan: {item.tglRencana}</span>
                     )}
-                  </span>
+                  </div>
                 </div>
                 <div className="w-28 border-r-2 border-black p-3 flex items-center justify-center">
                   <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>{statusInfo.label}</span>
@@ -864,12 +911,12 @@ export default function RecapitulationTable() {
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana</p>
-                    <p className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">
-                      {item.rencana}
+                    <div className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">
+                      <RencanaList rencana={item.rencana} textClass="text-[10px]" />
                       {item.tglRencana !== "—" && (
                         <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 {item.tglRencana}</span>
                       )}
-                    </p>
+                    </div>
                   </div>
                 </div>
                 <div>
