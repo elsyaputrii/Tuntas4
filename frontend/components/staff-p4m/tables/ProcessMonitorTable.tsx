@@ -99,6 +99,8 @@ export default function ProcessMonitorTable() {
   const [meSignature, setMeSignature] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterApprovalStaf, setFilterApprovalStaf] = useState("semua");
 
   // ✅ KEPUTUSAN STAFF: state modal konfirmasi ✅ Siap / ❌ Belum Siap.
   // Keputusan ini dikembalikan jadi wewenang Staf P4M (bukan lagi Ka
@@ -305,10 +307,33 @@ export default function ProcessMonitorTable() {
     }
   }
 
-  const filteredData = useMemo(
-    () => data.filter((d) => isInPeriodFilter(filterMode, selectedDate, toLocalDate, d.created_at ?? null)),
-    [data, filterMode, selectedDate]
-  );
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      // 1. Filter Periode Tanggal (logika lama)
+      const matchPeriode = isInPeriodFilter(filterMode, selectedDate, toLocalDate, item.created_at ?? null);
+
+      // 2. Filter Pencarian Kata Kunci (Global Search)
+      const query = searchQuery.toLowerCase().trim();
+      const matchQuery =
+        !query ||
+        (item.kode_laporan?.toLowerCase().includes(query) ?? false) ||
+        (item.nama_unit?.toLowerCase().includes(query) ?? false) ||
+        (item.isi_laporan?.toLowerCase().includes(query) ?? false) ||
+        (item.hasil_tindakan?.toLowerCase().includes(query) ?? false);
+
+      // 3. Filter Keputusan Staff
+      let matchApproval = true;
+      if (filterApprovalStaf === "diterima") {
+        matchApproval = item.approval_staf === "diterima";
+      } else if (filterApprovalStaf === "ditolak") {
+        matchApproval = item.approval_staf === "ditolak";
+      } else if (filterApprovalStaf === "menunggu") {
+        matchApproval = !item.approval_staf || item.approval_staf === "menunggu";
+      }
+
+      return matchPeriode && matchQuery && matchApproval;
+    });
+  }, [data, filterMode, selectedDate, searchQuery, filterApprovalStaf]);
 
   const highlightedDates = useMemo(() => {
     return new Set(
@@ -481,18 +506,60 @@ export default function ProcessMonitorTable() {
         </div>
       )}
 
-      {/* ── FILTER PERIODE ── */}
-      <div className="mb-3">
-        <PeriodFilterBar
-          filterMode={filterMode}
-          onFilterModeChange={setFilterMode}
-          selectedDate={selectedDate}
-          onSelectedDateChange={setSelectedDate}
-          highlightedDates={highlightedDates}
-          showCalendar={false}
-        />
-        <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase">
-          {filteredData.length} laporan · {labelPeriodFilter(filterMode, selectedDate, fmtTgl)}
+      {/* ── FILTER CONTAINER (PERIODE, SEARCH, & KEPUTUSAN SEJAJAR) ── */}
+      <div className="mb-3 space-y-2 px-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          
+          {/* 1. Filter Periode (Sisi Kiri) */}
+          <PeriodFilterBar
+            filterMode={filterMode}
+            onFilterModeChange={setFilterMode}
+            selectedDate={selectedDate}
+            onSelectedDateChange={setSelectedDate}
+            highlightedDates={highlightedDates}
+            showCalendar={false}
+          />
+
+          {/* 2. Filter Tambahan: Search & Dropdown Keputusan (Sisi Kanan - Sejajar) */}
+          <div className="flex flex-wrap items-center gap-2 flex-1 md:flex-initial justify-end min-w-[300px]">
+            
+            {/* Input Search Kata Kunci */}
+            <div className="relative flex-1 sm:w-64 min-w-[180px]">
+              <input
+                type="text"
+                placeholder="Cari ID, Unit, atau Isi Laporan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full border border-black px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-black rounded-md"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown Keputusan Staff */}
+            <select
+              value={filterApprovalStaf}
+              onChange={(e) => setFilterApprovalStaf(e.target.value)}
+              className="border border-black px-2 py-1.5 text-xs bg-white outline-none cursor-pointer rounded-md"
+            >
+              <option value="semua">Semua Keputusan Staff</option>
+              <option value="menunggu">⏳ Menunggu Keputusan</option>
+              <option value="diterima">✅ Siap / Diterima</option>
+              <option value="ditolak">❌ Belum Siap / Ditolak</option>
+            </select>
+          </div>
+
+        </div>
+
+        {/* Label Info Jumlah Laporan & Periode */}
+        <p className="mt-1 text-[10px] text-gray-400 font-bold uppercase">
+          {filteredData.length} laporan ditemukan · {labelPeriodFilter(filterMode, selectedDate, fmtTgl)}
         </p>
       </div>
 

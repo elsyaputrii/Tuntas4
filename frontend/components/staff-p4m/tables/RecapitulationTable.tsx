@@ -691,7 +691,7 @@ export default function RecapitulationTable() {
   );
 
   return(
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-4 px-3">
       {error &&<p className="text-red-500 text-xs font-bold px-3 py-2 bg-red-50 border border-red-200 rounded">❌ {error}</p>}
 
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">

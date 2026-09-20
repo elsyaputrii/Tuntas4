@@ -3,7 +3,7 @@ import IncomingReportTable from '@/components/staff-p4m/tables/IncomingReportTab
 export default function LaporanMasukPage() {
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white px-3 pt-3">
         📩 Laporan Masuk
       </h2>
       <IncomingReportTable />

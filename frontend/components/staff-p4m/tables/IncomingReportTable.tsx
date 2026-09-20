@@ -6,6 +6,7 @@ import { ChevronDown, X, Search, Calendar } from "lucide-react";
 import { DAFTAR_UNIT_UMUM } from "@/lib/unitsUmum";
 import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
 import { toLocalDate, fmtTgl } from "@/lib/exportHelpers";
+import { div } from "framer-motion/m";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 const DAFTAR_UNIT = DAFTAR_UNIT_UMUM;
@@ -296,7 +297,7 @@ export default function IncomingReportTable() {
       {modalSrc && <ImageModal src={modalSrc} onClose={() => setModalSrc(null)} />}
 
       {/* FILTER PERIODE */}
-      <div className="mb-3">
+      <div className="mb-3 px-3">
         <PeriodFilterBar
           filterMode={filterMode}
           onFilterModeChange={setFilterMode}
@@ -311,61 +312,122 @@ export default function IncomingReportTable() {
       </div>
 
       {/* TABLE */}
-      <div className="w-full border-2 border-black bg-white overflow-x-auto">
-        {successMsg && (
-          <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b border-green-200">
-            {successMsg}
-          </p>
-        )}
-        {error && (
-          <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b border-red-200">
-            {error}
-          </p>
-        )}
+      <div className="px-3">
+        <div className="w-full border-2 border-black bg-white overflow-x-auto">
+          {successMsg && (
+            <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b border-green-200">
+              {successMsg}
+            </p>
+          )}
+          {error && (
+            <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b border-red-200">
+              {error}
+            </p>
+          )}
 
-        {/* DESKTOP */}
-        <div className="hidden md:block min-w-150">
-          <div className="flex font-bold uppercase text-xs border-b-2 border-black">
-            <div className="flex-1 border-r-2 border-black p-3 text-center">
-              Kritik atau Pengaduan Terkait Polibatam
+          {/* DESKTOP */}
+          <div className="hidden md:block min-w-150">
+            <div className="flex font-bold uppercase text-xs border-b-2 border-black">
+              <div className="flex-1 border-r-2 border-black p-3 text-center">
+                Kritik atau Pengaduan Terkait Polibatam
+              </div>
+              <div className="w-80 p-3 text-center">Unit yang di tuju</div>
             </div>
-            <div className="w-80 p-3 text-center">Unit yang di tuju</div>
+
+            {laporanTampil.length === 0 ? (
+              <div className="flex min-h-45 items-center justify-center">
+                <p className="text-gray-400 italic text-sm">
+                  Tidak ada laporan masuk untuk periode ini.
+                </p>
+              </div>
+            ) : (
+              laporanTampil.map((item) => (
+                <div key={item.id_laporan} className="flex min-h-45 border-t-2 border-black">
+                  <div className="flex-1 border-r-2 border-black p-5">
+                    <p className="text-[9px] text-gray-400 italic mb-1">
+                      {item.kode_laporan} · {item.jenis_laporan}
+                    </p>
+                    <div className="border border-gray-400 p-4 h-28 text-xs bg-gray-50 overflow-auto">
+                      {item.deskripsi}
+                    </div>
+                    <p className="mt-3 text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                      <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}
+                    </p>
+                    <p className="mt-1 text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                      <Calendar size={10} /> Tanggal kejadian: {formatTanggalKejadian(item)}
+                    </p>
+                    {item.lampiran && (
+                      <button
+                        onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran}`)}
+                        className="mt-2 border border-black px-2 py-1 flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase"
+                      >
+                        🖼️ Lihat Gambar
+                      </button>
+                    )}
+                  </div>
+                  <div className="w-80 p-5 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase block text-center mb-2">
+                        Pilih Unit :
+                      </label>
+                      <MultiSelectUnit
+                        selected={selectedUnit[item.id_laporan] || []}
+                        onChange={(units) =>
+                          setSelectedUnit((prev) => ({
+                            ...prev,
+                            [item.id_laporan]: units,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="flex justify-center mt-6">
+                      <button
+                        onClick={() => handleSend(item.id_laporan)}
+                        disabled={loadingKirim === item.id_laporan}
+                        className="bg-blue-600 text-white px-10 py-2 font-bold shadow-md hover:bg-blue-700 transition-all uppercase text-xs tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
-          {laporanTampil.length === 0 ? (
-            <div className="flex min-h-45 items-center justify-center">
-              <p className="text-gray-400 italic text-sm">
-                Tidak ada laporan masuk untuk periode ini.
-              </p>
-            </div>
-          ) : (
-            laporanTampil.map((item) => (
-              <div key={item.id_laporan} className="flex min-h-45 border-t-2 border-black">
-                <div className="flex-1 border-r-2 border-black p-5">
-                  <p className="text-[9px] text-gray-400 italic mb-1">
+          {/* MOBILE */}
+          <div className="md:hidden">
+            {laporanTampil.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-gray-400 italic text-sm">
+                  Tidak ada laporan masuk untuk periode ini.
+                </p>
+              </div>
+            ) : (
+              laporanTampil.map((item) => (
+                <div key={item.id_laporan} className="border-t-2 border-black p-4 space-y-3">
+                  <p className="text-[10px] text-gray-400 italic">
                     {item.kode_laporan} · {item.jenis_laporan}
                   </p>
-                  <div className="border border-gray-400 p-4 h-28 text-xs bg-gray-50 overflow-auto">
+                  <div className="border border-gray-400 p-4 text-xs bg-gray-50 max-h-32 overflow-auto">
                     {item.deskripsi}
                   </div>
-                  <p className="mt-3 text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                  <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
                     <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}
                   </p>
-                  <p className="mt-1 text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                  <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
                     <Calendar size={10} /> Tanggal kejadian: {formatTanggalKejadian(item)}
                   </p>
                   {item.lampiran && (
                     <button
                       onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran}`)}
-                      className="mt-2 border border-black px-2 py-1 flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase"
+                      className="border border-black px-2 py-1 flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase"
                     >
                       🖼️ Lihat Gambar
                     </button>
                   )}
-                </div>
-                <div className="w-80 p-5 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold uppercase block text-center mb-2">
+                  <div>
+                    <label className="text-[11px] font-bold uppercase block mb-1">
                       Pilih Unit :
                     </label>
                     <MultiSelectUnit
@@ -378,76 +440,17 @@ export default function IncomingReportTable() {
                       }
                     />
                   </div>
-                  <div className="flex justify-center mt-6">
-                    <button
-                      onClick={() => handleSend(item.id_laporan)}
-                      disabled={loadingKirim === item.id_laporan}
-                      className="bg-blue-600 text-white px-10 py-2 font-bold shadow-md hover:bg-blue-700 transition-all uppercase text-xs tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* MOBILE */}
-        <div className="md:hidden">
-          {laporanTampil.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-400 italic text-sm">
-                Tidak ada laporan masuk untuk periode ini.
-              </p>
-            </div>
-          ) : (
-            laporanTampil.map((item) => (
-              <div key={item.id_laporan} className="border-t-2 border-black p-4 space-y-3">
-                <p className="text-[10px] text-gray-400 italic">
-                  {item.kode_laporan} · {item.jenis_laporan}
-                </p>
-                <div className="border border-gray-400 p-4 text-xs bg-gray-50 max-h-32 overflow-auto">
-                  {item.deskripsi}
-                </div>
-                <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
-                  <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}
-                </p>
-                <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
-                  <Calendar size={10} /> Tanggal kejadian: {formatTanggalKejadian(item)}
-                </p>
-                {item.lampiran && (
                   <button
-                    onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran}`)}
-                    className="border border-black px-2 py-1 flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase"
+                    onClick={() => handleSend(item.id_laporan)}
+                    disabled={loadingKirim === item.id_laporan}
+                    className="w-full bg-blue-600 text-white py-2.5 font-bold shadow-md hover:bg-blue-700 transition-all uppercase text-xs tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    🖼️ Lihat Gambar
+                    {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
                   </button>
-                )}
-                <div>
-                  <label className="text-[11px] font-bold uppercase block mb-1">
-                    Pilih Unit :
-                  </label>
-                  <MultiSelectUnit
-                    selected={selectedUnit[item.id_laporan] || []}
-                    onChange={(units) =>
-                      setSelectedUnit((prev) => ({
-                        ...prev,
-                        [item.id_laporan]: units,
-                      }))
-                    }
-                  />
                 </div>
-                <button
-                  onClick={() => handleSend(item.id_laporan)}
-                  disabled={loadingKirim === item.id_laporan}
-                  className="w-full bg-blue-600 text-white py-2.5 font-bold shadow-md hover:bg-blue-700 transition-all uppercase text-xs tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
-                </button>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
     </>

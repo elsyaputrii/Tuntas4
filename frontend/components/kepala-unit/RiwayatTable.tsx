@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import { exportPDFRiwayatKepalaUnit } from "@/lib/exportPdf";
+import { PeriodFilterBar, isInPeriodFilter, type FilterMode as PeriodFilterMode } from "@/components/shared/PeriodFilterBar";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -187,6 +188,9 @@ export default function RiwayatTable() {
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [periodFilterMode, setPeriodFilterMode] = useState<PeriodFilterMode>("semua");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -210,6 +214,28 @@ export default function RiwayatTable() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const highlightedDates = useMemo(() => {
+    const dates = new Set<string>();
+
+    data.forEach((item) => {
+      if (!item.tanggal_laporan) return;
+
+      const d = new Date(item.tanggal_laporan);
+
+      if (isNaN(d.getTime())) return;
+
+      const key = [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, "0"),
+        String(d.getDate()).padStart(2, "0"),
+      ].join("-");
+
+      dates.add(key);
+    });
+
+    return dates;
+  }, [data]);
 
   function getImageUrl(lampiran: string | null): string {
     if (!lampiran) return "";
@@ -247,8 +273,25 @@ export default function RiwayatTable() {
   // laporan yang masih berjalan (menunggu Ka P4M, di unit, dsb) TIDAK
   // ikut dihitung/ditampilkan sebagai selesai.
   const filteredData = useMemo(
-    () => data.filter((d) => (filterMode === "selesai" ? d.status_boxing === "selesai" : true)),
-    [data, filterMode]
+    () =>
+      data.filter((item) => {
+        // Filter status
+        const statusMatch =
+          filterMode === "semua"
+            ? true
+            : item.status_boxing === "selesai";
+
+        // Filter periode berdasarkan tanggal laporan
+        const periodMatch = isInPeriodFilter(
+          periodFilterMode,
+          selectedDate,
+          (value) => new Date(value),
+          item.tanggal_laporan
+        );
+
+        return statusMatch && periodMatch;
+      }),
+    [data, filterMode, periodFilterMode, selectedDate]
   );
 
   if (loading) return (
@@ -291,18 +334,43 @@ export default function RiwayatTable() {
           </div>
         </div>
 
-        {/* Filter pill */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {(["semua", "selesai"] as FilterMode[]).map((mode) => (
-            <button key={mode} onClick={() => setFilterMode(mode)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
-                ${filterMode === mode ? "bg-dark-header text-white border-dark-header shadow" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
-              {mode === "semua" ? "📋 Semua" : "✓ Selesai"}
-            </button>
-          ))}
-          <span className="text-[9px] text-gray-400 ml-auto italic hidden sm:flex items-center">
-            {filteredData.length} laporan
-          </span>
+        {/* Filter periode + filter status */}
+        <div className="flex items-start gap-2 w-full">
+          {/* Filter periode — kiri */}
+          <div className="shrink-0">
+            <PeriodFilterBar
+              filterMode={periodFilterMode}
+              onFilterModeChange={setPeriodFilterMode}
+              selectedDate={selectedDate}
+              onSelectedDateChange={setSelectedDate}
+              highlightedDates={highlightedDates}
+              showCalendar={false}
+            />
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Filter status — kanan */}
+          <div className="flex items-center gap-2 shrink-0 pt-0">
+            {(["semua", "selesai"] as FilterMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setFilterMode(mode)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                  filterMode === mode
+                    ? "bg-dark-header text-white border-dark-header shadow"
+                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {mode === "semua" ? "📋 Semua" : "✓ Selesai"}
+              </button>
+            ))}
+
+            <span className="text-[9px] text-gray-400 italic whitespace-nowrap">
+              {filteredData.length} laporan
+            </span>
+          </div>
         </div>
 
         {/* Tabel — DESKTOP */}
