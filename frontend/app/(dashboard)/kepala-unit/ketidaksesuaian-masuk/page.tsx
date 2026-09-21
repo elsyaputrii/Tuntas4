@@ -11,18 +11,22 @@ export default function KetidaksesuaianMasukPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('baru');
+
+  // 🔴 1. State untuk menyimpan jumlah notifikasi dari StafDecisionTable
+  const [keputusanStafCount, setKeputusanStafCount] = useState<number>(0);
+
   const isMounted = useRef(true);
 
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
       const role = localStorage.getItem('role');
-      
+
       if (!token || role !== 'kepala_unit') {
         router.replace('/kepala-unit/login');
         return;
       }
-      
+
       if (isMounted.current) {
         setIsChecking(false);
       }
@@ -60,21 +64,32 @@ export default function KetidaksesuaianMasukPage() {
         >
           📋 Laporan Baru
         </button>
+
+        {/* 🔴 2. Menampilkan badge angka jika ada revisi/penolakan dari Staf */}
         <button
           onClick={() => setActiveTab('keputusan-staf')}
-          className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 ${
+          className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 flex items-center gap-2 ${
             activeTab === 'keputusan-staf'
               ? 'border-blue-500 text-blue-600 dark:text-blue-400'
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
           }`}
         >
-          📋 Keputusan Staf
+          <span>📋 Keputusan Staf</span>
+          {keputusanStafCount > 0 && (
+            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold text-white bg-red-500 rounded-full">
+              {keputusanStafCount}
+            </span>
+          )}
         </button>
       </div>
 
       <div>
         {activeTab === 'baru' && <DiscrepancyTable />}
-        {activeTab === 'keputusan-staf' && <StafDecisionTable />}
+
+        {/* 🔴 3. Oper fungsi setKeputusanStafCount ke child component */}
+        {activeTab === 'keputusan-staf' && (
+          <StafDecisionTable onCountChange={setKeputusanStafCount} />
+        )}
       </div>
     </div>
   );

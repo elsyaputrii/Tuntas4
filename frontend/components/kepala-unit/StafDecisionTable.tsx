@@ -32,7 +32,11 @@ interface StafDecisionItem {
   lampiran_laporan?: string | null;
 }
 
-export default function StafDecisionTable() {
+interface StafDecisionTableProps {
+  onCountChange?: (count: number) => void;
+}
+
+export default function StafDecisionTable({ onCountChange }: StafDecisionTableProps) {
   const [data, setData] = useState<StafDecisionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState("");
@@ -43,11 +47,6 @@ export default function StafDecisionTable() {
   // FORM REVISI RANCANGAN
   const [penyebab, setPenyebab] = useState<Record<number, string>>({});
 
-  // ✅ FIX: dulu ada state `rencana` (plain textarea) yang isinya tidak
-  // pernah dibaca backend — sekarang rencana tindak lanjut dikelola lewat
-  // RencanaPanel yang sama dengan tab "Ketidaksesuaian Masuk" (tersambung
-  // ke tabel rencana_tindak_lanjut yang sesungguhnya dipakai backend saat
-  // submitRancangan). rencanaCount dipakai untuk validasi sebelum kirim.
   const [rencanaCount, setRencanaCount] = useState<Record<number, number>>({});
 
   const handleCountChange = useCallback((idBoxing: number, count: number) => {
@@ -61,9 +60,6 @@ export default function StafDecisionTable() {
     setLoading(true);
     setErrMsg("");
     try {
-      // Tidak ada endpoint terpisah untuk "laporan ditolak staf".
-      // Data ini sudah termasuk dalam getLaporanMasuk (lihat kepalaUnitController.js),
-      // jadi kita filter sendiri di frontend berdasarkan approval_staf === "ditolak".
       const result = await kepalaUnitApi.getLaporanMasuk();
       if (result.success) {
         const ditolakStaf = (result.data as StafDecisionItem[]).filter(
@@ -71,6 +67,12 @@ export default function StafDecisionTable() {
         );
 
         setData(ditolakStaf);
+
+        // Kirim jumlah data ke parent component untuk notifikasi angka
+        if (onCountChange) {
+          onCountChange(ditolakStaf.length);
+        }
+
         const initP: Record<number, string> = {};
         ditolakStaf.forEach((item: StafDecisionItem) => {
           initP[item.id_boxing] = item.penyebab || "";
@@ -84,7 +86,7 @@ export default function StafDecisionTable() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onCountChange]);
 
   useEffect(() => {
     fetchData();
@@ -107,12 +109,6 @@ export default function StafDecisionTable() {
     const id_boxing = confirmId;
     setSubmitting((prev) => ({ ...prev, [id_boxing]: true }));
     try {
-      // Backend menangani resubmit setelah ditolak lewat endpoint
-      // /kepala-unit/rancangan yang sama (lihat submitRancangan di
-      // kepalaUnitController.js — sudah menerima kasus status='di_staff'
-      // AND approval_staf='ditolak'), dan mengambil daftar rencana
-      // langsung dari tabel rencana_tindak_lanjut (diisi lewat RencanaPanel
-      // di atas), jadi tidak perlu kirim field rencana_tindakan manual lagi.
       await kepalaUnitApi.submitRancangan({
         id_boxing,
         penyebab: penyebab[id_boxing].trim(),
@@ -272,7 +268,7 @@ export default function StafDecisionTable() {
                 <span className="text-[10px] text-gray-500">{formatTanggal(item.created_at)}</span>
               </div>
 
-              {/* Kolom 3: Penyebab (Input, auto-resize — sama seperti tab Laporan Baru) */}
+              {/* Kolom 3: Penyebab */}
               <div className="w-[20%] border-r-2 border-black p-4">
                 <AutoResizeTextarea
                   minHeight={112}
@@ -284,7 +280,7 @@ export default function StafDecisionTable() {
                 />
               </div>
 
-              {/* Kolom 4: Rencana Tindak Lanjut — sama seperti tab Laporan Baru */}
+              {/* Kolom 4: Rencana Tindak Lanjut */}
               <div className="w-[20%] border-r-2 border-black p-3">
                 <RencanaPanel idBoxing={item.id_boxing} onCountChange={handleCountChange} />
               </div>

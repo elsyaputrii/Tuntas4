@@ -543,7 +543,7 @@ export default function RecapitulationTable() {
   const [exportingPDF, setExportingPDF] = useState<PdfKategori|null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [kaP4M, setKaP4M] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
-
+  const [searchQuery, setSearchQuery] = useState("");
   const [arsipData, setArsipData] = useState<ArsipItem[]>([]);
   const [loadingArsip, setLoadingArsip] = useState(false);
 
@@ -658,7 +658,23 @@ export default function RecapitulationTable() {
     return d.getFullYear()===selectedDate.getFullYear();
   }
 
-  const filteredItems   = allItems.filter(d=>isInFilter(d.tglMasuk));
+  const filteredItems = allItems.filter((d) => {
+    const passFilter = isInFilter(d.tglMasuk);
+    if (!passFilter) return false;
+
+    if (!searchQuery.trim()) return true;
+
+    const q = searchQuery.toLowerCase();
+    return (
+      d.kode.toLowerCase().includes(q) ||
+      d.jenis.toLowerCase().includes(q) ||
+      d.uraian.toLowerCase().includes(q) ||
+      d.unit.toLowerCase().includes(q) ||
+      d.penyebab.toLowerCase().includes(q) ||
+      d.rencana.toLowerCase().includes(q) ||
+      d.hasil.toLowerCase().includes(q)
+    );
+  });
   const totalAll        = filteredItems.length;
   const ditindakCount   = filteredItems.filter(d=>d.isSelesai).length;
   const menungguCount   = filteredItems.filter(d=>!d.isSelesai).length;
@@ -775,6 +791,7 @@ export default function RecapitulationTable() {
 
       <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
         <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold w-full sm:w-auto">📥 Export:</span>
+        
         <button
           onClick={async ()=>{
             setExportingExcelLoading(true);
@@ -812,9 +829,22 @@ export default function RecapitulationTable() {
             {kat.charAt(0).toUpperCase()+kat.slice(1)}
           </button>
         ))}
-        <span className="text-[9px] text-gray-400 ml-auto italic hidden sm:block">
-          {filteredItems.length} laporan · {labelFilter[filterMode]}
-        </span>
+
+        <div className="ml-auto flex items-center gap-3">
+          <div className="w-full sm:w-56">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari kode, uraian, unit..."
+              className="w-full px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dark-header/30 text-gray-800 placeholder-gray-400"
+            />
+          </div>
+
+          <span className="text-[9px] text-gray-400 italic whitespace-nowrap hidden sm:block">
+            {filteredItems.length} laporan · {labelFilter[filterMode]}
+          </span>
+        </div>
       </div>
 
       {/* Tabel — DESKTOP */}

@@ -190,6 +190,7 @@ export default function RiwayatTable() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [periodFilterMode, setPeriodFilterMode] = useState<PeriodFilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [searchQuery, setSearchQuery] = useState("");
 
 
   const fetchData = useCallback(async () => {
@@ -272,6 +273,7 @@ export default function RiwayatTable() {
   // ✅ FIX: filter "Selesai" tetap murni status_boxing === 'selesai' —
   // laporan yang masih berjalan (menunggu Ka P4M, di unit, dsb) TIDAK
   // ikut dihitung/ditampilkan sebagai selesai.
+  // 🔍 UBAH FUNGSI INI:
   const filteredData = useMemo(
     () =>
       data.filter((item) => {
@@ -289,9 +291,17 @@ export default function RiwayatTable() {
           item.tanggal_laporan
         );
 
-        return statusMatch && periodMatch;
+        const q = searchQuery.trim().toLowerCase();
+        const searchMatch = !q || (
+          (item.kode_laporan?.toLowerCase().includes(q) ?? false) ||
+          (item.isi_laporan?.toLowerCase().includes(q) ?? false) ||
+          (item.rencana_tindakan?.toLowerCase().includes(q) ?? false) ||
+          (item.hasil_tindakan?.toLowerCase().includes(q) ?? false)
+        );
+
+        return statusMatch && periodMatch && searchMatch;
       }),
-    [data, filterMode, periodFilterMode, selectedDate]
+    [data, filterMode, periodFilterMode, selectedDate, searchQuery] 
   );
 
   if (loading) return (
@@ -334,8 +344,8 @@ export default function RiwayatTable() {
           </div>
         </div>
 
-        {/* Filter periode + filter status */}
-        <div className="flex items-start gap-2 w-full">
+        {/* Filter periode + Input Pencarian + filter status */}
+        <div className="flex flex-wrap items-center justify-between gap-2 w-full">
           {/* Filter periode — kiri */}
           <div className="shrink-0">
             <PeriodFilterBar
@@ -348,16 +358,34 @@ export default function RiwayatTable() {
             />
           </div>
 
-          {/* Spacer */}
-          <div className="flex-1" />
+          {/* Area Kanan: Input Pencarian & Filter Status */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* ➕ TAMBAHKAN ELEMENT INPUT PENCARIAN INI: */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Cari kode/uraian..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-52 sm:w-62 pl-3 pr-8 py-1.5 text-xs border-2 border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
-          {/* Filter status — kanan */}
-          <div className="flex items-center gap-2 shrink-0 pt-0">
+            {/* Filter Status */}
             {(["semua", "selesai"] as FilterMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setFilterMode(mode)}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold border transition-all ${
                   filterMode === mode
                     ? "bg-dark-header text-white border-dark-header shadow"
                     : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
@@ -386,7 +414,10 @@ export default function RiwayatTable() {
           {filteredData.length === 0 ? (
             <div className="flex p-10 justify-center border-t-2 border-black">
               <p className="text-gray-400 italic text-sm">
-                {filterMode === "selesai"
+                {/* 🔄 UBAH PESAN INI: */}
+                {searchQuery
+                  ? "Tidak ada laporan yang cocok dengan pencarian Anda."
+                  : filterMode === "selesai"
                   ? "Belum ada laporan yang selesai untuk unit ini."
                   : "Belum ada laporan yang pernah ditangani unit ini."}
               </p>
@@ -450,7 +481,10 @@ export default function RiwayatTable() {
           </div>
           {filteredData.length === 0 ? (
             <div className="p-8 text-center text-gray-400 italic">
-              {filterMode === "selesai"
+              {/* 🔄 UBAH PESAN INI: */}
+              {searchQuery
+                ? "Tidak ada laporan yang cocok dengan pencarian Anda."
+                : filterMode === "selesai"
                 ? "Belum ada laporan yang selesai untuk unit ini."
                 : "Belum ada laporan yang pernah ditangani unit ini."}
             </div>
