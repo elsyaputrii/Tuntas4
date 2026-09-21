@@ -7,6 +7,7 @@ import { DAFTAR_UNIT_UMUM } from "@/lib/unitsUmum";
 import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
 import { toLocalDate, fmtTgl } from "@/lib/exportHelpers";
 import { div } from "framer-motion/m";
+import { createPortal } from "react-dom";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 const DAFTAR_UNIT = DAFTAR_UNIT_UMUM;
@@ -73,11 +74,54 @@ function MultiSelectUnit({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
 
+  // 1. TAMBAHKAN REF UNTUK TRIGGER DAN DROPDOWN
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 2. STATE UNTUK MENYIMPAN KOORDINAT
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
+
+  // 3. FUNGSI MENGHITUNG POSISI (BoundingClientRect)
+  const updateCoords = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    }
+  };
+
+  // 4. EFEK UNTUK UPDATE POSISI SAAT DI-SCROLL / RESIZE WINDOW
+  useEffect(() => {
+    if (open) {
+      updateCoords();
+      window.addEventListener("scroll", updateCoords, true);
+      window.addEventListener("resize", updateCoords);
+    }
+    return () => {
+      window.removeEventListener("scroll", updateCoords, true);
+      window.removeEventListener("resize", updateCoords);
+    };
+  }, [open]);
+
+  // 5. UPDATE EVENT LISTENER CLICK OUTSIDE (MENGGUNAKAN REF LENGKAP)
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -107,10 +151,11 @@ function MultiSelectUnit({
   }
 
   return (
-    <div className="relative w-full" ref={ref}>
+    <div className="relative w-full">
       <div
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
-        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-8.75"
+        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-[35px]"
       >
         <div className="flex flex-wrap gap-1 flex-1">
           {selected.length > 0 ? (
@@ -127,69 +172,77 @@ function MultiSelectUnit({
         <ChevronDown size={13} className={`ml-1 transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
 
-      {open && (
-        <div className="absolute z-30 w-full mt-1 border border-black bg-white shadow-xl">
-          <div className="p-2 border-b border-gray-200 bg-gray-50 relative">
-            <input
-              type="text"
-              placeholder="Cari unit..."
-              className="w-full border border-gray-300 px-2 py-1 text-[11px] outline-none pr-6"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
-            <Search size={11} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
+      {open && typeof document !== "undefined" && createPortal(
+          <div ref={dropdownRef}
+            style={{
+              position: "absolute",
+              top: `${coords.top + 2}px`,
+              left: `${coords.left}px`,
+              width: `${coords.width}px`,
+            }} className="z-[9999] border border-black bg-white shadow-xl rounded-md overflow-hidden"
+          >
+            <div className="p-2 border-b border-gray-200 bg-gray-50 relative">
+              <input
+                type="text"
+                placeholder="Cari unit..."
+                className="w-full border border-gray-300 px-2 py-1 text-[11px] outline-none pr-6"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
+              <Search size={11} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            </div>
 
-          <div className="max-h-60 overflow-y-auto">
-            {Object.entries(grouped).map(([grup, units]) => (
-              <div key={grup}>
-                <div className="px-3 py-1 text-[9px] font-bold text-gray-400 uppercase bg-gray-50 border-b border-gray-100">
-                  {grup}
-                </div>
-                {units.map((unit) => (
-                  <div
-                    key={unit}
-                    onClick={() => toggle(unit)}
-                    className={`px-3 py-2 text-[11px] flex items-center gap-2 cursor-pointer border-b border-gray-100 last:border-none transition-colors ${
-                      selected.includes(unit)
-                        ? "bg-blue-50 font-bold text-blue-700"
-                        : "hover:bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(unit)}
-                      readOnly
-                      className="w-3 h-3 accent-blue-600 pointer-events-none"
-                    />
-                    {unit}
+            <div className="max-h-60 overflow-y-auto">
+              {Object.entries(grouped).map(([grup, units]) => (
+                <div key={grup}>
+                  <div className="px-3 py-1 text-[9px] font-bold text-gray-400 uppercase bg-gray-50 border-b border-gray-100">
+                    {grup}
                   </div>
-                ))}
-              </div>
-            ))}
-            {filtered.length === 0 && (
-              <div className="p-3 text-[10px] text-red-400 italic text-center">
-                Unit tidak ditemukan
+                  {units.map((unit) => (
+                    <div
+                      key={unit}
+                      onClick={() => toggle(unit)}
+                      className={`px-3 py-2 text-[11px] flex items-center gap-2 cursor-pointer border-b border-gray-100 last:border-none transition-colors ${
+                        selected.includes(unit)
+                          ? "bg-blue-50 font-bold text-blue-700"
+                          : "hover:bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(unit)}
+                        readOnly
+                        className="w-3 h-3 accent-blue-600 pointer-events-none"
+                      />
+                      {unit}
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div className="p-3 text-[10px] text-red-400 italic text-center">
+                  Unit tidak ditemukan
+                </div>
+              )}
+            </div>
+
+            {selected.length > 0 && (
+              <div className="p-2 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+                <span className="text-[9px] font-bold text-gray-500 uppercase">
+                  {selected.length} unit terpilih
+                </span>
+                <button
+                  onClick={() => onChange([])}
+                  className="text-[9px] text-red-500 font-bold hover:underline"
+                >
+                  Hapus Semua
+                </button>
               </div>
             )}
-          </div>
-
-          {selected.length > 0 && (
-            <div className="p-2 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
-              <span className="text-[9px] font-bold text-gray-500 uppercase">
-                {selected.length} unit terpilih
-              </span>
-              <button
-                onClick={() => onChange([])}
-                className="text-[9px] text-red-500 font-bold hover:underline"
-              >
-                Hapus Semua
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+          </div>,
+          document.body // <-- Mengirimkan tampilan dropdown ini langsung ke paling luar (body)
+        )}
     </div>
   );
 }
@@ -343,12 +396,15 @@ export default function IncomingReportTable() {
             ) : (
               laporanTampil.map((item) => (
                 <div key={item.id_laporan} className="flex min-h-45 border-t-2 border-black">
-                  <div className="flex-1 border-r-2 border-black p-5">
-                    <p className="text-[9px] text-gray-400 italic mb-1">
-                      {item.kode_laporan} · {item.jenis_laporan}
-                    </p>
-                    <div className="border border-gray-400 p-4 h-28 text-xs bg-gray-50 overflow-auto">
-                      {item.deskripsi}
+                  <div className="flex-1 border-r-2 border-black p-5 flex flex-col justify-between">
+                    <div className="flex-1 flex flex-col mb-3">
+                      <p className="text-[9px] text-gray-400 italic mb-1 font-semibold">
+                        {item.kode_laporan} · {item.jenis_laporan}
+                      </p>
+                      {/* Tambahkan flex-1 dan min-h-[120px] agar melar penuh ke bawah */}
+                      <div className="border border-gray-400 p-4 text-xs bg-gray-50 overflow-auto flex-1 min-h-[140px]">
+                        {item.deskripsi}
+                      </div>
                     </div>
                     <p className="mt-3 text-[9px] text-gray-500 font-bold flex items-center gap-1">
                       <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}

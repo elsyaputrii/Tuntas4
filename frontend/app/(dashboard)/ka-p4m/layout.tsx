@@ -268,9 +268,9 @@ useEffect(() => {
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-[20px] font-bold leading-tight">
-                  Transformasi Tata Kelola Organisasi:
+                  Selamat Datang di Aplikasi 
                   <br />
-                  Aplikasi Pengelolaan Ketidaksesuaian Polibatam
+                  Pengelolaan Ketidaksesuaian Polibatam
                 </h1>
                 <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
                   👤 Kepala Unit P4M (Ka P4M)
@@ -306,26 +306,42 @@ useEffect(() => {
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">KA-P4M</p>
                         <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
                       </div>
-                      <div className="p-2">
-                        <button
-                          onClick={() => {
-                            setShowProfile(false);
-                            router.push('/ka-p4m/profil');
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-                        >
-                          Profil Saya
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowProfile(false);
-                            router.push('/ka-p4m/pengaturan');
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-                        >
-                          Pengaturan
-                        </button>
-                      </div>
+                      <div className="p-2 space-y-1">
+  <button
+    onClick={() => {
+      setShowProfile(false);
+      router.push('/ka-p4m/profil');
+    }}
+    className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+  >
+    Profil Saya
+  </button>
+  <button
+    onClick={() => {
+      setShowProfile(false);
+      router.push('/ka-p4m/pengaturan');
+    }}
+    className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+  >
+    Pengaturan
+  </button>
+
+  {/* Garis Pemisah / Divider */}
+  <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+
+  {/* Tombol Logout */}
+  <button
+    onClick={() => {
+      setShowProfile(false);
+      localStorage.clear();
+      router.push('/login');
+    }}
+    className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition flex items-center gap-2 font-medium"
+  >
+    <LogOut size={16} />
+    Logout
+  </button>
+</div>
                     </div>
                   )}
                 </div>
@@ -415,9 +431,9 @@ useEffect(() => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-[20px] font-bold leading-tight">
-                Transformasi Tata Kelola Organisasi:
+                Selamat Datang di Aplikasi 
                 <br />
-                Aplikasi Pengelolaan Ketidaksesuaian Polibatam
+                Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
                 👩‍💻KA-P4M
@@ -453,7 +469,7 @@ useEffect(() => {
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">KA-P4M</p>
                       <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
                     </div>
-                    <div className="p-2">
+                    <div className="p-2 space-y-1">
                       <button
                         onClick={() => {
                           setShowProfile(false);
@@ -471,6 +487,22 @@ useEffect(() => {
                         className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
                       >
                         Pengaturan
+                      </button>
+
+                      {/* Garis Pemisah / Divider */}
+                      <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+
+                      {/* Tombol Logout */}
+                      <button
+                        onClick={() => {
+                          setShowProfile(false);
+                          localStorage.clear();
+                          router.push('/login');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition flex items-center gap-2 font-medium"
+                      >
+                        <LogOut size={16} />
+                        Logout
                       </button>
                     </div>
                   </div>

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
-import { Eye, EyeOff, User, Lock, X } from "lucide-react";
+import { Eye, EyeOff, User, Lock, X, ArrowLeft } from "lucide-react";
 
 // Ke mana user diarahkan setelah login, berdasarkan role yang
 // dikembalikan backend — bukan dari path yang diakses.
@@ -173,13 +173,35 @@ export default function LoginForm({
             {/* Error message */}
             {error && <p className="text-red-200 text-sm text-center">{error}</p>}
 
-            {/* Link lupa password */}
-            <Link
-              href={forgotPasswordPath}
-              className="text-[12px] text-blue-200 hover:underline block text-left w-full mt-1"
-            >
-              lupa password?
-            </Link>
+            {/* Link Lupa Password & Panduan Pengguna */}
+            <div className="flex items-center justify-between text-[12px] pt-1">
+              <Link
+                href={forgotPasswordPath}
+                className="text-blue-200 hover:underline"
+              >
+                lupa password?
+              </Link>
+
+              <a
+                href="https://drive.google.com/drive/folders/19wn6yzvK8H9_0qN-Z3LV29k_Ha9nnB9T?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-200 hover:underline"
+              >
+                panduan pengguna
+              </a>
+            </div>
+
+            {/* Tombol Back ke Beranda */}
+            <div className="pt-1">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 text-[12px] text-white/80 hover:text-white hover:underline transition"
+              >
+                <ArrowLeft size={14} />
+                <span>Kembali ke Beranda</span>
+              </Link>
+            </div>
           </div>
 
           {/* Tombol Login */}

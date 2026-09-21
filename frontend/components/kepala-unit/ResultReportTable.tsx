@@ -275,15 +275,28 @@ export default function ResultReportTable() {
                       }))
                     }
                   />
-                  <div className="flex items-center gap-2">
-                    <input type="file" id={`upload-${item.id_boxing}`} className="hidden" accept="image/*,application/pdf"
-                      onChange={(e) => setFiles((prev) => ({ ...prev, [item.id_boxing]: e.target.files?.[0] || null }))}
-                    />
-                    <label htmlFor={`upload-${item.id_boxing}`}
-                      className="border border-black px-3 py-1 text-[10px] cursor-pointer hover:bg-gray-100 flex items-center gap-2">
-                      🖼️ {files[item.id_boxing] ? files[item.id_boxing]!.name : "tambahkan gambar (wajib)"}
-                    </label>
-                  </div>
+                  <div className="flex flex-col gap-1">
+  <div className="flex items-center gap-2">
+    <input 
+      type="file" 
+      id={`upload-${item.id_boxing}`} 
+      className="hidden" 
+      accept="image/*,application/pdf"
+      onChange={(e) => setFiles((prev) => ({ ...prev, [item.id_boxing]: e.target.files?.[0] || null }))}
+    />
+    <label 
+      htmlFor={`upload-${item.id_boxing}`}
+      className="border border-black px-3 py-1 text-[10px] cursor-pointer hover:bg-gray-100 flex items-center gap-2"
+    >
+      🖼️ {files[item.id_boxing] ? files[item.id_boxing]!.name : "Tambahkan Bukti Lampiran (Wajib)"}
+    </label>
+  </div>
+
+  {/* 💡 Keterangan format & batas file untuk pengguna */}
+  <p className="text-[10px] text-gray-500">
+    * Format yang diizinkan: <strong>JPG, PNG, PDF</strong> (Maksimal <strong>5 MB</strong>)
+  </p>
+</div>
                   <div className="flex justify-end">
                     <button onClick={() => handleSubmit(item.id_boxing)} disabled={submitting[item.id_boxing]}
                       className="bg-blue-polibatam text-white px-6 py-1.5 rounded font-bold uppercase text-[10px] hover:bg-blue-600 shadow transition-all disabled:opacity-50">
