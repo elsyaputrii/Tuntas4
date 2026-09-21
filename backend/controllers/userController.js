@@ -7,7 +7,7 @@
 // Frontend (data-akun) pakai key:   'staff_p4m' | 'ka_p4m' | 'kepala_unit'
 // (beda 1 huruf 'f' di staf/staff) → di-mapping di sini biar konsisten.
 //
-// Data profil (nama, nip, no_telp, unit) disimpan terpisah per role di
+// Data profil (nama, nip, unit) disimpan terpisah per role di
 // tabel staf_p4m / kepala_unit / ka_p4m, masing-masing terhubung lewat
 // pengguna.id_pengguna.
 
@@ -16,7 +16,9 @@ const fs = require("fs");
 const path = require("path");
 const { pool } = require("../config/db");
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
+// ✅ FIX: path absolut terpusat, sama dengan yang dipakai middleware
+// upload & server.js — lihat config/uploadDir.js untuk alasannya.
+const UPLOAD_DIR = require("../config/uploadDir");
 
 const ROLE_FE_TO_DB = { staff_p4m: "staf_p4m", kepala_unit: "kepala_unit", ka_p4m: "ka_p4m" };
 const ROLE_DB_TO_FE = { staf_p4m: "staff_p4m", kepala_unit: "kepala_unit", ka_p4m: "ka_p4m" };
@@ -39,7 +41,6 @@ async function getUsers(req, res) {
         p.tanda_tangan AS tandaTangan,
         p.created_at  AS createdAt,
         COALESCE(s.nip, k.nip, kp.nip)         AS nip,
-        COALESCE(s.no_telp, '')                AS phone,
         COALESCE(k.unit, '')                   AS unit
       FROM pengguna p
       LEFT JOIN staf_p4m    s  ON s.id_pengguna  = p.id_pengguna AND p.role = 'staf_p4m'
@@ -64,7 +65,7 @@ async function getUsers(req, res) {
 
 // ── POST /api/users — tambah akun baru ───────────────────────────────
 async function createUser(req, res) {
-  const { name, email, role, nip, phone, unit, status, password } = req.body;
+  const { name, email, role, nip, unit, status, password } = req.body;
 
   if (!name || !email || !role || !password) {
     return res.status(400).json({ success: false, message: "Nama, email, role, dan password wajib diisi." });
@@ -97,8 +98,8 @@ async function createUser(req, res) {
 
     if (roleDb === "staf_p4m") {
       await conn.query(
-        `INSERT INTO staf_p4m (id_pengguna, nama, nip, email, no_telp) VALUES (?, ?, ?, ?, ?)`,
-        [idPengguna, name, finalNip, email, phone || null]
+        `INSERT INTO staf_p4m (id_pengguna, nama, nip, email) VALUES (?, ?, ?, ?)`,
+        [idPengguna, name, finalNip, email]
       );
     } else if (roleDb === "kepala_unit") {
       await conn.query(
@@ -129,7 +130,7 @@ async function createUser(req, res) {
 // ── PUT /api/users/:id — edit akun ───────────────────────────────────
 async function updateUser(req, res) {
   const { id } = req.params;
-  const { name, email, role, nip, phone, unit, status, password } = req.body;
+  const { name, email, role, nip, unit, status, password } = req.body;
 
   const roleDb = ROLE_FE_TO_DB[role];
   if (!roleDb) {
@@ -162,10 +163,10 @@ async function updateUser(req, res) {
     // Sinkronkan ke tabel profil sesuai role (insert kalau belum ada baris-nya)
     if (roleDb === "staf_p4m") {
       await conn.query(
-        `INSERT INTO staf_p4m (id_pengguna, nama, nip, email, no_telp)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE nama=?, nip=?, email=?, no_telp=?`,
-        [id, name, nip, email, phone || null, name, nip, email, phone || null]
+        `INSERT INTO staf_p4m (id_pengguna, nama, nip, email)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE nama=?, nip=?, email=?`,
+        [id, name, nip, email, name, nip, email]
       );
     } else if (roleDb === "kepala_unit") {
       await conn.query(

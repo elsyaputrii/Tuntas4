@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Edit, Trash2, Search, UserPlus, UserCheck, Users, Mail, Phone,
+  Edit, Trash2, Search, UserPlus, UserCheck, Users, Mail,
   Crown, Briefcase, UserCog, X, PenTool, Upload, Trash,
 } from "lucide-react";
 import { userApi } from "@/lib/api";
@@ -15,7 +15,6 @@ interface User {
   email: string;
   role: "staff_p4m" | "kepala_unit" | "ka_p4m";
   nip: string;
-  phone: string;
   unit: string;
   status: "active" | "inactive";
   lastLogin: string;
@@ -35,7 +34,7 @@ export default function DataAkunPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<Partial<User>>({
-    name: "", email: "", role: "staff_p4m", nip: "", phone: "",
+    name: "", email: "", role: "staff_p4m", nip: "",
     unit: "", status: "active", password: "",
   });
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
@@ -90,7 +89,7 @@ export default function DataAkunPage() {
         // ✅ FIX: cast formData ke tipe yang diharapkan userApi.createUser.
         //    Field wajib (name, email, password, role) sudah dijamin
         //    ada oleh validasi `required` di form HTML + cek password
-        //    di atas. Field opsional (nip, phone, unit, status) dikirim
+        //    di atas. Field opsional (nip, unit, status) dikirim
         //    kalau ada, backend yang akan validasi.
         await userApi.createUser(formData as {
           name: string;
@@ -98,7 +97,6 @@ export default function DataAkunPage() {
           password: string;
           role: string;
           nip?: string;
-          phone?: string;
           unit?: string;
           status?: string;
         });
@@ -137,7 +135,7 @@ export default function DataAkunPage() {
   const openAddModal = () => {
     setSelectedUser(null);
     setFormData({
-      name: "", email: "", role: "staff_p4m", nip: "", phone: "",
+      name: "", email: "", role: "staff_p4m", nip: "",
       unit: "", status: "active", password: "",
     });
     setSignatureFile(null);
@@ -388,9 +386,6 @@ export default function DataAkunPage() {
                         <p className="text-sm text-slate-400 flex items-center gap-1">
                           <Mail size={12} className="text-slate-300" /> {user.email}
                         </p>
-                        <p className="text-sm text-slate-400 flex items-center gap-1">
-                          <Phone size={12} className="text-slate-300" /> {user.phone}
-                        </p>
                       </div>
                     </div>
                   </td>
@@ -497,13 +492,6 @@ export default function DataAkunPage() {
                     NIP <span className="text-rose-400">*</span>
                   </label>
                   <input type="text" name="nip" value={formData.nip || ""} onChange={handleInputChange} required placeholder="Masukkan NIP"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Nomor Telepon <span className="text-rose-400">*</span>
-                  </label>
-                  <input type="text" name="phone" value={formData.phone || ""} onChange={handleInputChange} required placeholder="Masukkan nomor telepon"
                     className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
                 <div className="col-span-2">

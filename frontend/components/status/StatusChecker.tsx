@@ -114,7 +114,7 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
             Cek Status Laporan Anda
           </h1>
           <p className="text-blue-100 mt-3 max-w-2xl">
-            Masukkan nomor tiket (format LAP-00001) untuk melihat perkembangan laporan.
+            Masukkan nomor tiket (format LAP-8F2A93C1) untuk melihat perkembangan laporan.
           </p>
         </div>
         <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full" />
@@ -129,7 +129,7 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
             </label>
             <input
               type="text"
-              placeholder="Contoh: LAP-00001"
+              placeholder="Contoh: LAP-8F2A93C1"
               value={ticket}
               onChange={(e) => setTicket(e.target.value.toUpperCase())}
               className="w-full border border-gray-300 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-blue-500 transition uppercase tracking-wider"

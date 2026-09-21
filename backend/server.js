@@ -69,7 +69,12 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// ✅ FIX: pakai path absolut terpusat (config/uploadDir.js) biar folder
+// yang di-serve statis di sini SELALU sama dengan folder tempat multer
+// menyimpan file (lihat middleware/*.js) — sebelumnya dua-duanya
+// resolve path secara terpisah dan bisa berbeda di production.
+const UPLOAD_DIR = require("./config/uploadDir");
+app.use("/uploads", express.static(UPLOAD_DIR));
 
 app.use("/api/civitas",     civitasRoutes);
 app.use("/api/auth",        authRoutes);

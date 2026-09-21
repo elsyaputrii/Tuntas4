@@ -279,7 +279,6 @@ export const userApi = {
     password: string;
     role: string;
     nip?: string;
-    phone?: string;
     unit?: string;
     status?: string;
   }) =>
@@ -294,7 +293,6 @@ export const userApi = {
     password?: string;
     role?: string;
     nip?: string;
-    phone?: string;
     unit?: string;
     status?: string;
   }) =>
