@@ -46,6 +46,29 @@ const pool = mysql.createPool({
 });
 
 // ============================================================
+// ✅ FIX: paksa session MySQL sendiri pakai +07:00, jangan cuma
+// bilang ke driver "anggap +07:00" lewat opsi `timezone` di atas.
+//
+// Opsi `timezone` cuma ngasih tau mysql2 caranya MENERJEMAHKAN
+// nilai yang balik dari MySQL ke objek Date JS. Itu cuma bener
+// KALAU session MySQL-nya emang lagi +07:00. Session time_zone
+// defaultnya ikut `SYSTEM` (timezone OS server MySQL) kalau gak
+// di-set eksplisit.
+//
+// Di localhost kamu (OS-nya WIB) itu kebetulan cocok (SYSTEM = +07:00),
+// makanya jam-nya kelihatan bener. Tapi begitu di-deploy ke server lain
+// yang OS/DB-nya UTC (banyak platform hosting default-nya begini,
+// apalagi dump SQL kamu eksplisit `SET time_zone = "+00:00"`), asumsi
+// "+07:00" di atas jadi salah dan setiap timestamp bakal geser ±7 jam.
+//
+// Solusinya: SET time_zone di level session begitu koneksi baru dibuka,
+// jadi apapun timezone OS/host MySQL-nya, koneksi Node.js selalu lihat
+// waktu dalam +07:00 — konsisten di localhost maupun di production.
+pool.on("connection", (connection) => {
+  connection.query("SET time_zone = '+07:00'");
+});
+
+// ============================================================
 // FUNGSI TEST KONEKSI
 // Dipanggil saat server pertama kali dinyalakan.
 // Tujuannya: pastikan database bisa diakses sebelum

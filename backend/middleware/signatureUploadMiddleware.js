@@ -11,13 +11,10 @@
 
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
 require("dotenv").config();
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+// ✅ FIX: path absolut terpusat — lihat config/uploadDir.js untuk alasannya.
+const UPLOAD_DIR = require("../config/uploadDir");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

@@ -258,7 +258,7 @@ async function cekStatusLaporan(req, res) {
     if (!kodeNormalized) {
       return res.status(400).json({
         success: false,
-        message: "Format nomor tiket tidak valid. Gunakan format LAP-8F2A93C1.",
+        message: "Format nomor tiket tidak valid. Gunakan format contoh ( LAP-8F2A93C1).",
       });
     }
 

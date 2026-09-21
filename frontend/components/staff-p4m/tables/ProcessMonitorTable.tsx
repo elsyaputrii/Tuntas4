@@ -621,7 +621,7 @@ export default function ProcessMonitorTable() {
 
                       <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-top">
                         {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                        {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 line-clamp-7">{item.aksi_masukan}</p>}
+                        {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 whitespace-pre-line break-words">{item.aksi_masukan}</p>}
                       </div>
 
                       <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
@@ -710,7 +710,7 @@ export default function ProcessMonitorTable() {
 
                           <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-top">
                             {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                            {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 line-clamp-7">{item.aksi_masukan}</p>}
+                            {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 whitespace-pre-line break-words">{item.aksi_masukan}</p>}
                           </div>
 
                           <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">

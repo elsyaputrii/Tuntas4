@@ -90,7 +90,20 @@ const BASE_CSS = `
     padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold;
     cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
   .close-btn:hover { background:#3a4d5e; }
-  @media print { body { padding:8px; } @page { size:A4 landscape; margin:12mm; } tr { page-break-inside:avoid; } .close-btn { display:none !important; } }
+  @media print {
+    body { padding:8px; }
+    @page { size:A4 landscape; margin:12mm; }
+    tr { page-break-inside:avoid; break-inside:avoid; }
+    /* ✅ FIX: tanda tangan (.ttd, di dalam .footer) kepotong di
+       tengah kalau kebetulan jatuh persis di batas halaman —
+       sebelumnya cuma <tr> yang dilindungi dari page-break, blok
+       tanda tangan di bawah tabel tidak. Sekarang seluruh blok
+       .footer (nama, jabatan, gambar TTD/QR) dipaksa selalu utuh
+       di satu halaman yang sama; kalau tidak muat, browser akan
+       mendorongnya ke halaman berikutnya, bukan memotongnya. */
+    .footer, .ttd { page-break-inside:avoid; break-inside:avoid; }
+    .close-btn { display:none !important; }
+  }
 `;
 
 // ─── FIX: window PDF TIDAK auto-close lagi ──────────────────────

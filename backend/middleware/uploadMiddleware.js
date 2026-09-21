@@ -6,15 +6,14 @@
 
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
 require("dotenv").config();
 
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  console.log(`📁 Folder '${UPLOAD_DIR}' berhasil dibuat`);
-}
+// ✅ FIX: pakai path absolut yang sama di semua tempat (lihat
+// config/uploadDir.js) — sebelumnya "uploads" di sini adalah path
+// relatif ke cwd proses, yang di production bisa resolve ke folder
+// lain daripada yang di-serve statis oleh server.js, bikin file
+// ter-upload tapi gak bisa diakses (404).
+const UPLOAD_DIR = require("../config/uploadDir");
 
 // ============================================================
 // STORAGE ENGINE
