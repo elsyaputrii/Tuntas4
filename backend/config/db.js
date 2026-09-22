@@ -65,7 +65,16 @@ const pool = mysql.createPool({
 // jadi apapun timezone OS/host MySQL-nya, koneksi Node.js selalu lihat
 // waktu dalam +07:00 — konsisten di localhost maupun di production.
 pool.on("connection", (connection) => {
-  connection.query("SET time_zone = '+07:00'");
+  // ⚠️ Awas: query ini bisa gagal diam-diam di beberapa layanan hosting
+  // DB (mis. koneksi lewat proxy/connection pooling yang menolak atau
+  // tidak mempertahankan SET SESSION antar query). Kalau itu terjadi,
+  // JANGAN andalkan ini sebagai satu-satunya sumber kebenaran timezone
+  // untuk data yang ditampilkan ke user — lihat civitasController.js
+  // cekStatusLaporan() untuk contoh cara yang tidak bergantung sama
+  // sekali pada timezone session (pakai UNIX_TIMESTAMP()).
+  connection.query("SET time_zone = '+07:00'").catch((err) => {
+    console.error("⚠️ Gagal SET time_zone di koneksi MySQL:", err.message);
+  });
 });
 
 // ============================================================

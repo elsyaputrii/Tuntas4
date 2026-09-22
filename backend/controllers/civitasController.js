@@ -169,6 +169,21 @@ function buildTahapProgres(laporan, ringkasan) {
         ? `Diteruskan ke: ${ringkasan.unit_tujuan.join(", ")}`
         : "Menunggu peninjauan dan penentuan unit oleh Staf P4M.",
     },
+    // ✅ Tahap baru: kepala unit sudah mengisi penyebab + rencana tindak
+    // lanjut (tabel rancangan_tindakan). Sebelumnya `adaRancangan` sudah
+    // dihitung di atas tapi tidak pernah dipakai di tahapan manapun,
+    // jadi progress di sisi civitas gak pernah "maju" pada momen ini —
+    // langsung loncat dari distribusi ke keputusan Ka P4M.
+    {
+      id: "rencana_unit",
+      title: "Kepala Unit Menyusun Rencana",
+      selesai: adaRancangan,
+      deskripsi: adaRancangan
+        ? "Kepala unit telah mengisi penyebab dan rencana tindak lanjut."
+        : adaBoxing
+        ? "Menunggu kepala unit mengisi penyebab dan rencana tindak lanjut."
+        : "Menunggu laporan didistribusikan ke unit.",
+    },
     {
       id: "keputusan_ka",
       title: "Keputusan Ka P4M",
@@ -262,6 +277,23 @@ async function cekStatusLaporan(req, res) {
       });
     }
 
+    // ✅ FIX jam salah setelah deploy: sebelumnya created_at/updated_at
+    // diambil apa adanya, lalu diterjemahkan ke objek Date oleh driver
+    // mysql2 berdasarkan opsi `timezone: "+07:00"` di config/db.js —
+    // itu cuma benar KALAU session MySQL beneran +07:00 saat itu (diatur
+    // lewat `SET time_zone` di pool.on("connection")). Command SET itu
+    // tidak ditunggu/di-catch, dan banyak layanan hosting DB (proxy /
+    // connection pooling) menolak atau tidak mempertahankan SET SESSION
+    // semacam ini antar query. Kalau itu gagal diam-diam, session-nya
+    // balik ke default host (sering UTC), tapi driver tetap memaksa
+    // anggap +07:00 → jam laporan di civitas geser ±7 jam persis seperti
+    // yang dilaporkan (beda dari jam di laptop/device).
+    //
+    // Solusi yang tidak bergantung pada timezone session MySQL sama
+    // sekali: UNIX_TIMESTAMP(kolom_timestamp) dihitung MySQL langsung
+    // dari nilai epoch internal kolom TIMESTAMP (yang memang selalu
+    // disimpan sebagai UTC), sehingga hasilnya benar di mesin manapun,
+    // apapun timezone OS/session MySQL saat itu.
     const [laporanRows] = await pool.query(
       `SELECT
         id_laporan,
@@ -272,7 +304,9 @@ async function cekStatusLaporan(req, res) {
         lampiran,
         status,
         created_at,
-        updated_at
+        updated_at,
+        UNIX_TIMESTAMP(created_at) * 1000 AS created_at_epoch_ms,
+        UNIX_TIMESTAMP(updated_at) * 1000 AS updated_at_epoch_ms
       FROM laporan_ketidaksesuaian
       WHERE kode_laporan = ?`,
       [kodeNormalized]
@@ -361,8 +395,15 @@ async function cekStatusLaporan(req, res) {
         lampiran: laporan.lampiran,
         status: laporan.status,
         status_label: labelStatusLaporan(laporan.status),
-        created_at: laporan.created_at,
-        updated_at: laporan.updated_at,
+        // ✅ Dibangun dari UNIX_TIMESTAMP (lihat komentar di query di atas)
+        // supaya jam yang dikirim ke frontend selalu instant UTC yang
+        // benar — browser user lah yang menerjemahkannya ke jam lokal
+        // device mereka lewat toLocaleDateString, bukan lagi bergantung
+        // pada asumsi timezone di server.
+        created_at: new Date(Number(laporan.created_at_epoch_ms)).toISOString(),
+        updated_at: laporan.updated_at_epoch_ms
+          ? new Date(Number(laporan.updated_at_epoch_ms)).toISOString()
+          : null,
         unit_tujuan: ringkasan.unit_tujuan,
         detail_unit,
         tahap_progres: buildTahapProgres(laporan, ringkasan),

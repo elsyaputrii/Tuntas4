@@ -39,6 +39,13 @@ interface StatusCheckerProps {
   initialKode?: string;
 }
 
+// ✅ "Rencana Tindak Lanjut" dari Ka Unit sengaja DISEMBUNYIKAN dari
+// tampilan civitas — bukan dihapus. Datanya tetap diambil dari API
+// (lihat unit.rencana_tindakan di bawah) supaya gampang dinyalakan
+// lagi kalau suatu saat mau ditampilkan lagi, tinggal ganti flag ini
+// jadi true.
+const TAMPILKAN_RENCANA_KA_UNIT = false;
+
 const statusBadgeClass: Record<string, string> = {
   menunggu: "bg-yellow-100 text-yellow-800 border-yellow-300",
   diproses: "bg-blue-100 text-blue-800 border-blue-300",
@@ -230,7 +237,12 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                     const adaRencana = !!unit.rencana_tindakan;
                     const adaCatatan = !!unit.catatan_staf;
 
-                    if (!adaRencana && !adaCatatan) return null;
+                    // Rencana Ka Unit disembunyikan (lihat TAMPILKAN_RENCANA_KA_UNIT),
+                    // jadi block ini cuma dianggap "ada isinya" kalau ada catatan,
+                    // atau kalau rencana lagi ditampilkan.
+                    const adaKontenDitampilkan =
+                      adaCatatan || (TAMPILKAN_RENCANA_KA_UNIT && adaRencana);
+                    if (!adaKontenDitampilkan) return null;
 
                     const tampilkanLabelUnit = data.detail_unit.length > 1;
 
@@ -245,7 +257,7 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                           </p>
                         )}
 
-                        {adaRencana && (
+                        {TAMPILKAN_RENCANA_KA_UNIT && adaRencana && (
                           <div>
                             <p className="text-gray-500 mb-2">
                               Rencana Tindak Lanjut
