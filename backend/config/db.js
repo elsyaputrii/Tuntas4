@@ -8,94 +8,76 @@ require("dotenv").config();
 
 // ============================================================
 // MEMBUAT POOL KONEKSI
-//
-// Pool = kumpulan koneksi yang sudah siap dipakai.
-// Analoginya seperti antrian kasir di supermarket —
-// daripada buka kasir baru setiap ada pembeli (lambat),
-// lebih baik sediakan beberapa kasir sekaligus (efisien).
-//
-// Jadi setiap kali ada request masuk, backend tidak perlu
-// buat koneksi baru dari nol ke MySQL, cukup ambil koneksi
-// yang sudah tersedia di pool.
 // ============================================================
 const pool = mysql.createPool({
-  host:     process.env.DB_HOST,      // dari .env: localhost
-  port:     process.env.DB_PORT,      // dari .env: 3306
-  user:     process.env.DB_USER,      // dari .env: root
-  password: process.env.DB_PASSWORD,  // dari .env: password kamu
-  database: process.env.DB_NAME,      // dari .env: tuntas4
+  host:     process.env.DB_HOST,
+  port:     process.env.DB_PORT,
+  user:     process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 
-  waitForConnections: true,  // tunggu jika semua koneksi sedang dipakai
-  connectionLimit: 10,       // maksimal 10 koneksi bersamaan
-  queueLimit: 0,             // antrian tidak dibatasi (0 = unlimited)
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 
-  // ✅ FIX: paksa koneksi Node.js ↔ MySQL pakai WIB (+07:00).
-  // Dump SQL kamu punya `SET time_zone = "+00:00"`, artinya kolom
-  // created_at/updated_at (tipe timestamp) dibaca sebagai UTC kalau
-  // koneksi tidak dikasih tahu timezone-nya. Ini yang bikin filter
-  // HARI INI / MINGGU INI / BULAN INI di Laporan Masuk meleset.
+  // Gunakan WIB
   timezone: "+07:00",
 
-  // ✅ FIX: kolom bertipe DATE (mis. tanggal_kejadian) dipaksa selalu
-  // dikembalikan sebagai string murni "YYYY-MM-DD", bukan objek Date JS.
-  // Kalau dibiarkan jadi objek Date, res.json() bakal manggil
-  // .toISOString() otomatis (selalu ke UTC) — itu bisa menggeser
-  // tanggalnya mundur 1 hari tergantung timezone server. String polos
-  // sama sekali tidak kena masalah ini.
+  // Kolom DATE dikembalikan sebagai string YYYY-MM-DD
   dateStrings: ["DATE"],
 });
 
 // ============================================================
-// ✅ FIX: paksa session MySQL sendiri pakai +07:00, jangan cuma
-// bilang ke driver "anggap +07:00" lewat opsi `timezone` di atas.
+// SET TIMEZONE SESSION MYSQL
 //
-// Opsi `timezone` cuma ngasih tau mysql2 caranya MENERJEMAHKAN
-// nilai yang balik dari MySQL ke objek Date JS. Itu cuma bener
-// KALAU session MySQL-nya emang lagi +07:00. Session time_zone
-// defaultnya ikut `SYSTEM` (timezone OS server MySQL) kalau gak
-// di-set eksplisit.
-//
-// Di localhost kamu (OS-nya WIB) itu kebetulan cocok (SYSTEM = +07:00),
-// makanya jam-nya kelihatan bener. Tapi begitu di-deploy ke server lain
-// yang OS/DB-nya UTC (banyak platform hosting default-nya begini,
-// apalagi dump SQL kamu eksplisit `SET time_zone = "+00:00"`), asumsi
-// "+07:00" di atas jadi salah dan setiap timestamp bakal geser ±7 jam.
-//
-// Solusinya: SET time_zone di level session begitu koneksi baru dibuka,
-// jadi apapun timezone OS/host MySQL-nya, koneksi Node.js selalu lihat
-// waktu dalam +07:00 — konsisten di localhost maupun di production.
+// PENTING:
+// Walaupun menggunakan mysql2/promise, connection yang diterima
+// dari event "connection" menggunakan query callback-style.
+// Jadi JANGAN pakai .catch() di sini.
+// ============================================================
 pool.on("connection", (connection) => {
-  // ⚠️ Awas: query ini bisa gagal diam-diam di beberapa layanan hosting
-  // DB (mis. koneksi lewat proxy/connection pooling yang menolak atau
-  // tidak mempertahankan SET SESSION antar query). Kalau itu terjadi,
-  // JANGAN andalkan ini sebagai satu-satunya sumber kebenaran timezone
-  // untuk data yang ditampilkan ke user — lihat civitasController.js
-  // cekStatusLaporan() untuk contoh cara yang tidak bergantung sama
-  // sekali pada timezone session (pakai UNIX_TIMESTAMP()).
-  connection.query("SET time_zone = '+07:00'").catch((err) => {
-    console.error("⚠️ Gagal SET time_zone di koneksi MySQL:", err.message);
-  });
+  connection.query(
+    "SET time_zone = '+07:00'",
+    (err) => {
+      if (err) {
+        console.error(
+          "⚠️ Gagal SET time_zone di koneksi MySQL:",
+          err.message
+        );
+      }
+    }
+  );
 });
 
 // ============================================================
 // FUNGSI TEST KONEKSI
-// Dipanggil saat server pertama kali dinyalakan.
-// Tujuannya: pastikan database bisa diakses sebelum
-// menerima request dari user.
 // ============================================================
 async function testConnection() {
   try {
-    // Coba ambil 1 koneksi dari pool
     const connection = await pool.getConnection();
+
     console.log("✅ Koneksi ke database MySQL berhasil!");
-    // Kembalikan koneksi ke pool setelah selesai dipakai
+
+    // Kembalikan koneksi ke pool
     connection.release();
   } catch (error) {
-    console.error("❌ Gagal koneksi ke database:", error.message);
-    console.error("   Cek kembali isi DB_HOST, DB_USER, DB_PASSWORD di file .env");
-    process.exit(1); // hentikan server jika database tidak bisa diakses
+    console.error(
+      "❌ Gagal koneksi ke database:",
+      error.message
+    );
+
+    console.error(
+      "   Cek kembali isi DB_HOST, DB_USER, DB_PASSWORD di file .env"
+    );
+
+    process.exit(1);
   }
 }
 
-// Export pool dan testConnection agar bisa dipakai di file lain
-module.exports = { pool, testConnection };
+// ============================================================
+// EXPORT
+// ============================================================
+module.exports = {
+  pool,
+  testConnection,
+};

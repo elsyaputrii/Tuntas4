@@ -287,24 +287,25 @@ export default function KepalaUnitLayout({
                     </div>
                     <div className="p-2">
                       <button
-                        onClick={() => {
-                          setShowProfile(false);
-                          router.push('/ka-p4m/profil');
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-                      >
-                        Profil Saya
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowProfile(false);
-                          router.push('/ka-p4m/pengaturan');
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-                      >
-                        Pengaturan
-                      </button>
+  onClick={() => {
+    setShowProfile(false);
+    router.push('/kepala-unit/profil'); // <-- Ubah dari /ka-p4m/profil ke /kepala-unit/profil
+  }}
+  className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+>
+  Profil Saya
+</button>
 
+{/* Tombol Pengaturan */}
+<button
+  onClick={() => {
+    setShowProfile(false);
+    router.push('/kepala-unit/pengaturan'); // <-- Ubah dari /ka-p4m/pengaturan ke /kepala-unit/pengaturan
+  }}
+  className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+>
+  Pengaturan
+</button>
                       {/* Divider */}
                       <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
 

@@ -2,149 +2,69 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import {
-  User,
-  Mail,
-  Building,
-  Calendar,
-  Edit,
-  Save,
-  X,
-  Camera,
-} from 'lucide-react';
+import { User, Mail, Building, Calendar, Edit, Save, X, Camera } from 'lucide-react';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
-
-interface UserProfile {
-  id: number;
-  nama_lengkap: string;
-  email: string;
-  role: string;
-  unit: string;
-  username: string;
-  created_at: string;
-  foto_profil: string | null;
-  tanggal_bergabung: string | null;
-}
-
-export default function ProfilKaP4MPage() {
+export default function ProfilStaffPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<UserProfile>({
-    id: 0,
-    nama_lengkap: '',
-    email: '',
-    role: '',
-    unit: '',
-    username: '',
-    created_at: '',
-    foto_profil: null,
-    tanggal_bergabung: null,
+  const [profile, setProfile] = useState({
+    name: 'Admin Staff P4M',
+    email: 'staff@polibatam.ac.id',
+    role: 'Staff P4M',
+    unit: 'P4M',
+    username: 'staff_p4m',
+    joined: '2024-01-01',
   });
   const [editForm, setEditForm] = useState(profile);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [avatarVersion, setAvatarVersion] = useState(0);
+  const [avatar, setAvatar] = useState<string | null>(null);
 
-  // Auth check
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const userRaw = localStorage.getItem('user');
-    if (!token || !userRaw) {
-      router.replace('/kepala-unit/login');
+    const role = localStorage.getItem('role');
+    if (!token || role !== 'staf_p4m') {
+      router.replace('/staff-p4m/login');
       return;
     }
+    // Ambil data user dari localStorage
     try {
-      const user = JSON.parse(userRaw);
-      if (user.role !== 'kepala_unit') {
-        router.replace('/kepala-unit/login');
-        return;
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (user.name) {
+        setProfile({
+          name: user.name || 'Admin Staff P4M',
+          email: user.email || 'staff@polibatam.ac.id',
+          role: 'Staff P4M',
+          unit: user.unit || 'P4M',
+          username: user.username || 'staff_p4m',
+          joined: user.created_at || '2024-01-01',
+        });
+        setEditForm({
+          name: user.name || 'Admin Staff P4M',
+          email: user.email || 'staff@polibatam.ac.id',
+          role: 'Staff P4M',
+          unit: user.unit || 'P4M',
+          username: user.username || 'staff_p4m',
+          joined: user.created_at || '2024-01-01',
+        });
       }
-    } catch {
-      router.replace('/kepala-unit/login');
-      return;
+    } catch (e) {
+      console.error('Error loading user data:', e);
     }
     setIsChecking(false);
   }, [router]);
 
-  // Ambil data user
-  useEffect(() => {
-    if (isChecking) return;
-    fetchUserData();
-  }, [isChecking]);
-
-  const fetchUserData = async () => {
-    setLoading(true);
+  const handleSave = () => {
+    setProfile(editForm);
+    setIsEditing(false);
+    // Simpan ke localStorage
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/api/users/profile`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-        setEditForm(data);
-      } else {
-        // Data dummy (kalau API belum siap)
-        const dummy = {
-          id: 1,
-          nama_lengkap: 'Kepala Unit',
-          email: 'kepala.unit@polibatam.ac.id',
-          role: 'kepala_unit',
-          unit: '-',
-          username: 'kepala_unit',
-          created_at: '2024-01-01',
-          foto_profil: null,
-          tanggal_bergabung: '2024-01-01',
-        };
-        setProfile(dummy);
-        setEditForm(dummy);
-      }
-    } catch (error) {
-      console.error('Gagal ambil data user:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nama_lengkap: editForm.nama_lengkap,
-          email: editForm.email,
-          tanggal_bergabung: editForm.tanggal_bergabung,
-        }),
-      });
-
-      if (response.ok) {
-        const updated = await response.json();
-        setProfile(updated);
-        setEditForm(updated);
-        setIsEditing(false);
-        alert('✅ Profil berhasil diperbarui! Silakan login kembali.');
-
-        // Data akun berubah (nama/email) → sesi lama nggak valid lagi
-        // secara logika, jadi paksa logout & balik ke halaman login.
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('user');
-        router.replace('/kepala-unit/login');
-      } else {
-        alert('Gagal menyimpan perubahan');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Gagal menyimpan perubahan');
-    }
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      user.name = editForm.name;
+      user.email = editForm.email;
+      user.unit = editForm.unit;
+      localStorage.setItem('user', JSON.stringify(user));
+    } catch (e) {}
+    alert('✅ Profil berhasil diperbarui!');
   };
 
   const handleCancel = () => {
@@ -152,220 +72,129 @@ export default function ProfilKaP4MPage() {
     setIsEditing(false);
   };
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      alert('⚠️ Format foto harus PNG, JPG, atau WEBP.');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      alert('⚠️ Ukuran foto maksimal 2MB.');
-      return;
-    }
-
-    setUploadingAvatar(true);
-    try {
-      const token = localStorage.getItem('token');
-      const formData = new FormData();
-      formData.append('foto', file);
-
-      const response = await fetch(`${BASE_URL}/api/users/profile/foto`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-
-      const data = await response.json().catch(() => null);
-      if (response.ok && data?.success) {
-        setProfile((prev) => ({ ...prev, foto_profil: data.foto_profil }));
-        setEditForm((prev) => ({ ...prev, foto_profil: data.foto_profil }));
-        setAvatarVersion((v) => v + 1);
-      } else {
-        alert(data?.message || 'Gagal mengunggah foto profil.');
-      }
-    } catch (error) {
-      console.error('Error upload foto profil:', error);
-      alert('Gagal mengunggah foto profil.');
-    } finally {
-      setUploadingAvatar(false);
-      e.target.value = '';
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setAvatar(url);
     }
   };
 
-  if (isChecking || loading) {
+  if (isChecking) {
     return (
-      <div className="min-h-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-500">Memuat data profil...</p>
-        </div>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      {/* Header Avatar */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">👤 Profil Saya</h2>
+        <button
+          onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition"
+        >
+          {isEditing ? <Save size={18} /> : <Edit size={18} />}
+          {isEditing ? 'Simpan' : 'Edit Profil'}
+        </button>
+      </div>
+
+      {/* Avatar */}
       <div className="text-center mb-8">
         <div className="relative inline-block">
-          <div className="w-28 h-28 rounded-full bg-linear-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto mb-3 overflow-hidden relative">
-            {uploadingAvatar ? (
-              <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
-            ) : profile.foto_profil ? (
-              <Image
-                src={`${BASE_URL}/uploads/${profile.foto_profil}?v=${avatarVersion}`}
-                alt="Foto profil"
-                fill
-                sizes="112px"
-                className="object-cover"
-              />
+          <div className="w-28 h-28 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white text-4xl font-bold mx-auto overflow-hidden">
+            {avatar ? (
+              <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-4xl">{profile.nama_lengkap?.charAt(0) || '👤'}</span>
+              <span>{profile.name?.charAt(0) || 'A'}</span>
             )}
           </div>
           {isEditing && (
             <label className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full cursor-pointer hover:bg-blue-600 transition">
               <Camera size={14} />
-              <input
-                type="file"
-                className="hidden"
-                accept="image/png, image/jpeg, image/webp"
-                onChange={handleAvatarChange}
-                disabled={uploadingAvatar}
-              />
+              <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
             </label>
           )}
         </div>
-        {!isEditing ? (
-          <>
-            <h2 className="text-2xl font-bold text-slate-700 dark:text-white mt-2">
-              {profile.nama_lengkap}
-            </h2>
-            <p className="text-slate-500 dark:text-slate-400 capitalize">
-              {profile.role?.replace('_', ' ')}
-            </p>
-          </>
-        ) : (
-          <div className="mt-2">
-            <input
-              type="text"
-              value={editForm.nama_lengkap}
-              onChange={(e) => setEditForm({ ...editForm, nama_lengkap: e.target.value })}
-              className="text-center text-2xl font-bold bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1 outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-        )}
+        <h3 className="text-xl font-semibold text-gray-800 dark:text-white mt-2">{profile.name}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{profile.role}</p>
       </div>
 
-      {/* Info Detail */}
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-slate-700 dark:text-white mb-4 flex items-center gap-2">
-          <User size={18} /> Informasi Akun
-        </h3>
-
-        {/* Username (readonly) */}
+      {/* Info */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 space-y-4">
         <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
-          <User size={18} className="text-slate-400" />
+          <User size={18} className="text-gray-400" />
           <div className="flex-1">
-            <p className="text-xs text-slate-400">Username</p>
-            <p className="text-slate-700 dark:text-white">{profile.username}</p>
+            <p className="text-xs text-gray-400">Nama Lengkap</p>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                className="w-full bg-transparent border-b border-blue-400 focus:outline-none dark:text-white"
+              />
+            ) : (
+              <p className="text-gray-700 dark:text-gray-300">{profile.name}</p>
+            )}
           </div>
         </div>
 
-        {/* Email */}
         <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
-          <Mail size={18} className="text-slate-400" />
+          <Mail size={18} className="text-gray-400" />
           <div className="flex-1">
-            <p className="text-xs text-slate-400">Email</p>
-            {!isEditing ? (
-              <p className="text-slate-700 dark:text-white">{profile.email}</p>
-            ) : (
+            <p className="text-xs text-gray-400">Email</p>
+            {isEditing ? (
               <input
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                className="w-full bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1 outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full bg-transparent border-b border-blue-400 focus:outline-none dark:text-white"
               />
-            )}
-          </div>
-        </div>
-
-        {/* Role (readonly) */}
-        <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
-          <Building size={18} className="text-slate-400" />
-          <div className="flex-1">
-            <p className="text-xs text-slate-400">Role</p>
-            <p className="text-slate-700 dark:text-white capitalize">
-              {profile.role?.replace('_', ' ')}
-            </p>
-          </div>
-        </div>
-
-        {/* Unit (readonly) */}
-        <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
-          <Building size={18} className="text-slate-400" />
-          <div className="flex-1">
-            <p className="text-xs text-slate-400">Unit</p>
-            <p className="text-slate-700 dark:text-white">{profile.unit || '-'}</p>
-          </div>
-        </div>
-
-        {/* Bergabung Sejak (bisa diedit: tahun, bulan, tanggal) */}
-        <div className="flex items-center gap-4 p-3">
-          <Calendar size={18} className="text-slate-400" />
-          <div className="flex-1">
-            <p className="text-xs text-slate-400">Bergabung Sejak</p>
-            {!isEditing ? (
-              <p className="text-slate-700 dark:text-white">
-                {profile.tanggal_bergabung
-                  ? new Date(profile.tanggal_bergabung).toLocaleDateString('id-ID')
-                  : '-'}
-              </p>
             ) : (
-              <input
-                type="date"
-                max={new Date().toISOString().split('T')[0]}
-                value={
-                  editForm.tanggal_bergabung
-                    ? new Date(editForm.tanggal_bergabung).toISOString().split('T')[0]
-                    : ''
-                }
-                onChange={(e) => setEditForm({ ...editForm, tanggal_bergabung: e.target.value })}
-                className="bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1 outline-none focus:ring-2 focus:ring-blue-400"
-              />
+              <p className="text-gray-700 dark:text-gray-300">{profile.email}</p>
             )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 p-3 border-b dark:border-slate-700">
+          <Building size={18} className="text-gray-400" />
+          <div className="flex-1">
+            <p className="text-xs text-gray-400">Unit</p>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editForm.unit}
+                onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+                className="w-full bg-transparent border-b border-blue-400 focus:outline-none dark:text-white"
+              />
+            ) : (
+              <p className="text-gray-700 dark:text-gray-300">{profile.unit}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 p-3">
+          <Calendar size={18} className="text-gray-400" />
+          <div className="flex-1">
+            <p className="text-xs text-gray-400">Bergabung Sejak</p>
+            <p className="text-gray-700 dark:text-gray-300">{profile.joined}</p>
           </div>
         </div>
       </div>
 
-      {/* Tombol Aksi */}
-      <div className="flex justify-end gap-3 mt-6">
-        {!isEditing ? (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition"
-          >
-            <Edit size={16} /> Edit Profil
+      {/* Tombol aksi */}
+      {isEditing && (
+        <div className="flex justify-end gap-3 mt-4">
+          <button onClick={handleCancel} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-xl transition">
+            <X size={16} /> Batal
           </button>
-        ) : (
-          <>
-            <button
-              onClick={handleCancel}
-              className="flex items-center gap-2 px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl transition"
-            >
-              <X size={16} /> Batal
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl transition"
-            >
-              <Save size={16} /> Simpan
-            </button>
-          </>
-        )}
-      </div>
+          <button onClick={handleSave} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl transition">
+            <Save size={16} /> Simpan
+          </button>
+        </div>
+      )}
     </div>
   );
 }
