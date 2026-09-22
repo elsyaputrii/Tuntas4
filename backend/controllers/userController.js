@@ -149,8 +149,12 @@ async function updateUser(req, res) {
 
     if (password?.trim()) {
       const hashed = await bcrypt.hash(password, 10);
+      // Staf P4M nyetel password baru buat akun ORANG LAIN (mis. reset
+      // password) → tandai wajib_ganti_password = 1 lagi, supaya pas
+      // login berikutnya pemilik akun diarahkan ganti password (atau
+      // boleh skip pakai password yang baru disiapkan ini).
       await conn.query(
-        `UPDATE pengguna SET nama=?, email=?, role=?, status=?, nip=?, password=? WHERE id_pengguna=?`,
+        `UPDATE pengguna SET nama=?, email=?, role=?, status=?, nip=?, password=?, wajib_ganti_password=1 WHERE id_pengguna=?`,
         [name, email, roleDb, status || "active", nip || existing[0].nip, hashed, id]
       );
     } else {
@@ -210,6 +214,7 @@ async function fetchProfileById(id) {
       p.created_at  AS created_at,
       p.foto_profil AS foto_profil,
       p.tanggal_bergabung AS tanggal_bergabung,
+      p.wajib_ganti_password AS wajib_ganti_password,
       ku.unit       AS unit_kepala
     FROM pengguna p
     LEFT JOIN kepala_unit ku ON ku.id_pengguna = p.id_pengguna
@@ -233,6 +238,7 @@ async function fetchProfileById(id) {
     // Fallback ke created_at kalau kolom baru ini belum keisi (akun lama
     // sebelum migration, atau belum sempat di-UPDATE backfill-nya)
     tanggal_bergabung: row.tanggal_bergabung || row.created_at,
+    wajibGantiPassword: !!row.wajib_ganti_password,
   };
 }
 
@@ -352,12 +358,43 @@ async function changePassword(req, res) {
     }
 
     const hashed = await bcrypt.hash(newPassword, 10);
-    await pool.query("UPDATE pengguna SET password = ? WHERE id_pengguna = ?", [hashed, userId]);
+    // User ganti password sendiri → matikan flag wajib_ganti_password,
+    // apapun nilainya sebelumnya (baik ini ganti password wajib pas
+    // login pertama, maupun ganti password biasa lewat halaman Pengaturan).
+    await pool.query(
+      "UPDATE pengguna SET password = ?, wajib_ganti_password = 0 WHERE id_pengguna = ?",
+      [hashed, userId]
+    );
 
     return res.status(200).json({ success: true, message: "Password berhasil diubah." });
   } catch (error) {
     console.error("Error changePassword:", error);
     return res.status(500).json({ success: false, message: "Gagal mengubah password." });
+  }
+}
+
+// ── PUT /api/users/lewati-ganti-password — skip ganti password wajib ─
+// Dipakai halaman "Ubah Password" (muncul wajib pas login pertama /
+// pas password baru direset Staf P4M). User boleh pilih lewati dan
+// tetap pakai password yang sudah disiapkan — cukup matikan flag-nya,
+// TIDAK perlu verifikasi password lama karena tidak ada perubahan.
+async function lewatiGantiPassword(req, res) {
+  const userId = req.user.id;
+  try {
+    const [existing] = await pool.query(
+      "SELECT id_pengguna FROM pengguna WHERE id_pengguna = ?",
+      [userId]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    await pool.query("UPDATE pengguna SET wajib_ganti_password = 0 WHERE id_pengguna = ?", [userId]);
+
+    return res.status(200).json({ success: true, message: "Berhasil dilewati. Password lama tetap dipakai." });
+  } catch (error) {
+    console.error("Error lewatiGantiPassword:", error);
+    return res.status(500).json({ success: false, message: "Gagal melewati proses ganti password." });
   }
 }
 
@@ -542,6 +579,7 @@ module.exports = {
   getProfile,
   updateProfile,
   changePassword,
+  lewatiGantiPassword,
   uploadFotoProfil,
   deleteFotoProfil,
 };

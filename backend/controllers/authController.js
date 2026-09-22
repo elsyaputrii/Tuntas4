@@ -30,7 +30,7 @@ function buatToken(user) {
 async function cekKredensial(email, password, roleDiharapkan, res) {
   // Cari user berdasarkan email
   const [rows] = await pool.query(
-    `SELECT id_pengguna, nama, email, password, role, nip
+    `SELECT id_pengguna, nama, email, password, role, nip, wajib_ganti_password
      FROM pengguna WHERE email = ? LIMIT 1`,
     [email]
   );
@@ -108,6 +108,7 @@ async function loginStaf(req, res) {
           email:   user.email,
           role:    user.role,
           nip:     user.nip,
+          wajibGantiPassword: !!user.wajib_ganti_password,
         },
       },
     });
@@ -157,6 +158,7 @@ async function loginKaP4M(req, res) {
           email: user.email,
           role:  user.role,
           nip:   user.nip,
+          wajibGantiPassword: !!user.wajib_ganti_password,
         },
       },
     });
@@ -208,6 +210,7 @@ async function loginKepalaUnit(req, res) {
           email:      user.email,
           role:       user.role,
           nip:        user.nip,
+          wajibGantiPassword: !!user.wajib_ganti_password,
         },
       },
     });
@@ -236,7 +239,7 @@ async function login(req, res) {
 
   try {
     const [rows] = await pool.query(
-      `SELECT id_pengguna, nama, email, password, role, nip
+      `SELECT id_pengguna, nama, email, password, role, nip, wajib_ganti_password
        FROM pengguna WHERE email = ? LIMIT 1`,
       [email]
     );
@@ -303,6 +306,7 @@ async function login(req, res) {
           email: user.email,
           role: user.role,
           nip: user.nip,
+          wajibGantiPassword: !!user.wajib_ganti_password,
         },
       },
     });

@@ -213,9 +213,11 @@ async function resetPassword(req, res) {
     // Hash password baru
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    // Update password di tabel pengguna
+    // Update password di tabel pengguna — user sudah sengaja bikin
+    // password sendiri lewat reset ini, jadi matikan juga flag
+    // wajib_ganti_password kalau sebelumnya masih menyala.
     await pool.query(
-      `UPDATE pengguna SET password = ? WHERE id_pengguna = ?`,
+      `UPDATE pengguna SET password = ?, wajib_ganti_password = 0 WHERE id_pengguna = ?`,
       [hashedPassword, resetToken.id_pengguna]
     );
 

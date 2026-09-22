@@ -20,6 +20,14 @@ import NotifikasiBell from '@/components/notifikasi/NotifikasiBell';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
+interface KepalaUnitProfile {
+  nama?: string;
+  email?: string;
+  unit?: string;
+  nama_unit?: string;
+  foto_profil?: string | null;
+}
+
 export default function KepalaUnitLayout({
   children,
 }: {
@@ -27,7 +35,7 @@ export default function KepalaUnitLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<KepalaUnitProfile | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -53,6 +61,13 @@ export default function KepalaUnitLayout({
       const user = JSON.parse(userRaw);
       if (user.role !== 'kepala_unit') {
         router.push('/login');
+        return;
+      }
+      // Akun baru / password baru direset Staf P4M → wajib mampir ganti
+      // password dulu (boleh dilewati) sebelum bisa buka dashboard,
+      // walaupun user coba lompat langsung lewat URL.
+      if (user.wajibGantiPassword) {
+        router.push('/ubah-password');
       }
     } catch {
       router.push('/login');
@@ -155,7 +170,7 @@ export default function KepalaUnitLayout({
     <div className="h-screen bg-[#ececec] dark:bg-slate-900 flex overflow-hidden">
       <aside
         className={`bg-linear-to-b from-[#18253d] to-[#08142b] dark:from-slate-800 dark:to-slate-900
-        text-white transition-all duration-300 flex flex-col shadow-2xl shadow-2xl h-screen sticky top-0
+        text-white transition-all duration-300 flex flex-col shadow-2xl h-screen sticky top-0
         ${sidebarOpen ? 'w-65' : 'w-21.25'}`}
       >
         <div className={`px-5 py-5 border-b border-white/10 flex items-center ${sidebarOpen ? 'justify-between' : 'flex-col justify-center gap-3'}`}>

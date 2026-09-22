@@ -68,6 +68,14 @@ export default function LoginForm({
         localStorage.setItem("user", JSON.stringify(res.data.user));
         localStorage.setItem("role", res.data.user.role);
 
+        // Akun baru / akun yang password-nya baru direset Staf P4M wajib
+        // diarahkan ganti password dulu (boleh dilewati di halaman itu),
+        // sebelum masuk ke dashboard masing-masing role.
+        if (res.data.user.wajibGantiPassword) {
+          router.push("/ubah-password");
+          return;
+        }
+
         const tujuan = REDIRECT_BY_ROLE[res.data.user.role] || "/login";
         router.push(tujuan);
       }
@@ -81,7 +89,7 @@ export default function LoginForm({
   if (!mounted) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 z-100 flex items-center justify-center overflow-hidden">
       {/* Background gambar penuh (JELAS, tanpa blur) */}
       <div className="absolute inset-0 z-0">
         <Image

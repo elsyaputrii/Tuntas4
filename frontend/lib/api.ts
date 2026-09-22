@@ -317,4 +317,17 @@ export const userApi = {
 
   deleteTandaTangan: (id: number) =>
     apiFetch(`/users/${id}/tanda-tangan`, { method: "DELETE" }),
+
+  getProfile: () => apiFetch("/users/profile"),
+
+  changePassword: (oldPassword: string, newPassword: string) =>
+    apiFetch("/users/change-password", {
+      method: "PUT",
+      body: JSON.stringify({ oldPassword, newPassword }),
+    }),
+
+  // Dipakai halaman "Ubah Password" wajib pas login pertama — user
+  // pilih lewati dan tetap pakai password yang sudah disiapkan.
+  skipGantiPassword: () =>
+    apiFetch("/users/lewati-ganti-password", { method: "PUT" }),
 };

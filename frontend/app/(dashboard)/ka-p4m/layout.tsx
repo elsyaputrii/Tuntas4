@@ -55,6 +55,13 @@ export default function KaP4MLayout({
       const user = JSON.parse(userRaw);
       if (user.role !== 'ka_p4m') {
         router.push('/login');
+        return;
+      }
+      // Akun baru / password baru direset Staf P4M → wajib mampir ganti
+      // password dulu (boleh dilewati) sebelum bisa buka dashboard,
+      // walaupun user coba lompat langsung lewat URL.
+      if (user.wajibGantiPassword) {
+        router.push('/ubah-password');
       }
     } catch {
       router.push('/login');
