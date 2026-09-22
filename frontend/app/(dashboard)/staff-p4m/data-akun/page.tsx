@@ -57,7 +57,12 @@ export default function DataAkunPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/users');
+      const token = localStorage.getItem("token");
+      const response = await fetch('http://localhost:5000/api/users', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -106,9 +111,13 @@ export default function DataAkunPage() {
         : 'http://localhost:5000/api/users';
       const method = selectedUser ? 'PUT' : 'POST';
 
+      const token = localStorage.getItem("token");
       const response = await fetch(url, {
         method: method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(formData),
       });
 
@@ -128,8 +137,12 @@ export default function DataAkunPage() {
   const handleDelete = async () => {
     if (selectedUser) {
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch(`http://localhost:5000/api/users/${selectedUser.id}`, {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
         if (response.ok) {
           setUsers(users.filter((user) => user.id !== selectedUser.id));

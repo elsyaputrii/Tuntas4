@@ -89,9 +89,14 @@ async function createUser(req, res) {
     const hashed = await bcrypt.hash(password, 10);
     const finalNip = nip?.trim() || generateNip();
 
+    // ✅ wajib_ganti_password dipaksa = 1 di sini, jangan andalkan default
+    // kolom di database. Ini penting kalau aplikasinya di-deploy ulang ke
+    // instalasi baru (mis. server milik pembeli) — akun yang baru dibuat
+    // Staf P4M harus SELALU disuruh ganti password sekali di login
+    // pertama, apa pun default kolomnya di DB masing-masing instalasi.
     const [result] = await conn.query(
-      `INSERT INTO pengguna (nama, email, password, role, status, nip)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO pengguna (nama, email, password, role, status, nip, wajib_ganti_password)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
       [name, email, hashed, roleDb, status || "active", finalNip]
     );
     const idPengguna = result.insertId;

@@ -49,8 +49,8 @@ async function seed() {
       const nip = `1985010120100${String(11001 + i).padStart(5, "0")}`.slice(0, 20);
 
       const [penggunaResult] = await conn.query(
-        `INSERT INTO pengguna (nama, email, password, role, nip)
-         VALUES (?, ?, ?, 'kepala_unit', ?)`,
+        `INSERT INTO pengguna (nama, email, password, role, nip, wajib_ganti_password)
+         VALUES (?, ?, ?, 'kepala_unit', ?, 1)`,
         [unitToNama(unit), email, passwordHash, nip]
       );
 
