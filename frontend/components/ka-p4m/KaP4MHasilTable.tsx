@@ -23,6 +23,7 @@ import {
   Wrench,
   ClipboardCheck,
   Building2,
+  Search,
 } from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -110,6 +111,8 @@ export default function KaP4MHasilTable() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("semua");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -127,10 +130,36 @@ export default function KaP4MHasilTable() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const filteredData = useMemo(() => {
-    return data.filter((item) =>
-      isInPeriodFilter(filterMode, selectedDate, toLocalDate, item.created_at ?? null)
-    );
-  }, [data, filterMode, selectedDate]);
+    return data.filter((item) => {
+      // 1. Filter Periode Tanggal
+      const matchPeriod = isInPeriodFilter(filterMode, selectedDate, toLocalDate, item.created_at ?? null);
+      if (!matchPeriod) return false;
+
+      // 2. Filter Status Keputusan Staff (Diterima / Ditolak / Menunggu)
+      if (statusFilter !== "semua") {
+        const approval = item.approval_staf ?? "menunggu";
+        if (statusFilter === "diterima" && approval !== "diterima") return false;
+        if (statusFilter === "ditolak" && approval !== "ditolak") return false;
+        if (statusFilter === "menunggu" && approval !== "menunggu") return false;
+      }
+
+      // 3. Filter Kata Kunci Pencarian (Search Query)
+      if (searchQuery.trim() !== "") {
+        const q = searchQuery.toLowerCase();
+        const matchKode = item.kode_laporan?.toLowerCase().includes(q);
+        const matchIsi = item.isi_laporan?.toLowerCase().includes(q);
+        const matchUnit = item.nama_unit?.toLowerCase().includes(q);
+        const matchRencana = (item.aksi_masukan || item.rencana_tindakan)?.toLowerCase().includes(q);
+        const matchHasil = item.hasil_tindakan?.toLowerCase().includes(q);
+
+        if (!matchKode && !matchIsi && !matchUnit && !matchRencana && !matchHasil) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [data, filterMode, selectedDate, statusFilter, searchQuery]);
 
   const groupedData = useMemo(() => {
     const map = new Map<number, {
@@ -237,20 +266,55 @@ export default function KaP4MHasilTable() {
     <>
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
 
-      {/* FILTER PERIODE */}
-      <div className="mb-3">
-        <PeriodFilterBar
-          filterMode={filterMode}
-          onFilterModeChange={setFilterMode}
-          selectedDate={selectedDate}
-          onSelectedDateChange={setSelectedDate}
-          highlightedDates={highlightedDates}
-          showCalendar={false}
+      {/* FILTER PERIODE, SEARCH, & STATUS */}
+<div className="mb-3 space-y-2">
+  {/* Filter Periode Utama */}
+  <PeriodFilterBar
+    filterMode={filterMode}
+    onFilterModeChange={setFilterMode}
+    selectedDate={selectedDate}
+    onSelectedDateChange={setSelectedDate}
+    highlightedDates={highlightedDates}
+    showCalendar={false}
+  />
+
+  {/* BARIS INFO (KIRI) + SEARCH & STATUS FILTER (KANAN SEJAJAR) */}
+  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+    {/* TEKS INFO LAPORAN (KIRI) */}
+    <p className="text-[10px] text-gray-400 font-bold uppercase shrink-0">
+      {filteredData.length} item tindak lanjut ({groupedData.length} laporan) · {labelPeriodFilter(filterMode, selectedDate, fmtTglShared)}
+    </p>
+
+    {/* CONTROLS SEARCH & STATUS FILTER (KANAN, TIDAK FULL WIDTH) */}
+    <div className="flex items-center gap-2">
+      {/* SEARCH BAR (Lebar pas/compact) */}
+      <div className="relative w-56 sm:w-64">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+        <input
+          type="text"
+          placeholder="Cari laporan, unit, hasil..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-8 pr-2 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:border-black bg-white"
         />
-        <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase">
-          {filteredData.length} laporan · {labelPeriodFilter(filterMode, selectedDate, fmtTglShared)}
-        </p>
       </div>
+
+      {/* DROPDOWN STATUS STAFF */}
+      <div className="flex items-center gap-1 shrink-0">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="text-xs border border-gray-300 rounded-md px-2 py-2 bg-white font-medium focus:outline-none focus:border-black"
+        >
+          <option value="semua">Semua Status</option>
+          <option value="diterima">Siap (Selesai)</option>
+          <option value="ditolak">Belum Siap (Revisi)</option>
+          <option value="menunggu">Menunggu Keputusan / Proses</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">

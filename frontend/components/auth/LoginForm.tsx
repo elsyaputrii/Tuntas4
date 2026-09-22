@@ -132,42 +132,52 @@ export default function LoginForm({
 
           {/* Form */}
           <div className="w-full space-y-4">
-            {/* Email */}
-            <div className="relative">
-              <span className="absolute inset-y-0 left-4 flex items-center text-gray-600">
-                <User size={18} />
-              </span>
-              <input
-                type="email"
-                placeholder="Enter Email"
-                className="w-full pl-12 pr-4 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
+            {/* Email / Username */}
+            <div>
+              <label className="block text-white text-xs font-semibold mb-1.5">
+                Email
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-4 flex items-center text-gray-600">
+                  <User size={18} />
+                </span>
+                <input
+                  type="email"
+                  placeholder="xxxx@polibatam.ac.id"
+                  className="w-full pl-12 pr-4 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
+              </div>
             </div>
 
             {/* Password */}
-            <div className="relative">
-              <span className="absolute inset-y-0 left-4 flex items-center text-gray-600">
-                <Lock size={18} />
-              </span>
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter Password"
-                className="w-full pl-12 pr-12 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none [&::-ms-reveal]:hidden [&::-webkit-credentials-picker]:hidden"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute inset-y-0 right-4 flex items-center text-gray-500 hover:text-gray-700 transition z-10 cursor-pointer"
-                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+            <div>
+              <label className="block text-white text-xs font-semibold mb-1.5">
+                Kata Sandi
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-4 flex items-center text-gray-600">
+                  <Lock size={18} />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Masukkan kata sandi"
+                  className="w-full pl-12 pr-12 py-3 rounded-lg bg-[#E8F0FE] text-gray-800 placeholder-gray-500 focus:outline-none [&::-ms-reveal]:hidden [&::-webkit-credentials-picker]:hidden"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-4 flex items-center text-gray-500 hover:text-gray-700 transition z-10 cursor-pointer"
+                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {/* Error message */}

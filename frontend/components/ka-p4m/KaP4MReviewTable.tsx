@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { kaP4MApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
-import { Pencil, Eye, Clock, RefreshCw, CheckCircle2, Calendar, XCircle, Image as ImageIcon, Mail, Target,
+import { Pencil, Eye, Clock, RefreshCw, CheckCircle2, Calendar, XCircle, Image as ImageIcon, Mail, Target, Search, Filter,
 } from "lucide-react";
 import { PeriodFilterBar, isInPeriodFilter, type FilterMode,
 } from "@/components/shared/PeriodFilterBar";
@@ -115,6 +115,8 @@ export default function KaP4MReviewTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [msgOk, setMsgOk] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); 
+  const [statusFilter, setStatusFilter] = useState("semua");
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const filterModeLabel: Record<FilterMode, string> = {
@@ -153,16 +155,40 @@ export default function KaP4MReviewTable() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filteredData = useMemo(() => {
-  return data.filter((item) =>
-    isInPeriodFilter(
+  // ── FILTERED DATA (PERIODE + SEARCH + STATUS) ──
+const filteredData = useMemo(() => {
+  return data.filter((item) => {
+    // 1. Filter Periode
+    const matchPeriod = isInPeriodFilter(
       filterMode,
       selectedDate,
       (value) => new Date(value),
       item.created_at
-    )
-  );
-}, [data, filterMode, selectedDate]);
+    );
+    if (!matchPeriod) return false;
+
+    // 2. Filter Status Review (Tambah bagian ini)
+    if (statusFilter !== "semua" && item.status_review !== statusFilter) {
+      return false;
+    }
+
+    // 3. Filter Search (Tambah bagian ini)
+    if (searchQuery.trim() !== "") {
+      const query = searchQuery.toLowerCase();
+      const matchKode = item.kode_laporan?.toLowerCase().includes(query);
+      const matchIsi = item.isi_laporan?.toLowerCase().includes(query);
+      const matchUnit = item.nama_unit?.toLowerCase().includes(query);
+      const matchPenyebab = item.penyebab?.toLowerCase().includes(query);
+      const matchRencana = item.rencana_tindakan?.toLowerCase().includes(query);
+
+      if (!matchKode && !matchIsi && !matchUnit && !matchPenyebab && !matchRencana) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}, [data, filterMode, selectedDate, statusFilter, searchQuery]); 
 
 const highlightedDates = useMemo(() => {
   const filterModeLabel: Record<FilterMode, string> = {
@@ -436,25 +462,63 @@ const highlightedDates = useMemo(() => {
         </div>
       )}
 
-      {/* ── FILTER PERIODE ── */}
-      <div className="mb-4">
-        <PeriodFilterBar
-          filterMode={filterMode}
-          onFilterModeChange={setFilterMode}
-          selectedDate={selectedDate}
-          onSelectedDateChange={setSelectedDate}
-          highlightedDates={highlightedDates}
-          showCalendar={false}
-        />
-  
-        <p className="mt-2 text-[11px] text-gray-500 italic">
-          Menampilkan{" "}
-          <span className="bg-[#4E617A] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-            {filteredData.length} laporan
-          </span>
-        </p>
-      </div>
+      {/* ── FILTER & SEARCH BAR ── */}
+      <div className="mb-4 space-y-3">
+        {/* BARIS 1: FILTER PERIODE */}
+        <div>
+          <PeriodFilterBar
+            filterMode={filterMode}
+            onFilterModeChange={setFilterMode}
+            selectedDate={selectedDate}
+            onSelectedDateChange={setSelectedDate}
+            highlightedDates={highlightedDates}
+            showCalendar={false}
+          />
+        </div>
 
+        {/* BARIS 2: KETERANGAN JUMLAH LAPORAN (KIRI) & SEARCH + FILTER STATUS (KANAN) */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          {/* KETERANGAN JUMLAH LAPORAN */}
+          <p className="text-[11px] text-gray-500 italic">
+            Menampilkan{" "}
+            <span className="bg-[#4E617A] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+              {filteredData.length} laporan
+            </span>{" "}
+            {filterModeLabel[filterMode]}
+          </p>
+
+          {/* SEARCH & FILTER STATUS */}
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto justify-end">
+            <div className="relative w-full sm:w-64">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari kata kunci..."
+                className="w-full pl-8 pr-2 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:border-black bg-white"
+              />
+            </div>
+
+            <div className="relative w-full sm:w-auto flex items-center gap-1.5 border border-gray-300 focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-gray-200 px-3 py-2 bg-white rounded-md shrink-0">
+              <Filter size={14} className="text-gray-500" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs bg-transparent outline-none cursor-pointer w-full"
+              >
+                <option value="semua">Semua Status Review</option>
+                <option value="menunggu_keputusan_ka">Menunggu Keputusan</option>
+                <option value="ditindaklanjuti">Perbaikan Berkelanjutan</option>
+                <option value="tidak_ditindaklanjuti">Sesuai</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── TABEL ── */}
       <div className="w-full border-2 border-black bg-white text-xs">
@@ -473,7 +537,9 @@ const highlightedDates = useMemo(() => {
         <div className="sm:hidden">
           {groupedData.length === 0 ? (
             <div className="p-12 text-center text-gray-400 italic text-sm">
-              {filterMode === "semua"
+              {searchQuery || statusFilter !== "semua"
+                ? "Tidak ada data yang sesuai dengan kriteria pencarian/filter."
+                : filterMode === "semua"
                 ? "Belum ada rancangan dari Kepala Unit."
                 : `Tidak ada laporan untuk periode ${filterModeLabel[filterMode]}.`}
             </div>
@@ -614,7 +680,9 @@ const highlightedDates = useMemo(() => {
 
             {groupedData.length === 0 ? (
               <div className="col-span-6 p-12 text-center text-gray-400 italic text-sm">
-                {filterMode === "semua"
+                {searchQuery || statusFilter !== "semua"
+                  ? "Tidak ada data yang sesuai dengan kriteria pencarian/filter."
+                  : filterMode === "semua"
                   ? "Belum ada rancangan dari Kepala Unit."
                   : `Tidak ada laporan untuk periode ${filterModeLabel[filterMode]}.`}
               </div>
