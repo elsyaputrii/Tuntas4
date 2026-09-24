@@ -828,7 +828,30 @@ export default function RecapitulationTable() {
         <span className="text-[9px] text-gray-400">PDF:</span>
         {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
           <button key={kat}
-            onClick={async ()=>{ setExportingPDF(kat); await exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M); setExportingPDF(null); }}
+            onClick={async ()=>{
+              setExportingPDF(kat);
+              try{
+                // ✅ FIX: ikut ambil data arsip (Upload Data Lama) sebelum export PDF,
+                // sama seperti yang sudah dilakukan tombol Export Excel.
+                let arsipForPdf: ArsipItem[] = [];
+                try{
+                  // ✅ FIX: `tahun` sekarang SELALU dikirim (kolom int, indexed
+                  // di backend) buat semua mode — sebelumnya cuma dikirim
+                  // pas "tahunan", jadi mode lain narik semua tahun arsip.
+                  // `bulan` ikut dikirim khusus utk harian/mingguan/bulanan,
+                  // karena ketiganya selalu dalam satu bulan kalender yang
+                  // sama (lihat sameWeekOfMonth di exportHelpers.ts — minggu
+                  // nggak pernah lintas bulan), jadi aman disortir di server.
+                  const tahunFilter = selectedDate.getFullYear();
+                  const bulanFilter = kat === "tahunan" ? undefined : selectedDate.getMonth() + 1;
+                  const arsipRes = await stafApi.getArsipRekap(tahunFilter, bulanFilter);
+                  arsipForPdf = arsipRes.data ?? [];
+                }catch{ /* nonfatal — PDF tetap jalan meski fetch arsip gagal */ }
+                await exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M,arsipForPdf);
+              } finally {
+                setExportingPDF(null);
+              }
+            }}
             disabled={exportingPDF===kat}
             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
             {exportingPDF===kat?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📄"}

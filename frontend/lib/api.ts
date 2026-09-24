@@ -136,8 +136,16 @@ export const stafApi = {
   // ✅ FIX: terima parameter opsional `tahun` — sesuai backend
   //    (GET /api/staf/rekap/arsip?tahun=xxxx)
   //    Kalau tahun undefined → ambil semua tahun.
-  getArsipRekap: (tahun?: number) =>
-    apiFetch(`/staf/rekap/arsip${tahun ? `?tahun=${tahun}` : ""}`),
+  // ✅ FIX: sekarang bisa ikut kirim `bulan` (1-12) supaya backend cuma
+  // narik data 1 tahun + disortir per-bulan di server, bukan tarik semua
+  // tahun arsip lalu difilter di frontend.
+  getArsipRekap: (tahun?: number, bulan?: number) => {
+    const params = new URLSearchParams();
+    if (tahun) params.set("tahun", String(tahun));
+    if (bulan) params.set("bulan", String(bulan));
+    const qs = params.toString();
+    return apiFetch(`/staf/rekap/arsip${qs ? `?${qs}` : ""}`);
+  },
 
   // ✅ FIX: path upload sesuai backend stafRoutes.js:
   //    POST /api/staf/rekap/arsip/upload

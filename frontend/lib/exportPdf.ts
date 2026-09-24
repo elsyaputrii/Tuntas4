@@ -5,7 +5,7 @@
 //   - ProcessMonitorTable.tsx  → exportPDFProses (per laporan individual)
 
 import QRCode from "qrcode";
-import type { RekapItem, ProsesItem } from "./exportTypes";
+import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
 import {
   fmtTgl,
   fmtTglWaktu,
@@ -149,7 +149,11 @@ export async function exportPDFRekap(
   prosesData: ProsesItem[],
   kategori: PdfKategori,
   selectedDate: Date,
-  penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null
+  penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null,
+  // ✅ FIX: data hasil "Upload Data Lama" (tabel arsip_rekapitulasi) — sebelumnya
+  // nggak pernah dikirim ke sini sama sekali, jadi nggak pernah muncul di PDF
+  // Harian/Mingguan/Bulanan/Tahunan walaupun sudah masuk ke Export Excel.
+  arsipData: ArsipItem[] = []
 ) {
   function isInRange(iso: string | null): boolean {
     if (!iso) return false;
@@ -168,6 +172,9 @@ export async function exportPDFRekap(
 
   const filteredSelesai  = rekapData.filter((d) => isInRange(d.created_at ?? null));
   const filteredDipantau = dipantauData.filter((p) => isInRange(p.created_at ?? null));
+  // ✅ FIX: arsip nggak punya created_at (bukan dibuat sistem, tapi diimpor dari
+  // Excel), jadi difilter pakai tgl_pelaksanaan — fallback ke tgl_masuk kalau kosong.
+  const filteredArsip = arsipData.filter((a) => isInRange(a.tgl_pelaksanaan ?? a.tgl_masuk ?? null));
 
   const mingguIni = getWeekOfMonth(selectedDate);
   const labelKat: Record<PdfKategori, string> = {
@@ -207,7 +214,25 @@ export async function exportPDFRekap(
     isSelesai: false,
   }));
 
-  const allRows = [...selesaiRows, ...dipantauRows];
+  // ✅ FIX: baris arsip dipetakan ke bentuk row yang sama dengan selesaiRows,
+  // lalu digabung dan dinomori ulang bareng data live supaya urut di tabel PDF.
+  const arsipRows = filteredArsip.map((a) => ({
+    no: 0,
+    kode: a.kode_laporan ?? "—",
+    jenis: a.jenis_laporan ?? "—",
+    uraian: a.uraian_ketidaksesuaian ?? "—",
+    unit: a.unit ?? "—",
+    penyebab: a.penyebab ?? "—",
+    rencana: a.rencana_tindakan ?? "—",
+    hasil: a.hasil_tindakan ?? "—",
+    lampiranHasil: null as string | null,
+    tgl: fmtTgl(a.tgl_pelaksanaan ?? a.tgl_masuk),
+    statusReview: a.status_review ?? "",
+    isSelesai: a.status_boxing === "selesai",
+  }));
+
+  const allRows = [...selesaiRows, ...dipantauRows, ...arsipRows]
+    .map((r, i) => ({ ...r, no: i + 1 }));
 
   const jabatanPenandatanganRekap = stripGelarDr(penandatangan?.nama?.trim() || "Ka P4M");
   const tglCetakRekap = fmtTglWaktu(new Date().toISOString());

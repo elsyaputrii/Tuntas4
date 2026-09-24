@@ -641,9 +641,28 @@ async function uploadArsipRekap(req, res) {
 // ============================================================
 // 7c. GET ARSIP REKAP
 // ============================================================
+
+// ✅ FIX: ambil nomor bulan (1-12) dari tanggal arsip yang disimpan sbg teks.
+// Kalau cell Excel aslinya native Date, uploadArsipRekap sudah menormalkan
+// ke "YYYY-MM-DD" (lihat ambilNilaiSel) — itu kasus paling umum & langsung
+// kena regex ISO di bawah. Format lain (dd/mm/yyyy, teks bebas, dst) dicoba
+// lewat Date.parse sebagai fallback. Kalau tetap gagal diparse → return
+// null, dan baris itu SENGAJA TETAP DIIKUTKAN oleh pemanggilnya (fail-open)
+// supaya data arsip lama nggak pernah hilang diam-diam gara-gara format
+// tanggal yang nggak konsisten dari file-file lama.
+function bulanDariTeksTanggal(teks) {
+  if (!teks) return null;
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(teks);
+  if (isoMatch) return parseInt(isoMatch[2], 10);
+  const dmyMatch = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/.exec(teks);
+  if (dmyMatch) return parseInt(dmyMatch[2], 10); // asumsi format dd/mm/yyyy
+  const parsed = new Date(teks);
+  return isNaN(parsed.getTime()) ? null : parsed.getMonth() + 1;
+}
+
 async function getArsipRekap(req, res) {
   try {
-    const { tahun } = req.query;
+    const { tahun, bulan } = req.query;
     let query = `
       SELECT tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian,
              unit, penyebab, rencana_tindakan, hasil_tindakan, tgl_pelaksanaan,
@@ -654,12 +673,34 @@ async function getArsipRekap(req, res) {
       query += ` WHERE tahun = ?`;
       params.push(tahun);
     }
+    // ✅ FIX: filter tahun di SQL (kolom int, ada index) SELALU dipakai kalau
+    // ada — ini yang benar-benar menghemat query besar (dari "s/d 10 tahun"
+    // jadi 1 tahun saja). Kolom `tahun` (int) reliable buat difilter di SQL.
     query += ` ORDER BY tahun DESC, tgl_masuk DESC, id_arsip ASC`;
 
     const [rows] = await pool.query(query, params);
+
+    // ✅ FIX: filter per-bulan (opsional, query param `bulan`) dilakukan di
+    // JS — BUKAN di SQL — karena tgl_masuk/tgl_pelaksanaan disimpan sbg
+    // varchar dengan format campur-campur dari file lama (lihat komentar di
+    // migrasi add_arsip_rekapitulasi.sql). Filter SQL langsung pakai
+    // MONTH(tgl_masuk) nggak reliable buat kolom teks begini dan berisiko
+    // diam-diam ngilangin baris yang formatnya beda. Ini cuma jalan SETELAH
+    // filter tahun di atas, jadi paling banter cuma nyortir dalam 1 tahun.
+    const bulanInt = bulan ? parseInt(bulan, 10) : null;
+    const rowsTerfilter = bulanInt
+      ? rows.filter((r) => {
+          const b = bulanDariTeksTanggal(r.tgl_pelaksanaan || r.tgl_masuk);
+          return b === null || b === bulanInt; // null = gagal parse → fail-open, tetap ikut
+        })
+      : rows;
+
+    // ✅ tahunTersedia tetap dihitung dari SEMUA baris tahun itu (sebelum
+    // difilter bulan), supaya dropdown/label tahun di frontend nggak
+    // ke-pengaruh oleh filter bulan yang cuma dipakai internal buat PDF.
     const tahunTersedia = [...new Set(rows.map((r) => r.tahun))].sort((a, b) => b - a);
 
-    return res.status(200).json({ success: true, data: rows, tahunTersedia });
+    return res.status(200).json({ success: true, data: rowsTerfilter, tahunTersedia });
   } catch (error) {
     console.error("Error getArsipRekap:", error);
     return res.status(500).json({
