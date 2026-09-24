@@ -94,12 +94,13 @@ export default function KaP4MKepalaUnitLaporanMasukPage() {
       </div>
 
       <div>
-        {activeTab === 'baru' && <DiscrepancyTable />}
+        <div className={activeTab === 'baru' ? 'block' : 'hidden'}>
+          <DiscrepancyTable />
+        </div>
         
-        {/* 🔴 3. Kirimkan fungsi setKeputusanStafCount ke StafDecisionTable */}
-        {activeTab === 'keputusan-staf' && (
+        <div className={activeTab === 'keputusan-staf' ? 'block' : 'hidden'}>
           <StafDecisionTable onCountChange={setKeputusanStafCount} />
-        )}
+        </div>
       </div>
     </div>
   );

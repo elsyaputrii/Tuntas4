@@ -627,18 +627,24 @@ export default function RecapitulationTable() {
       // status_boxing = "selesai", tetap dianggap selesai.
       isSelesai: p.status_boxing === "selesai",
     })),
-    ...arsipData.map((a,i)=>({
-      id_boxing:-1000000-i, kode:a.kode_laporan??"—", jenis:a.jenis_laporan??"—",
-      uraian:a.uraian_ketidaksesuaian??"—", unit:a.unit??"—",
-      penyebab:a.penyebab??"—", rencana:a.rencana_tindakan??"—",
-      hasil:a.hasil_tindakan??"—",
-      tglPelaksanaan:formatTglAman(a.tgl_pelaksanaan),
-      tglRencana: "—",
-      statusReview:a.status_review??"", statusBoxing:a.status_boxing??"selesai",
-      approvalStaf: null as string | null,
-      tglMasuk:`${a.tahun}-06-15`,
-      isSelesai:a.status_boxing==="selesai",
-    })),
+    ...arsipData.map((a,i)=>{
+      const isCloseOrSelesai = 
+        a.status_boxing?.toLowerCase() === "close" || 
+        a.status_boxing?.toLowerCase() === "selesai";
+
+      return {
+        id_boxing:-1000000-i, kode:a.kode_laporan??"—", jenis:a.jenis_laporan??"—",
+        uraian:a.uraian_ketidaksesuaian??"—", unit:a.unit??"—",
+        penyebab:a.penyebab??"—", rencana:a.rencana_tindakan??"—",
+        hasil:a.hasil_tindakan??"—",
+        tglPelaksanaan:formatTglAman(a.tgl_pelaksanaan), 
+        tglRencana: "—",
+        statusReview:a.status_review??"", statusBoxing:a.status_boxing??"selesai",
+        approvalStaf: null as string | null,
+        tglMasuk:`${a.tahun}-06-15`, 
+        isSelesai: isCloseOrSelesai, 
+      };
+    }),
   ];
 
   const highlightedDates = new Set<string>(

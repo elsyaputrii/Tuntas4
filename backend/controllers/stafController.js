@@ -475,17 +475,17 @@ async function getRekapitulasi(req, res) {
 // 7b. UPLOAD ARSIP REKAP
 // ============================================================
 const KOLOM_ALIAS = {
-  kode:         ["kode laporan", "kode"],
-  jenis:        ["jenis laporan", "jenis"],
-  tglMasuk:     ["tgl masuk", "tanggal masuk"],
-  uraian:       ["uraian ketidaksesuaian", "uraian"],
-  unit:         ["unit"],
-  penyebab:     ["penyebab"],
-  rencana:      ["rencana tindakan", "rencana"],
-  hasil:        ["hasil tindak lanjut", "hasil"],
-  tglPelaks:    ["tgl pelaksanaan", "tanggal pelaksanaan"],
+  kode:         ["kode laporan", "kode", "no", "no."],
+  jenis:        ["jenis laporan", "jenis", "jenis ketidaksesuaian"],
+  tglMasuk:     ["tgl masuk", "tanggal masuk", "tanggal", "tgl"],
+  uraian:       ["uraian ketidaksesuaian", "uraian", "deskripsi"],
+  unit:         ["unit", "bagian", "unit/bagian"],
+  penyebab:     ["penyebab", "penyebab ketidaksesuaian"],
+  rencana:      ["rencana tindakan", "rencana", "tindakan koreksi", "tindakan pencegahan"],
+  hasil:        ["hasil tindak lanjut", "hasil", "tindakan koreksi"],
+  tglPelaks:    ["tgl pelaksanaan", "tanggal pelaksanaan", "tanggal selesai", "tgl selesai"],
   statusReview: ["status review"],
-  statusBoxing: ["status proses", "status boxing"],
+  statusBoxing: ["status proses", "status boxing", "status (open/close)", "status"],
 };
 
 function cariBarisHeader(sheet) {
