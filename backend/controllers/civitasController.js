@@ -138,21 +138,74 @@ function labelStatusLaporan(v) {
 // ============================================================
 // BUILD TAHAP PROGRES — diperbaiki
 // ============================================================
-function buildTahapProgres(laporan, ringkasan) {
+function buildTahapProgres(laporan, ringkasan, detailUnit = []) {
   const { status } = laporan;
+  const totalUnitSeharusnya = ringkasan.jumlah_unit || 0;
+  const adaBoxing = totalUnitSeharusnya > 0;
 
-  const adaBoxing = ringkasan.jumlah_unit > 0;
-  const adaRancangan = ringkasan.jumlah_rancangan > 0;
-  const adaDitindaklanjuti = ringkasan.jumlah_ditindaklanjuti > 0;
-  const adaTidakDitindaklanjuti = ringkasan.jumlah_tidak > 0;
-  const adaPelaksanaan = ringkasan.jumlah_pelaksanaan > 0;
-  const adaSelesaiBoxing = ringkasan.jumlah_selesai > 0;
+  // 1. Cek Rencana dari Kepala Unit (Tahap 3)
+  const unitSudahMengisi = detailUnit
+    .filter((u) => u.rencana_tindakan !== null && u.rencana_tindakan.trim() !== "")
+    .map((u) => u.unit_tujuan);
 
-  // ✅ Flag: Ka P4M sudah mengambil keputusan (baik ditindaklanjuti maupun tidak)
-  const keputusanKaSudahAda = adaDitindaklanjuti || adaTidakDitindaklanjuti;
+  const unitBelumMengisi = detailUnit
+    .filter((u) => u.rencana_tindakan === null || u.rencana_tindakan.trim() === "")
+    .map((u) => u.unit_tujuan);
 
-  // ✅ Flag: laporan dinyatakan "sesuai / tidak perlu tindak lanjut"
-  const tidakPerluTindakLanjut = adaTidakDitindaklanjuti && !adaDitindaklanjuti;
+  const semuaUnitSudahMengisi =
+    adaBoxing && unitSudahMengisi.length === totalUnitSeharusnya;
+
+  // 2. Cek Keputusan Ka P4M (Tahap 4)
+  const unitSudahDireview = detailUnit
+    .filter(
+      (u) =>
+        u.status_review === "ditindaklanjuti" ||
+        u.status_review === "tidak_ditindaklanjuti"
+    )
+    .map((u) => u.unit_tujuan);
+
+  const semuaUnitSudahDireview =
+    semuaUnitSudahMengisi && unitSudahDireview.length === totalUnitSeharusnya;
+
+  // 3. Filter Unit Sesuai vs Perbaikan Berkelanjutan
+  const unitSesuai = detailUnit.filter(
+    (u) => u.status_review === "tidak_ditindaklanjuti"
+  );
+  
+  const unitPerbaikan = detailUnit.filter(
+    (u) => u.status_review === "ditindaklanjuti"
+  );
+
+  // ⬇️ VARIABEL INI HARUS DISEBUT DULU DI SINI SEBELUM DIPAKAI DI TAHAP 5!
+  const unitPerbaikanBelumHasil = unitPerbaikan
+    .filter((u) => !Boolean(u.ada_pelaksanaan))
+    .map((u) => u.unit_tujuan);
+
+  // Tahap 5 otomatis CENTANG HIJAU kalau semua unit perbaikan SUDAH KIRIM HASIL
+  const tahap5Selesai =
+    semuaUnitSudahDireview && unitPerbaikanBelumHasil.length === 0;
+
+  // Teks Deskripsi Tahap 5
+  let deskripsiTahap5 = "";
+  if (!semuaUnitSudahDireview) {
+    deskripsiTahap5 = "Menunggu keputusan Ka P4M untuk seluruh unit.";
+  } else if (unitSesuai.length === totalUnitSeharusnya) {
+    deskripsiTahap5 = "Tidak memerlukan tindakan lanjutan.";
+  } else if (unitPerbaikanBelumHasil.length > 0) {
+    deskripsiTahap5 = `Menunggu laporan hasil pelaksanaan dari: ${unitPerbaikanBelumHasil.join(", ")}.`;
+  } else {
+    deskripsiTahap5 = "Seluruh unit telah mengirimkan laporan hasil pelaksanaan.";
+  }
+
+  // Teks Deskripsi Tahap 6
+  let deskripsiTahap6 = "";
+  if (status === "selesai") {
+    deskripsiTahap6 = "Laporan telah resmi diselesaikan dan ditutup oleh Staf P4M.";
+  } else if (tahap5Selesai) {
+    deskripsiTahap6 = "Hasil pelaksanaan unit telah diterima. Menunggu verifikasi centang/silang akhir dari Staf P4M.";
+  } else {
+    deskripsiTahap6 = "Menunggu penyelesaian seluruh tahapan unit.";
+  }
 
   return [
     {
@@ -169,55 +222,35 @@ function buildTahapProgres(laporan, ringkasan) {
         ? `Diteruskan ke: ${ringkasan.unit_tujuan.join(", ")}`
         : "Menunggu peninjauan dan penentuan unit oleh Staf P4M.",
     },
-    // ✅ Tahap baru: kepala unit sudah mengisi penyebab + rencana tindak
-    // lanjut (tabel rancangan_tindakan). Sebelumnya `adaRancangan` sudah
-    // dihitung di atas tapi tidak pernah dipakai di tahapan manapun,
-    // jadi progress di sisi civitas gak pernah "maju" pada momen ini —
-    // langsung loncat dari distribusi ke keputusan Ka P4M.
     {
       id: "rencana_unit",
       title: "Kepala Unit Menyusun Rencana",
-      selesai: adaRancangan,
-      deskripsi: adaRancangan
-        ? "Kepala unit telah mengisi penyebab dan rencana tindak lanjut."
-        : adaBoxing
-        ? "Menunggu kepala unit mengisi penyebab dan rencana tindak lanjut."
-        : "Menunggu laporan didistribusikan ke unit.",
+      selesai: semuaUnitSudahMengisi,
+      deskripsi: semuaUnitSudahMengisi
+        ? `Semua unit terkait (${unitSudahMengisi.join(", ")}) telah mengisi rencana tindak lanjut.`
+        : unitSudahMengisi.length > 0
+        ? `Unit yang sudah mengirim rencana: ${unitSudahMengisi.join(", ")}. Menunggu: ${unitBelumMengisi.join(", ")}.`
+        : "Menunggu kepala unit menyusun penyebab dan rencana tindak lanjut.",
     },
     {
       id: "keputusan_ka",
       title: "Keputusan Ka P4M",
-      selesai: keputusanKaSudahAda,
-      deskripsi: adaDitindaklanjuti
-        ? "Ka P4M menindaklanjuti — unit melaksanakan tindakan."
-        : adaTidakDitindaklanjuti
-        ? "Laporan dinyatakan sesuai dan tidak memerlukan tindakan lanjutan."
+      selesai: semuaUnitSudahDireview,
+      deskripsi: semuaUnitSudahDireview
+        ? "Ka P4M telah memberikan keputusan untuk seluruh unit."
         : "Menunggu keputusan Ka P4M.",
     },
     {
       id: "pelaksanaan",
       title: "Hasil Tindak Lanjut Unit",
-      // ✅ Kalau Ka P4M bilang "tidak perlu tindak lanjut", tahap ini
-      //    otomatis dianggap selesai (tidak ada yang perlu dikerjakan).
-      selesai: adaPelaksanaan || tidakPerluTindakLanjut,
-      deskripsi: adaPelaksanaan
-        ? "Kepala unit telah melaporkan hasil."
-        : tidakPerluTindakLanjut
-        ? "Tidak memerlukan tindak lanjut unit."
-        : adaDitindaklanjuti
-        ? "Menunggu hasil dari kepala unit."
-        : "Menunggu keputusan Ka P4M.",
+      selesai: tahap5Selesai,
+      deskripsi: deskripsiTahap5,
     },
     {
       id: "selesai",
       title: "Laporan Selesai",
-      selesai: status === "selesai" || adaSelesaiBoxing,
-      deskripsi:
-        status === "selesai"
-          ? "Laporan dinyatakan selesai oleh Staf P4M."
-          : tidakPerluTindakLanjut
-          ? "Laporan dinyatakan sesuai — menunggu penutupan oleh Staf P4M."
-          : "Menunggu penilaian akhir Staf P4M.",
+      selesai: status === "selesai",
+      deskripsi: deskripsiTahap6,
     },
   ];
 }
@@ -225,7 +258,7 @@ function buildTahapProgres(laporan, ringkasan) {
 // ============================================================
 // BUILD UPDATE TERBARU — perbaiki duplikasi cek jumlah_pelaksanaan
 // ============================================================
-function buildUpdateTerbaru(laporan, ringkasan) {
+function buildUpdateTerbaru(laporan, ringkasan, detailUnit = []) {
   if (laporan.status === "selesai") {
     return "Laporan Anda telah diselesaikan. Terima kasih atas partisipasinya.";
   }
@@ -238,20 +271,34 @@ function buildUpdateTerbaru(laporan, ringkasan) {
   if (ringkasan.jumlah_selesai > 0) {
     return "Sebagian atau seluruh unit telah diselesaikan Staf P4M.";
   }
-  // ✅ Baris duplikat "jumlah_pelaksanaan > 0" di sini sudah dihapus
-  //    karena sebelumnya tidak akan pernah tercapai (sudah dicek di atas).
   if (ringkasan.jumlah_ditindaklanjuti > 0) {
     return "Ka P4M menindaklanjuti. Kepala unit menyusun hasil pelaksanaan.";
   }
   if (ringkasan.jumlah_tidak > 0) {
     return "Ka P4M menyatakan laporan sesuai dan tidak memerlukan tindakan lanjutan. Menunggu penutupan oleh Staf P4M.";
   }
-  if (ringkasan.jumlah_rancangan > 0) {
-    return "Kepala unit telah mengajukan rancangan. Menunggu keputusan Ka P4M.";
-  }
+  
+  // ✅ UPDATE: Menyesuaikan status unit secara rinci di kotak biru
   if (ringkasan.jumlah_unit > 0) {
+    const unitSudah = detailUnit
+      .filter((u) => u.rencana_tindakan !== null && u.rencana_tindakan !== "")
+      .map((u) => u.unit_tujuan);
+
+    const unitBelum = detailUnit
+      .filter((u) => u.rencana_tindakan === null || u.rencana_tindakan === "")
+      .map((u) => u.unit_tujuan);
+
+    if (unitBelum.length === 0) {
+      return `Semua unit (${unitSudah.join(", ")}) telah mengajukan rencana. Menunggu keputusan Ka P4M.`;
+    }
+
+    if (unitSudah.length > 0) {
+      return `Rencana telah dikirim oleh: ${unitSudah.join(", ")}. Menunggu rencana dari: ${unitBelum.join(", ")}.`;
+    }
+
     return "Laporan telah didistribusikan ke unit terkait untuk ditindaklanjuti.";
   }
+
   if (laporan.status === "menunggu") {
     return "Laporan dalam antrian peninjauan Staf P4M.";
   }
@@ -322,6 +369,7 @@ async function cekStatusLaporan(req, res) {
     const laporan = laporanRows[0];
     const id_laporan = laporan.id_laporan;
 
+    // ... di dalam fungsi cekStatusLaporan:
     const [ringkasanRows] = await pool.query(
       `SELECT
         COUNT(DISTINCT b.id_boxing) AS jumlah_unit,
@@ -368,7 +416,11 @@ async function cekStatusLaporan(req, res) {
           ORDER BY r.id_rancangan DESC LIMIT 1) AS catatan_staf,
         (SELECT r.status_review FROM rancangan_tindakan r
           WHERE r.id_boxing = b.id_boxing
-          ORDER BY r.id_rancangan DESC LIMIT 1) AS status_review
+          ORDER BY r.id_rancangan DESC LIMIT 1) AS status_review,
+        -- ⬇️ TAMBAHKAN BARIS INI (Cek ke tabel pelaksanaan_tindakan)
+        (SELECT p.id_pelaksanaan FROM pelaksanaan_tindakan p
+          WHERE p.id_boxing = b.id_boxing
+          ORDER BY p.id_pelaksanaan DESC LIMIT 1) AS ada_pelaksanaan
       FROM boxing_ketidaksesuaian b
       WHERE b.id_laporan = ?
       ORDER BY b.unit_tujuan`,
@@ -380,6 +432,7 @@ async function cekStatusLaporan(req, res) {
       rencana_tindakan: row.rencana_tindakan || null,
       catatan_staf: row.catatan_staf || null,
       status_review: row.status_review || null,
+      ada_pelaksanaan: row.ada_pelaksanaan ? true : false,
     }));
 
     return res.status(200).json({
@@ -406,8 +459,8 @@ async function cekStatusLaporan(req, res) {
           : null,
         unit_tujuan: ringkasan.unit_tujuan,
         detail_unit,
-        tahap_progres: buildTahapProgres(laporan, ringkasan),
-        update_terbaru: buildUpdateTerbaru(laporan, ringkasan),
+        tahap_progres: buildTahapProgres(laporan, ringkasan, detail_unit),
+        update_terbaru: buildUpdateTerbaru(laporan, ringkasan, detail_unit),
       },
     });
   } catch (error) {
