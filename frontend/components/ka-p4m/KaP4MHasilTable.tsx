@@ -396,10 +396,8 @@ export default function KaP4MHasilTable() {
                             </td>
                           )}
 
-                          {/* ✅ Rencana / Aksi Masukan — kotak di atas, label unit di BAWAH kotak.
-                              Warna label abu-abu bold (bukan biru), biar gak nyakitin mata. */}
                           {/* Rencana / Aksi Masukan */}
-                          <td className={`border-r-2 border-black p-3 align-middle ${isLastUnit ? "border-b-2" : "border-b"}`}>
+                          <td className={`border-r-2 border-black p-3 align-top ${isLastUnit ? "border-b-2" : "border-b"}`}>
                             {/* GANTI DENGAN KOMPONEN INI */}
                             <RencanaList rencana={item.aksi_masukan || item.rencana_tindakan} />
                             
@@ -415,7 +413,7 @@ export default function KaP4MHasilTable() {
                             </p>
                           </td>
 
-                          {/* ✅ Hasil Tindak Lanjut Unit — TANPA label unit (udah ada di kolom Rencana) */}
+                          {/* Hasil Tindak Lanjut Unit — TANPA label unit (udah ada di kolom Rencana) */}
                           <td className={`border-r-2 border-black p-3 align-top ${isLastUnit ? "border-b-2" : "border-b"}`}>
                             <div className="border border-gray-400 min-h-16 p-2 text-[10px] flex ">
                               <span className="w-full">

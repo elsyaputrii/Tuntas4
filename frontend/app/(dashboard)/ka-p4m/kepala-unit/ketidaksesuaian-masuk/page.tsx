@@ -12,7 +12,7 @@ export default function KaP4MKepalaUnitLaporanMasukPage() {
   const [isChecking, setIsChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('baru');
   
-  // 🔴 1. Tambahkan state untuk menyimpan jumlah notifikasi revisi
+  // 1. Tambahkan state untuk menyimpan jumlah notifikasi revisi
   const [keputusanStafCount, setKeputusanStafCount] = useState<number>(0);
   
   const isMounted = useRef(true);
@@ -75,7 +75,7 @@ export default function KaP4MKepalaUnitLaporanMasukPage() {
           📋 Laporan Baru
         </button>
 
-        {/* 🔴 2. Tambahkan Badge Angka di Tombol Tab "Keputusan Staf" */}
+        {/* 2. Tambahkan Badge Angka di Tombol Tab "Keputusan Staf" */}
         <button
           onClick={() => setActiveTab('keputusan-staf')}
           className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 flex items-center gap-2 ${

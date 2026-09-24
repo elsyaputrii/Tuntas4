@@ -7,12 +7,12 @@ import {
   Sun,
   Bell,
   BellOff,
-  Globe,
   Key,
   Save,
   CheckCircle,
   Lock,
 } from 'lucide-react';
+
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
@@ -38,10 +38,6 @@ export default function PengaturanKaP4MPage() {
     if (typeof window === 'undefined') return true;
     const saved = localStorage.getItem('notifikasiEmail');
     return saved !== null ? saved === 'true' : true;
-  });
-  const [bahasa, setBahasa] = useState(() => {
-    if (typeof window === 'undefined') return 'id';
-    return localStorage.getItem('bahasa') || 'id';
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
@@ -74,7 +70,6 @@ export default function PengaturanKaP4MPage() {
 
     // Simpan preferensi ke localStorage
     localStorage.setItem('notifikasiEmail', String(notifikasiEmail));
-    localStorage.setItem('bahasa', bahasa);
 
     alert('✅ Pengaturan berhasil disimpan!');
   };
@@ -190,41 +185,6 @@ export default function PengaturanKaP4MPage() {
               }`}
             />
           </button>
-        </div>
-      </div>
-
-      {/* Bahasa */}
-      <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 mb-4 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center gap-3 mb-3">
-          <Globe size={22} className="text-blue-500" />
-          <div>
-            <h3 className="font-semibold text-slate-700 dark:text-white">Bahasa</h3>
-            <p className="text-xs text-slate-400">Pilih bahasa aplikasi</p>
-          </div>
-        </div>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="bahasa"
-              value="id"
-              checked={bahasa === 'id'}
-              onChange={(e) => setBahasa(e.target.value)}
-              className="w-4 h-4 text-blue-600"
-            />
-            <span className="text-slate-700 dark:text-white text-sm">Bahasa Indonesia</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="bahasa"
-              value="en"
-              checked={bahasa === 'en'}
-              onChange={(e) => setBahasa(e.target.value)}
-              className="w-4 h-4 text-blue-600"
-            />
-            <span className="text-slate-700 dark:text-white text-sm">English</span>
-          </label>
         </div>
       </div>
 

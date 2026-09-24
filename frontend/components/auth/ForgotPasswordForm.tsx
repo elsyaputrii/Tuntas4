@@ -9,6 +9,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { User, Mail, ArrowLeft, MailCheck } from "lucide-react";
 import { authApi } from "@/lib/api";
 
 type Role = "staf_p4m" | "ka_p4m" | "kepala_unit";
@@ -96,7 +97,7 @@ export default function ForgotPasswordForm({
               {/* Input email */}
               <div className="relative">
                 <span className="absolute inset-y-0 left-4 flex items-center text-gray-500">
-                  👤
+                  <User size={18} />
                 </span>
                 <input
                   type="email"
@@ -134,16 +135,17 @@ export default function ForgotPasswordForm({
 
             <Link
               href={loginPath}
-              className="mt-4 text-xs text-white/70 hover:underline"
+              className="mt-4 text-xs text-white/70 hover:underline flex items-center gap-1"
             >
-              ← Kembali ke Login
+              <ArrowLeft size={12} />
+              Kembali ke Login
             </Link>
           </div>
 
         ) : (
           /* ── STATE: Email berhasil dikirim ── */
           <div className="flex flex-col items-center text-center space-y-5">
-            <span className="text-5xl">📧</span>
+            <MailCheck size={48} className="text-white" />
             <p className="text-white font-bold text-lg leading-tight">
               Link reset telah dikirim!
             </p>
@@ -158,8 +160,9 @@ export default function ForgotPasswordForm({
             </button>
             <Link
               href={loginPath}
-              className="mt-2 px-8 py-2 bg-white text-gray-700 font-bold rounded-full hover:bg-gray-100 transition-all shadow-md text-sm"
+              className="mt-2 px-8 py-2 bg-white text-gray-700 font-bold rounded-full hover:bg-gray-100 transition-all shadow-md text-sm flex items-center gap-2"
             >
+              <ArrowLeft size={14} />
               Kembali ke Login
             </Link>
           </div>
