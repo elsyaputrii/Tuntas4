@@ -64,7 +64,7 @@ function RencanaList({
   return (
     <div className={`${textClass} text-gray-800`}>
       {items.map((item, i) => (
-        <div key={i} className="whitespace-normal break-words leading-tight mb-1 last:mb-0">
+        <div key={i} className="whitespace-normal wrap-break-words leading-tight mb-1 last:mb-0">
           {item}
         </div>
       ))}
