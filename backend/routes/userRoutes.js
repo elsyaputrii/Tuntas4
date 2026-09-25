@@ -18,6 +18,7 @@ const {
   changePassword,
   uploadFotoProfil,
   deleteFotoProfil,
+  lewatiGantiPassword, // ✅ ditambahkan
 } = require("../controllers/userController");
 
 router.use(authMiddleware);
@@ -29,6 +30,7 @@ router.use(authMiddleware);
 router.get("/profile", getProfile);
 router.put("/profile", updateProfile);
 router.put("/change-password", changePassword);
+router.put("/lewati-ganti-password", lewatiGantiPassword); // ✅ ditambahkan
 
 // Foto profil akun sendiri — sama seperti di atas, semua role boleh akses.
 router.post("/profile/foto", uploadAvatar.single("foto"), uploadFotoProfil);
