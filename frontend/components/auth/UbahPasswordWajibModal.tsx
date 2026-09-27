@@ -1,34 +1,32 @@
-// FILE: frontend/components/auth/UbahPasswordWajibForm.tsx
-// Muncul begitu user (Kepala Unit / KA-P4M / Staff P4M) berhasil login
-// TAPI akunnya masih ditandai wajib_ganti_password = 1 (akun baru, atau
-// password-nya baru saja direset ulang oleh Staf P4M lewat Data Akun).
+// FILE: frontend/components/auth/UbahPasswordWajibModal.tsx
+// Versi POP UP dari UbahPasswordWajibForm.
 //
-// User punya 2 pilihan:
-//   1. Ganti password sekarang (isi password saat ini + password baru)
-//   2. Lewati — tetap pakai password yang sudah disiapkan, langsung
-//      lanjut ke dashboard.
+// Dulu: setelah login dengan akun yang wajib_ganti_password = 1, user
+// dilempar (router.push) ke halaman penuh /ubah-password, baru habis itu
+// masuk ke dashboard.
 //
-// Baik ganti maupun lewati, sama-sama mematikan flag wajib_ganti_password
-// di database supaya tidak muncul lagi di login berikutnya.
+// Sekarang: user langsung masuk ke halaman dashboard role-nya seperti biasa,
+// lalu modal kecil (tidak full page) ini muncul MENUMPUK di atas dashboard.
+// - Kalau user ganti password → modal tertutup, tetap di dashboard.
+// - Kalau user pilih "Lewati" → modal tertutup, tetap di dashboard, pakai
+//   password yang sudah ada.
+//
+// Dipasang di dalam layout dashboard masing-masing role (kepala-unit,
+// staff-p4m, ka-p4m), dikontrol lewat state `show` + `onDone`.
 
 "use client";
 
-import Image from "next/image";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 import { userApi } from "@/lib/api";
 
-const REDIRECT_BY_ROLE: Record<string, string> = {
-  staf_p4m: "/staff-p4m",
-  ka_p4m: "/ka-p4m",
-  kepala_unit: "/kepala-unit",
-};
+interface UbahPasswordWajibModalProps {
+  // Dipanggil setelah user selesai (baik ganti password maupun lewati).
+  // Layout yang pasang modal ini tinggal set state show-nya jadi false di sini.
+  onDone: () => void;
+}
 
-export default function UbahPasswordWajibForm() {
-  const router = useRouter();
-
-  const [checking, setChecking] = useState(true);
+export default function UbahPasswordWajibModal({ onDone }: UbahPasswordWajibModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -37,47 +35,19 @@ export default function UbahPasswordWajibForm() {
   const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState("");
 
-  // ── Guard: harus sudah login, dan cuma relevan kalau memang lagi
-  // wajib ganti password. Kalau tidak, langsung lempar ke dashboard
-  // role-nya (atau ke /login kalau belum login sama sekali).
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userRaw = localStorage.getItem("user");
-
-    if (!token || !userRaw) {
-      router.replace("/login");
-      return;
-    }
-
+  function tandaiSelesai() {
+    // Matikan flag di localStorage juga, biar layout tidak nyoba
+    // munculkan modal ini lagi selama sesi berjalan.
     try {
-      const user = JSON.parse(userRaw);
-      if (!user.wajibGantiPassword) {
-        router.replace(REDIRECT_BY_ROLE[user.role] || "/login");
-        return;
+      const userRaw = localStorage.getItem("user");
+      if (userRaw) {
+        const user = JSON.parse(userRaw);
+        localStorage.setItem("user", JSON.stringify({ ...user, wajibGantiPassword: false }));
       }
-      setChecking(false);
     } catch {
-      router.replace("/login");
+      // abaikan, tidak fatal
     }
-  }, [router]);
-
-  function getUser(): { role?: string; [key: string]: unknown } | null {
-    try {
-      return JSON.parse(localStorage.getItem("user") || "null");
-    } catch {
-      return null;
-    }
-  }
-
-  function lanjutKeDashboard() {
-    const user = getUser();
-    if (user) {
-      // Simpan lagi ke localStorage biar layout dashboard (yang baca
-      // flag ini juga) tidak nge-loop balik ke halaman ini.
-      localStorage.setItem("user", JSON.stringify({ ...user, wajibGantiPassword: false }));
-    }
-    const tujuan = (user && REDIRECT_BY_ROLE[user.role as string]) || "/login";
-    router.push(tujuan);
+    onDone();
   }
 
   async function handleGantiPassword() {
@@ -98,7 +68,7 @@ export default function UbahPasswordWajibForm() {
     try {
       setLoading(true);
       await userApi.changePassword(currentPassword, newPassword);
-      lanjutKeDashboard();
+      tandaiSelesai();
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "Gagal mengubah password. Cek password saat ini."
@@ -113,7 +83,7 @@ export default function UbahPasswordWajibForm() {
     try {
       setSkipping(true);
       await userApi.skipGantiPassword();
-      lanjutKeDashboard();
+      tandaiSelesai();
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "Gagal melewati proses ini. Coba lagi."
@@ -123,34 +93,13 @@ export default function UbahPasswordWajibForm() {
     }
   }
 
-  function handleLogout() {
-    localStorage.clear();
-    router.push("/login");
-  }
-
-  if (checking) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white">
-        <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="/poltek.jpg"
-          alt="Polibatam Background"
-          fill
-          className="object-cover"
-          priority
-        />
-      </div>
-      <div className="absolute inset-0 z-0 bg-white/50" />
+    <div className="fixed inset-0 z-200 flex items-center justify-center p-4">
+      {/* Overlay gelap transparan menutupi dashboard di belakangnya */}
+      <div className="absolute inset-0 bg-black/50" />
 
-      <div className="relative z-10 w-full max-w-sm bg-[#7C93A7] p-8 sm:p-10 rounded-[30px] shadow-2xl mx-4">
+      {/* Kartu pop up — cukup lega, bukan modal mini */}
+      <div className="relative z-10 w-full max-w-md bg-[#7C93A7] p-8 sm:p-10 rounded-[28px] shadow-2xl">
         <div className="flex flex-col items-center">
           <div className="mb-4 w-14 h-14 rounded-full bg-white/15 flex items-center justify-center">
             <ShieldCheck size={28} className="text-white" />
@@ -236,13 +185,6 @@ export default function UbahPasswordWajibForm() {
               {skipping ? "Memproses..." : "Lewati, gunakan password yang sudah ada"}
             </button>
           </div>
-
-          <button
-            onClick={handleLogout}
-            className="mt-3 text-[11px] text-white/60 hover:text-white/90 hover:underline transition"
-          >
-            Bukan Anda? Keluar
-          </button>
         </div>
       </div>
     </div>

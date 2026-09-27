@@ -17,6 +17,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import NotifikasiBell from '@/components/notifikasi/NotifikasiBell';
+import UbahPasswordWajibModal from '@/components/auth/UbahPasswordWajibModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
@@ -45,6 +46,22 @@ export default function KepalaUnitLayout({
   });
   const [showProfile, setShowProfile] = useState(false);
   const [fotoProfil, setFotoProfil] = useState<string | null>(null);
+  // Pop up "Ganti Password Anda" — muncul MENUMPUK di atas dashboard ini,
+  // bukan lagi lempar ke halaman /ubah-password terpisah.
+  // Dihitung langsung dari localStorage lewat lazy initializer (BUKAN di
+  // dalam useEffect) supaya tidak kena warning React "Calling setState
+  // synchronously within an effect".
+  const [showUbahPasswordModal, setShowUbahPasswordModal] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const userRaw = localStorage.getItem('user');
+      if (!userRaw) return false;
+      const user = JSON.parse(userRaw);
+      return Boolean(user.wajibGantiPassword);
+    } catch {
+      return false;
+    }
+  });
 
   // Auth check
   useEffect(() => {
@@ -63,12 +80,8 @@ export default function KepalaUnitLayout({
         router.push('/login');
         return;
       }
-      // Akun baru / password baru direset Staf P4M → wajib mampir ganti
-      // password dulu (boleh dilewati) sebelum bisa buka dashboard,
-      // walaupun user coba lompat langsung lewat URL.
-      if (user.wajibGantiPassword) {
-        router.push('/ubah-password');
-      }
+      // wajibGantiPassword sudah ditangani lewat lazy initializer di atas —
+      // di sini tinggal validasi role & token saja.
     } catch {
       router.push('/login');
     }
@@ -335,6 +348,10 @@ export default function KepalaUnitLayout({
           </div>
         </div>
       </div>
+
+      {showUbahPasswordModal && (
+        <UbahPasswordWajibModal onDone={() => setShowUbahPasswordModal(false)} />
+      )}
     </div>
   );
 }

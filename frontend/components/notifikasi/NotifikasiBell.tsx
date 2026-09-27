@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, X } from "lucide-react";
 import { notifikasiApi } from "@/lib/api";
@@ -55,7 +55,13 @@ export default function NotifikasiBell() {
     setLoading(true);
     try {
       const res = await notifikasiApi.getList();
-      setItems(res?.data ?? []);
+      // Hanya tampilkan yang belum dibaca — begitu ditandai dibaca
+      // (lewat "Lihat notifikasi lengkap" atau "Lihat Semua"), notifikasi
+      // itu tidak akan muncul lagi meskipun dropdown dibuka ulang.
+      const belumDibaca = (res?.data ?? []).filter(
+        (it: NotifikasiItem) => !it.is_read
+      );
+      setItems(belumDibaca);
     } catch {
       setItems([]);
     } finally {
@@ -87,25 +93,27 @@ export default function NotifikasiBell() {
     if (next) fetchList();
   }
 
-  async function handleClickItem(item: NotifikasiItem) {
-    if (!item.is_read) {
-      setItems((prev) =>
-        prev.map((it) => (it.id_notifikasi === item.id_notifikasi ? { ...it, is_read: 1 } : it))
-      );
-      setUnread((prev) => Math.max(0, prev - 1));
-      notifikasiApi.markAsRead(item.id_notifikasi).catch(() => {});
-    }
+  // Diklik dari link "Lihat notifikasi lengkap" pada 1 notifikasi:
+  // notifikasi itu langsung HILANG dari daftar (bukan cuma berubah gaya),
+  // lalu (kalau ada link tujuan) diarahkan ke halaman terkait.
+  async function handleViewFull(e: ReactMouseEvent, item: NotifikasiItem) {
+    e.stopPropagation();
+    setItems((prev) => prev.filter((it) => it.id_notifikasi !== item.id_notifikasi));
+    if (!item.is_read) setUnread((prev) => Math.max(0, prev - 1));
+    notifikasiApi.markAsRead(item.id_notifikasi).catch(() => {});
     setOpen(false);
     if (item.link) router.push(item.link);
   }
 
-  async function handleMarkAllRead() {
-    setItems((prev) => prev.map((it) => ({ ...it, is_read: 1 })));
+  // Diklik dari tombol "Lihat Semua" di footer dropdown:
+  // SEMUA notifikasi yang masuk hilang sekaligus dari daftar.
+  async function handleSeeAll() {
+    setItems([]);
     setUnread(0);
     try {
       await notifikasiApi.markAllAsRead();
     } catch {
-      // biarin, badge tetap ke-update secara optimis
+      // biarin, daftar tetap kosong secara optimis
     }
   }
 
@@ -127,19 +135,9 @@ export default function NotifikasiBell() {
         <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 z-50">
           <div className="p-3 border-b dark:border-slate-700 flex items-center justify-between">
             <span className="font-semibold text-slate-700 dark:text-white">Notifikasi</span>
-            <div className="flex items-center gap-3">
-              {unread > 0 && (
-                <button
-                  onClick={handleMarkAllRead}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  Tandai semua dibaca
-                </button>
-              )}
-              <button onClick={() => setOpen(false)}>
-                <X size={16} className="text-slate-700 dark:text-white" />
-              </button>
-            </div>
+            <button onClick={() => setOpen(false)}>
+              <X size={16} className="text-slate-700 dark:text-white" />
+            </button>
           </div>
 
           <div className="max-h-96 overflow-y-auto">
@@ -149,31 +147,45 @@ export default function NotifikasiBell() {
               <div className="p-8 text-center text-slate-400 text-sm">Belum ada notifikasi</div>
             ) : (
               items.map((item) => (
-                <button
+                <div
                   key={item.id_notifikasi}
-                  onClick={() => handleClickItem(item)}
-                  className={`w-full text-left px-4 py-3 border-b last:border-b-0 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition flex gap-2 ${
-                    !item.is_read ? "bg-blue-50 dark:bg-slate-700/30" : ""
-                  }`}
+                  className="w-full text-left px-4 py-3 border-b last:border-b-0 dark:border-slate-700 bg-blue-50 dark:bg-slate-700/30 flex gap-2"
                 >
-                  {!item.is_read && (
-                    <span className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                  )}
-                  <div className={!item.is_read ? "" : "pl-4"}>
+                  <span className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                  <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-800 dark:text-white">
                       {item.judul}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5 line-clamp-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5 whitespace-pre-wrap">
                       {item.pesan}
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      {waktuRelatif(item.created_at)}
-                    </p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-[11px] text-slate-400">
+                        {waktuRelatif(item.created_at)}
+                      </p>
+                      <button
+                        onClick={(e) => handleViewFull(e, item)}
+                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+                      >
+                        Lihat notifikasi lengkap
+                      </button>
+                    </div>
                   </div>
-                </button>
+                </div>
               ))
             )}
           </div>
+
+          {items.length > 0 && (
+            <div className="border-t dark:border-slate-700">
+              <button
+                onClick={handleSeeAll}
+                className="w-full py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-b-xl transition"
+              >
+                Lihat Semua
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

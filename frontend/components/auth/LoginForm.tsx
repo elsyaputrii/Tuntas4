@@ -68,14 +68,10 @@ export default function LoginForm({
         localStorage.setItem("user", JSON.stringify(res.data.user));
         localStorage.setItem("role", res.data.user.role);
 
-        // Akun baru / akun yang password-nya baru direset Staf P4M wajib
-        // diarahkan ganti password dulu (boleh dilewati di halaman itu),
-        // sebelum masuk ke dashboard masing-masing role.
-        if (res.data.user.wajibGantiPassword) {
-          router.push("/ubah-password");
-          return;
-        }
-
+        // Akun baru / akun yang password-nya baru direset Staf P4M tetap
+        // langsung diarahkan ke dashboard role-nya. Kalau memang wajib
+        // ganti password, layout dashboard yang akan memunculkan pop up
+        // "Ganti Password Anda" di atas halaman dashboard tersebut.
         const tujuan = REDIRECT_BY_ROLE[res.data.user.role] || "/login";
         router.push(tujuan);
       }
