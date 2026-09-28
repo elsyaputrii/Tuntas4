@@ -168,10 +168,10 @@ async function resetPassword(req, res) {
     });
   }
 
-  if (newPassword.length < 8) {
+  if (newPassword.length > 12) {
     return res.status(400).json({
       success: false,
-      message: "Password minimal 8 karakter.",
+      message: "Password boleh kurang dari 12 karakter, tapi tidak boleh lebih dari 12 karakter.",
     });
   }
 

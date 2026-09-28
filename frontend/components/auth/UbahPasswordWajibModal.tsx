@@ -59,8 +59,8 @@ export default function UbahPasswordWajibModal({ onDone }: UbahPasswordWajibModa
       setError("Konfirmasi password baru tidak cocok.");
       return;
     }
-    if (newPassword.length < 6) {
-      setError("Password baru minimal 6 karakter.");
+    if (newPassword.length > 12) {
+      setError("Password boleh kurang dari 12 karakter, tapi tidak boleh lebih dari 12 karakter.");
       return;
     }
     setError("");
@@ -111,7 +111,7 @@ export default function UbahPasswordWajibModal({ onDone }: UbahPasswordWajibModa
           <p className="text-white/70 text-center text-xs mb-6 leading-relaxed">
              Akun Anda masih memakai password bawaan. Untuk menjaga keamanan
   akun, kami sarankan Anda menggantinya sekarang. Anda juga dapat
-  melewati langkah ini dan tetapmenggunakan password yang sudah ada.
+  melewati langkah ini dan tetap menggunakan password yang sudah ada.
           </p>
 
           <div className="w-full space-y-3">

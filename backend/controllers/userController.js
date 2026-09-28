@@ -347,8 +347,8 @@ async function changePassword(req, res) {
   if (!oldPassword || !newPassword) {
     return res.status(400).json({ success: false, message: "Password lama dan baru wajib diisi." });
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ success: false, message: "Password baru minimal 6 karakter." });
+  if (newPassword.length > 12) {
+    return res.status(400).json({ success: false, message: "Password boleh kurang dari 12 karakter, tapi tidak boleh lebih dari 12 karakter." });
   }
 
   try {

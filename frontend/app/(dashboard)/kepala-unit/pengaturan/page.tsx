@@ -15,6 +15,9 @@ import {
 
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const MAX_PASSWORD_LENGTH = 12;
+const PASSWORD_MAX_MESSAGE =
+  'Password boleh kurang dari 12 karakter, tapi tidak boleh lebih dari 12 karakter.';
 
 export default function PengaturanKaP4MPage() {
   const router = useRouter();
@@ -43,6 +46,8 @@ export default function PengaturanKaP4MPage() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMessage, setPwMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Auth check — redirect kalau belum login/role salah
   useEffect(() => {
@@ -75,15 +80,22 @@ export default function PengaturanKaP4MPage() {
   };
 
   const handleChangePassword = async () => {
+    setPwMessage(null);
+
     if (!oldPassword || !newPassword || !confirmPassword) {
-      alert('⚠️ Harap isi semua field password!');
+      setPwMessage({ type: 'error', text: 'Harap isi semua field password.' });
+      return;
+    }
+    if (newPassword.length > MAX_PASSWORD_LENGTH) {
+      setPwMessage({ type: 'error', text: PASSWORD_MAX_MESSAGE });
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert('⚠️ Password baru dan konfirmasi tidak cocok!');
+      setPwMessage({ type: 'error', text: 'Password baru dan konfirmasi tidak cocok.' });
       return;
     }
 
+    setPwLoading(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/api/users/change-password`, {
@@ -92,31 +104,42 @@ export default function PengaturanKaP4MPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          oldPassword,
-          newPassword,
-        }),
+        body: JSON.stringify({ oldPassword, newPassword }),
       });
+
+      const data = await response.json().catch(() => null);
+      console.log('change-password:', response.status, data);
 
       if (response.ok) {
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        alert('✅ Password berhasil diubah! Silakan login kembali.');
+        setPwMessage({
+          type: 'success',
+          text: 'Password berhasil diubah. Anda akan dialihkan ke halaman login...',
+        });
 
-        // Password berubah → sesi lama nggak valid lagi secara logika,
-        // jadi paksa logout & balik ke halaman login.
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('user');
-        router.replace('/kepala-unit/login');
+        // Password berubah → paksa logout & balik ke halaman login.
+        setTimeout(() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('role');
+          localStorage.removeItem('user');
+          router.replace('/kepala-unit/login');
+        }, 1500);
       } else {
-        const data = await response.json().catch(() => null);
-        alert(`❌ ${data?.message || 'Gagal mengubah password. Cek password lama!'}`);
+        setPwMessage({
+          type: 'error',
+          text: `${data?.message || 'Gagal mengubah password.'} (kode ${response.status})`,
+        });
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      alert('❌ Gagal mengubah password');
+      setPwMessage({
+        type: 'error',
+        text: `Tidak bisa terhubung ke server (${BASE_URL}). Pastikan backend sedang berjalan.`,
+      });
+    } finally {
+      setPwLoading(false);
     }
   };
 
@@ -212,6 +235,9 @@ export default function PengaturanKaP4MPage() {
             placeholder="Password Baru"
             className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
           />
+          {newPassword.length > MAX_PASSWORD_LENGTH && (
+            <p className="text-xs text-red-600 -mt-1 px-1">{PASSWORD_MAX_MESSAGE}</p>
+          )}
           <input
             type="password"
             value={confirmPassword}
@@ -221,10 +247,23 @@ export default function PengaturanKaP4MPage() {
           />
           <button
             onClick={handleChangePassword}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm transition"
+            disabled={pwLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-sm transition"
           >
-            <Lock size={14} /> Ubah Password
+            <Lock size={14} /> {pwLoading ? 'Menyimpan...' : 'Ubah Password'}
           </button>
+
+          {pwMessage && (
+            <p
+              className={`text-sm rounded-xl px-4 py-2 ${
+                pwMessage.type === 'success'
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}
+            >
+              {pwMessage.text}
+            </p>
+          )}
         </div>
       </div>
 

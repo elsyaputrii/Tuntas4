@@ -35,8 +35,8 @@ export default function ResetPasswordForm({ loginPath }: ResetPasswordFormProps)
       setError("Konfirmasi password tidak cocok.");
       return;
     }
-    if (newPassword.length < 8) {
-      setError("Password minimal 8 karakter.");
+    if (newPassword.length > 12) {
+      setError("Password boleh kurang dari 12 karakter, tapi tidak boleh lebih dari 12 karakter.");
       return;
     }
     setError("");
