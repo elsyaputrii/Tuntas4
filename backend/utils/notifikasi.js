@@ -1,22 +1,14 @@
 // FILE: backend/utils/notifikasi.js
 //
 // Helper terpusat untuk notifikasi in-app (tabel `notifikasi`, muncul di
-// lonceng 🔔 tiap dashboard) SEKALIGUS email (pakai Gmail, sama seperti
-// yang dipakai fitur lupa password).
-//
-// Dipanggil dari controller di titik-titik "serah terima" laporan:
-//   civitas → staf_p4m → kepala_unit → ka_p4m (dan sebaliknya pas keputusan).
+// lonceng 🔔 tiap dashboard) SEKALIGUS email (pakai Gmail).
 //
 // PENTING: semua fungsi di sini sengaja TIDAK melempar error ke pemanggil.
-// Gagal kirim notifikasi/email tidak boleh bikin proses utama (simpan
-// laporan, distribusi, dst) ikut gagal — cuma di-log ke console.
+// Gagal kirim notifikasi/email tidak boleh bikin proses utama ikut gagal.
 
 const nodemailer = require("nodemailer");
 const { pool } = require("../config/db");
 
-// ============================================================
-// SETUP NODEMAILER — sama seperti forgotPasswordController.js
-// ============================================================
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -25,7 +17,31 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+// ============================================================
+// KONFIGURASI
+// ============================================================
+// Alamat aplikasi yang bisa dibuka penerima email (BUKAN localhost)
+const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, "");
+
+if (/localhost|127\.0\.0\.1/.test(FRONTEND_URL)) {
+  console.warn(
+    "⚠️  FRONTEND_URL masih localhost. Tombol di email tidak akan bisa dibuka orang lain."
+  );
+}
+
+// Mode uji coba: email HANYA dikirim ke alamat di EMAIL_ALLOWLIST.
+// Kalau EMAIL_TEST_MODE=false, email dikirim ke semua akun seperti biasa.
+const EMAIL_TEST_MODE = process.env.EMAIL_TEST_MODE === "true";
+const EMAIL_ALLOWLIST = (process.env.EMAIL_ALLOWLIST || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+if (EMAIL_TEST_MODE) {
+  console.warn(
+    `⚠️  EMAIL_TEST_MODE aktif: email hanya dikirim ke: ${EMAIL_ALLOWLIST.join(", ") || "(kosong)"}`
+  );
+}
 
 // ============================================================
 // KIRIM EMAIL (dipanggil internal, tidak melempar error)
@@ -33,13 +49,23 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 async function kirimEmail(to, judul, pesan, link) {
   if (!to) return;
 
-  const url = link ? `${FRONTEND_URL}${link}` : null;
+  let subject = judul;
+
+  if (EMAIL_TEST_MODE) {
+    if (!EMAIL_ALLOWLIST.includes(String(to).toLowerCase())) {
+      console.log(`[TEST MODE] Email ke ${to} dilewati (tidak ada di EMAIL_ALLOWLIST).`);
+      return;
+    }
+    subject = `[UJI COBA] ${judul}`;
+  }
+
+  const url = link ? `${FRONTEND_URL}${link.startsWith("/") ? link : "/" + link}` : null;
 
   try {
     await transporter.sendMail({
       from: `"TUNTAS4 - P4M Polibatam" <${process.env.EMAIL_USER}>`,
       to,
-      subject: judul,
+      subject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #18253d;">${judul}</h2>
@@ -62,7 +88,6 @@ async function kirimEmail(to, judul, pesan, link) {
 
 // ============================================================
 // BUAT 1 NOTIFIKASI untuk 1 akun (id_pengguna sudah diketahui)
-// Simpan ke DB dulu, baru kirim email (email tidak menunggu/blocking).
 // ============================================================
 async function notifikasiUntukPengguna(id_pengguna, { judul, pesan, jenis, link }) {
   if (!id_pengguna) return;
@@ -74,8 +99,6 @@ async function notifikasiUntukPengguna(id_pengguna, { judul, pesan, jenis, link 
       [id_pengguna, judul, pesan, jenis, link || null]
     );
 
-    // Ambil email pemilik akun, lalu kirim (tidak di-await supaya request
-    // utama tidak nunggu proses kirim email selesai).
     const [rows] = await pool.query(
       `SELECT email FROM pengguna WHERE id_pengguna = ?`,
       [id_pengguna]
@@ -90,7 +113,6 @@ async function notifikasiUntukPengguna(id_pengguna, { judul, pesan, jenis, link 
 
 // ============================================================
 // BUAT NOTIFIKASI untuk SEMUA akun dengan role tertentu
-// Contoh: laporan baru dari civitas → semua akun staf_p4m dikasih tau.
 // ============================================================
 async function notifikasiUntukRole(role, { judul, pesan, jenis, link }) {
   try {
