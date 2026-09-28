@@ -893,11 +893,11 @@ export default function RecapitulationTable() {
       <div className="hidden md:block w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <div className="flex min-w-175 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
           <div className="w-10 border-r-2 border-black p-2">No</div>
-          <div className="flex-1 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
-          <div className="w-40 border-r-2 border-black p-2">Penyebab</div>
-          <div className="w-40 border-r-2 border-black p-2">Rencana</div>
+          <div className="w-78 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
+          <div className="w-50 border-r-2 border-black p-2">Penyebab</div>
+          <div className="w-50 border-r-2 border-black p-2">Rencana</div>
           <div className="w-28 border-r-2 border-black p-2">Status</div>
-          <div className="flex-1 border-r-2 border-black p-2">Hasil Tindak Lanjut</div>
+          <div className="w-78 border-r-2 border-black p-2">Hasil Tindak Lanjut</div>
           <div className="w-24 p-2">Status Proses</div>
         </div>
         {filteredItems.length===0?(
@@ -912,15 +912,15 @@ export default function RecapitulationTable() {
                 <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
                   <span className="font-bold text-sm">{index+1}</span>
                 </div>
-                <div className="flex-1 border-r-2 border-black p-3">
+                <div className="w-78 border-r-2 border-black p-3">
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
                   <div className="border border-gray-400 p-2 min-h-20 text-[10px]">{item.uraian}</div>
                 </div>
-                <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
+                <div className="w-50 border-r-2 border-black p-2">
                   <span className=" text-gray-600 text-center text-[10px]">{item.penyebab}</span>
                 </div>
-                <div className="w-40 border-r-2 border-black p-3 flex items-center justify-center">
-                  <div className="text-gray-600 text-left text-[10px] w-full">
+                <div className="w-50 border-r-2 border-black p-2">
+                  <div className="text-gray-600 text-[10px]">
                     <RencanaList rencana={item.rencana} textClass="text-[10px]" />
                     {item.tglRencana !== "—" && (
                       <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 Direncanakan: {item.tglRencana}</span>
@@ -930,7 +930,7 @@ export default function RecapitulationTable() {
                 <div className="w-28 border-r-2 border-black p-3 flex items-center justify-center">
                   <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>{statusInfo.label}</span>
                 </div>
-                <div className="flex-1 border-r-2 border-black p-3">
+                <div className="w-78 border-r-2 border-black p-3">
                   <div className="border border-gray-400 p-2 min-h-20 text-gray-600">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
                     {item.hasil}

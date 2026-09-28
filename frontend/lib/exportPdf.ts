@@ -228,7 +228,9 @@ export async function exportPDFRekap(
     lampiranHasil: null as string | null,
     tgl: fmtTgl(a.tgl_pelaksanaan ?? a.tgl_masuk),
     statusReview: a.status_review ?? "",
-    isSelesai: a.status_boxing === "selesai",
+    isSelesai:
+      a.status_boxing === "selesai" ||
+      a.status_boxing?.toLowerCase() === "closed",
   }));
 
   const allRows = [...selesaiRows, ...dipantauRows, ...arsipRows]

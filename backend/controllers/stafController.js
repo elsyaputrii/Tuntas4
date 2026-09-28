@@ -469,35 +469,26 @@ function cariBarisHeader(sheet) {
     let jumlahCocok = 0;
 
     row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-      const nilai = cell.value;
-      if (nilai == null) return;
+      let teks = cell.value;
+      if (teks == null) return;
 
-      let teks = "";
-
-      if (typeof nilai === "object") {
-        teks =
-          nilai.text ??
-          nilai.result ??
-          "";
-      } else {
-        teks = nilai;
+      if (typeof teks === "object") {
+        teks = teks.text ?? teks.result ?? "";
       }
 
       teks = normalisasiHeader(teks);
       if (!teks) return;
-      for (const [key, aliases] of Object.entries(KOLOM_ALIAS)) {
-        const cocok = aliases.some(
-          alias => normalisasiHeader(alias) === teks
-        );
 
-        if (cocok && petaKolom[key] === undefined) {
+      for (const [key, aliases] of Object.entries(KOLOM_ALIAS)) {
+        if (
+          petaKolom[key] === undefined &&
+          aliases.some(alias => normalisasiHeader(alias) === teks)
+        ) {
           petaKolom[key] = colNumber;
           jumlahCocok++;
         }
       }
     });
-    // Debug: tampilkan hasil pencocokan header
-    console.log(`HEADER CHECK ROW ${r}:`, petaKolom, "MATCH:", jumlahCocok);
 
     if (jumlahCocok >= 4) return { headerRowNum: r, petaKolom };
   }
@@ -543,7 +534,6 @@ function ambilNilaiSel(row, colNumber) {
       return String(teks).trim() || null;
     }
 
-    console.log("⚠️ VALUE EXCEL TIDAK DIKENALI:", JSON.stringify(nilai));
     return null;
   }
   return String(nilai).trim() || null;
@@ -594,27 +584,8 @@ async function uploadArsipRekap(req, res) {
       });
     }
     const { headerRowNum, petaKolom } = hasilHeader;
-
-    console.log("=================================");
-    console.log("HEADER ROW:", headerRowNum);
-    console.log("PETA KOLOM:", petaKolom);
-
-    const headerDebug = sheet.getRow(headerRowNum);
-
-    headerDebug.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-      console.log(
-        `HEADER COL ${colNumber}:`,
-        JSON.stringify(cell.value)
-      );
-    });
-
-    console.log("=================================");
-
     const barisSiapInsert = [];
     let laporanSaatIni = null;
-
-    console.log("DEBUG TAHUN:", tahun);
-    console.log("DEBUG TYPE TAHUN:", typeof tahun);
 
 for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
   const row = sheet.getRow(r);
@@ -637,21 +608,16 @@ for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
     statusReview, statusBoxing
   ].filter(Boolean).join(" ").trim();
 
-  // ================================
   // STOP FOOTER
-  // ================================
   if (
     /^Batam,\s*\d{1,2}\s+\w+\s+\d{4}$/i.test(semuaNilai) ||
     /^Kepala P4M$/i.test(semuaNilai) ||
     /^\(Evaliata Br\. Sembiring\)$/i.test(semuaNilai)
   ) {
-    console.log("STOP FOOTER:", r);
     break;
   }
 
-  // ================================
   // NORMALISASI KODE
-  // ================================
   const kodeText = kode == null
     ? null
     : String(kode).trim();
@@ -661,16 +627,8 @@ for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
       ? parseInt(kodeText, 10)
       : null;
 
-  // DEBUG
-  console.log(`ROW ${r}`, {
-    kode: kodeText, kodeAngka, jenis, adaUraian: !!uraian, adaPenyebab: !!penyebab,
-    adaRencana: !!rencana, adaHasil: !!hasil
-  });
-
   // KODE BARU
   const kodeBaru = kodeAngka !== null && (!laporanSaatIni || Number(laporanSaatIni.kode) !== kodeAngka);
-
-  console.log("CHECK:", r, "RAW KODE:", JSON.stringify(kode), "KODE TEXT:", kodeText, "KODE ANGKA:", kodeAngka);
 
   if (kodeBaru) {
     laporanSaatIni = {
@@ -680,15 +638,11 @@ for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
     };
 
     barisSiapInsert.push(laporanSaatIni);
-    console.log(">>> LAPORAN BARU:", kodeAngka);
     continue;
   }
 
-  // BARIS LANJUTAN
-  if (!laporanSaatIni) {
-    continue;
-  }
-
+  if (!laporanSaatIni) continue;
+  
   if (jenis) laporanSaatIni.jenis = jenis;
   if (tglMasuk) laporanSaatIni.tglMasuk = tglMasuk;
   if (unit) laporanSaatIni.unit = unit;
@@ -702,14 +656,8 @@ for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
   if (hasil) laporanSaatIni.hasil = laporanSaatIni.hasil ? `${laporanSaatIni.hasil}\n${hasil}` : hasil;
 }
 
-  console.log("=================================");
-  console.log("TOTAL LAPORAN:", barisSiapInsert.length);
-  console.log("KODE:", barisSiapInsert.map(x => x.kode));
-  console.log("=================================");
-
-
-    if (barisSiapInsert.length === 0) {
-      return res.status(400).json({
+  if (barisSiapInsert.length === 0) {
+    return res.status(400).json({
         success: false,
         message: "Tidak ditemukan baris data yang bisa dibaca dari file ini.",
       });
@@ -717,52 +665,47 @@ for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
 
     const connection = await pool.getConnection();
 
-try {
-  await connection.beginTransaction();
+    try {
+      await connection.beginTransaction();
 
-  await connection.query(
-    `DELETE FROM arsip_rekapitulasi WHERE tahun = ?`,
-    [tahun]
-  );
+      await connection.query(
+        `DELETE FROM arsip_rekapitulasi WHERE tahun = ?`,
+        [tahun]
+      );
 
-  const sqlInsert = `
-    INSERT INTO arsip_rekapitulasi
-    (tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian, unit, penyebab, rencana_tindakan, hasil_tindakan, tgl_pelaksanaan, status_review, status_boxing, nama_file_asal, diupload_oleh)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
+    const sqlInsert = `
+      INSERT INTO arsip_rekapitulasi
+      (tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian, unit, penyebab, rencana_tindakan, hasil_tindakan, tgl_pelaksanaan, status_review, status_boxing, nama_file_asal, diupload_oleh)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
-  for (const laporan of barisSiapInsert) {
-    const dataInsert = [
-      laporan.tahun,
-      laporan.kode,
-      laporan.jenis,
-      laporan.tglMasuk,
-      laporan.uraian,
-      laporan.unit,
-      laporan.penyebab,
-      laporan.rencana,
-      laporan.hasil,
-      laporan.tglPelaks,
-      laporan.statusReview,
-      laporan.statusBoxing,
-      laporan.namaFileAsal,
-      laporan.diuploadOleh,
-    ];
+    for (const laporan of barisSiapInsert) {
+      const dataInsert = [
+        laporan.tahun,
+        laporan.kode,
+        laporan.jenis,
+        laporan.tglMasuk,
+        laporan.uraian,
+        laporan.unit,
+        laporan.penyebab,
+        laporan.rencana,
+        laporan.hasil,
+        laporan.tglPelaks,
+        laporan.statusReview,
+        laporan.statusBoxing,
+        laporan.namaFileAsal,
+        laporan.diuploadOleh,
+      ];
 
-    console.log("INSERT DATA:", dataInsert);
-    await connection.query(sqlInsert, dataInsert);
-  }
-
-  await connection.commit();
-
-} catch (error) {
-  await connection.rollback();
-  throw error;
-
-} finally {
-  connection.release();
-}
-
+      await connection.query(sqlInsert, dataInsert);
+    }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
 
     return res.status(200).json({
       success: true,
