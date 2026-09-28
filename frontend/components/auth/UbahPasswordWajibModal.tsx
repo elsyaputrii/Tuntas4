@@ -109,9 +109,9 @@ export default function UbahPasswordWajibModal({ onDone }: UbahPasswordWajibModa
             Ganti Password Anda
           </h2>
           <p className="text-white/70 text-center text-xs mb-6 leading-relaxed">
-            Ini pertama kali Anda login, atau password Anda baru saja
-            disiapkan ulang. Demi keamanan, sebaiknya ganti password sekarang
-            — atau lewati untuk tetap pakai password yang sudah diberikan.
+             Akun Anda masih memakai password bawaan. Untuk menjaga keamanan
+  akun, kami sarankan Anda menggantinya sekarang. Anda juga dapat
+  melewati langkah ini dan tetapmenggunakan password yang sudah ada.
           </p>
 
           <div className="w-full space-y-3">

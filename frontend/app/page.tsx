@@ -262,7 +262,7 @@ export default function HomePage() {
             Politeknik Negeri Batam - Sistem Penanganan Ketidaksesuaian (P4M)
           </p>
           <p className="text-gray-500 text-xs mt-2">
-            P4M. Semua hak dilindungi.
+            @P4M. Semua hak dilindungi.
           </p>
         </div>
       </footer>
