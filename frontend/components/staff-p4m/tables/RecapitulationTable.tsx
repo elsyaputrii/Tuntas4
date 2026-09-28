@@ -408,7 +408,7 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
       </button>
 
       {showUploadArsip && (
-        <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2">
+        <div className="absolute bottom-full left-0 mb-2 z-[999] w-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
           {msg && (
             <p className="text-green-700 text-[10px] font-bold px-2 py-1.5 bg-green-50 border border-green-200 rounded">
               ✅ {msg}
@@ -628,31 +628,41 @@ export default function RecapitulationTable() {
       isSelesai: p.status_boxing === "selesai",
     })),
     ...arsipData.map((a,i)=>{
+      const statusRevLower = (a.status_review ?? "").toLowerCase();
+      const statusBoxLower = (a.status_boxing ?? "").toLowerCase();
+
       const isCloseOrSelesai = 
-        a.status_boxing?.toLowerCase() === "close" || 
-        a.status_boxing?.toLowerCase() === "selesai";
+        statusRevLower.includes("close") || statusRevLower.includes("selesai") ||
+        statusBoxLower.includes("close") || statusBoxLower.includes("selesai");
 
       return {
-        id_boxing:-1000000-i, kode:a.kode_laporan??"—", jenis:a.jenis_laporan??"—",
-        uraian:a.uraian_ketidaksesuaian??"—", unit:a.unit??"—",
-        penyebab:a.penyebab??"—", rencana:a.rencana_tindakan??"—",
-        hasil:a.hasil_tindakan??"—",
-        tglPelaksanaan:formatTglAman(a.tgl_pelaksanaan), 
+        id_boxing: -1000000 - i,
+        kode: a.kode_laporan ?? "—",
+        jenis: a.jenis_laporan ?? "—",
+        uraian: a.uraian_ketidaksesuaian ?? "—",
+        unit: a.unit ?? "—",
+        penyebab: a.penyebab ?? "—",
+        rencana: a.rencana_tindakan ?? "—",
+        hasil: a.hasil_tindakan ?? "—",
+        tglPelaksanaan: formatTglAman(a.tgl_pelaksanaan),
         tglRencana: "—",
-        statusReview:a.status_review??"", statusBoxing:a.status_boxing??"selesai",
+        statusReview: a.status_review ?? "",
+        statusBoxing: a.status_boxing ?? (isCloseOrSelesai ? "selesai" : "menunggu"),
         approvalStaf: null as string | null,
-        tglMasuk:`${a.tahun}-06-15`, 
-        isSelesai: isCloseOrSelesai, 
+        tglMasuk: a.tgl_masuk ? formatTglAman(a.tgl_masuk) : `${a.tahun}-06-15`,
+        isSelesai: isCloseOrSelesai,
       };
     }),
   ];
 
   const highlightedDates = new Set<string>(
-    allItems.filter(d=>d.tglMasuk).map(d=>{
+  allItems
+    .filter(d => d.tglMasuk && !isNaN(Date.parse(d.tglMasuk)))
+    .map(d => {
       const dt = toLocalDate(d.tglMasuk!);
-      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     })
-  );
+);
 
   function isInFilter(tglMasuk:string|null):boolean{
     if(filterMode==="semua") return true;
@@ -808,11 +818,14 @@ export default function RecapitulationTable() {
                 return !ids.has(p.id_boxing)&&isInFilter(p.created_at??null);
               });
               let arsipExport: ArsipItem[] = [];
-              const tahunFilter = filterMode === "tahunan" ? selectedDate.getFullYear() : undefined;
-              try{
-                const arsipRes = await stafApi.getArsipRekap(tahunFilter);
+              const tahunFilter = selectedDate.getFullYear();
+              const bulanFilter = filterMode === "tahunan" || filterMode === "semua" ? undefined : selectedDate.getMonth() + 1;
+
+              try {
+                const arsipRes = await stafApi.getArsipRekap(tahunFilter, bulanFilter);
                 arsipExport = arsipRes.data ?? [];
-              }catch{ /* nonfatal */ }
+              } catch { /* nonfatal */ }
+
               await exportExcel(filteredRekap, filteredDipantau, arsipExport, tahunFilter);
             } finally {
               setTimeout(()=>setExportingExcelLoading(false),1200);
