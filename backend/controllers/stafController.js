@@ -310,33 +310,12 @@ async function setKeputusanBoxing(req, res) {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      await conn.query(`UPDATE boxing_ketidaksesuaian SET status = 'terdistribusi', approval_staf = 'menunggu' WHERE id_boxing = ?`, [id_boxing]);
 
-      await conn.query(
-        `UPDATE boxing_ketidaksesuaian
-         SET status = 'terdistribusi', approval_staf = 'menunggu'
-         WHERE id_boxing = ?`,
-        [id_boxing]
-      );
+      if (row.id_rancangan) await conn.query(`UPDATE rancangan_tindakan SET status_review = 'menunggu_keputusan_ka', aksi_masukan = NULL, updated_at = NOW() WHERE id_boxing = ?`, [id_boxing]);
 
-      if (row.id_rancangan) {
-        await conn.query(
-          `UPDATE rancangan_tindakan
-           SET status_review = 'menunggu_keputusan_ka', aksi_masukan = NULL, updated_at = NOW()
-           WHERE id_boxing = ?`,
-          [id_boxing]
-        );
-      }
-
-      await conn.query(
-        `DELETE FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
-        [id_boxing]
-      );
-
-      await conn.query(
-        `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
-        [row.id_laporan]
-      );
-
+      await conn.query(`DELETE FROM pelaksanaan_tindakan WHERE id_boxing = ?`, [id_boxing]);
+      await conn.query(`UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`, [row.id_laporan]);
       await conn.commit();
     } catch (txErr) {
       await conn.rollback();
@@ -346,15 +325,11 @@ async function setKeputusanBoxing(req, res) {
     }
 
     return res.status(200).json({
-      success: true,
-      message: "Laporan dibuka kembali ke Unit — Penyebab & Rencana sebelumnya tetap tersimpan dan siap diedit ulang oleh Kepala Unit.",
-    });
+      success: true, message: "Laporan dibuka kembali ke Unit — Penyebab & Rencana sebelumnya tetap tersimpan dan siap diedit ulang oleh Kepala Unit.", });
   } catch (error) {
     console.error("Error setKeputusanBoxing:", error);
     return res.status(500).json({
-      success: false,
-      message: "Gagal menyimpan keputusan.",
-    });
+      success: false, message: "Gagal menyimpan keputusan.",});
   }
 }
 
@@ -367,8 +342,7 @@ async function inputHasilPemantauan(req, res) {
 
   if (!id_boxing || !hasil) {
     return res.status(400).json({
-      success: false,
-      message: "id_boxing dan hasil pemantauan wajib diisi.",
+      success: false, message: "id_boxing dan hasil pemantauan wajib diisi.",
     });
   }
 
@@ -380,8 +354,7 @@ async function inputHasilPemantauan(req, res) {
 
     if (stafRows.length === 0) {
       return res.status(403).json({
-        success: false,
-        message: "Data staf P4M tidak ditemukan.",
+        success: false, message: "Data staf P4M tidak ditemukan.",
       });
     }
     const id_staf = stafRows[0].id_staf;
@@ -393,8 +366,7 @@ async function inputHasilPemantauan(req, res) {
 
     if (pelaksanaan.length === 0) {
       return res.status(400).json({
-        success: false,
-        message: "Kepala Unit belum menginput laporan hasil pelaksanaan.",
+        success: false, message: "Kepala Unit belum menginput laporan hasil pelaksanaan.",
       });
     }
 
@@ -408,15 +380,13 @@ async function inputHasilPemantauan(req, res) {
     );
 
     return res.status(201).json({
-      success: true,
-      message: "Hasil pemantauan berhasil disimpan.",
+      success: true, message: "Hasil pemantauan berhasil disimpan.",
       data: { id_pemantauan: result.insertId },
     });
   } catch (error) {
     console.error("Error inputHasilPemantauan:", error);
     return res.status(500).json({
-      success: false,
-      message: "Gagal menyimpan hasil pemantauan.",
+      success: false, message: "Gagal menyimpan hasil pemantauan.",
     });
   }
 }
@@ -465,8 +435,7 @@ async function getRekapitulasi(req, res) {
   } catch (error) {
     console.error("Error getRekapitulasi:", error);
     return res.status(500).json({
-      success: false,
-      message: "Gagal mengambil data rekapitulasi.",
+      success: false, message: "Gagal mengambil data rekapitulasi.",
     });
   }
 }
@@ -475,69 +444,116 @@ async function getRekapitulasi(req, res) {
 // 7b. UPLOAD ARSIP REKAP
 // ============================================================
 const KOLOM_ALIAS = {
-  kode:         ["kode laporan", "kode", "no", "no."],
-  jenis:        ["jenis laporan", "jenis", "jenis ketidaksesuaian"],
-  tglMasuk:     ["tgl masuk", "tanggal masuk", "tanggal", "tgl"],
-  uraian:       ["uraian ketidaksesuaian", "uraian", "deskripsi"],
-  unit:         ["unit", "bagian", "unit/bagian"],
-  penyebab:     ["penyebab", "penyebab ketidaksesuaian"],
-  rencana:      ["rencana tindakan", "rencana", "tindakan koreksi", "tindakan pencegahan"],
-  hasil:        ["hasil tindak lanjut", "hasil", "tindakan koreksi"],
-  tglPelaks:    ["tgl pelaksanaan", "tanggal pelaksanaan", "tanggal selesai", "tgl selesai"],
+  kode: ["kode laporan","kode","no","no.","nomor","nomor laporan"],
+  jenis: ["jenis laporan","jenis","jenis ketidaksesuaian"],
+  tglMasuk: ["tgl masuk","tanggal masuk","tanggal","tgl","tanggal laporan"],
+  uraian: ["uraian ketidaksesuaian","uraian","deskripsi","uraian masalah"],
+  unit: ["unit","bagian","unit/bagian","unit pelaksana"],
+  penyebab: ["penyebab","penyebab ketidaksesuaian"],
+  rencana: ["rencana tindakan","rencana","tindakan pencegahan"],
+  hasil: ["hasil tindak lanjut","hasil","hasil tindakan","tindakan koreksi"],
+  tglPelaks: ["tgl pelaksanaan","tanggal pelaksanaan","tanggal selesai","tgl selesai"],
   statusReview: ["status review"],
-  statusBoxing: ["status proses", "status boxing", "status (open/close)", "status"],
+  statusBoxing: ["status proses","status boxing","status (open/close)","status"],
 };
 
+function normalisasiHeader(value) {
+  return String(value ?? "").replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function cariBarisHeader(sheet) {
-  const batasBaris = Math.min(sheet.rowCount, 10);
+  const batasBaris = Math.min(sheet.rowCount, 15);
+
   for (let r = 1; r <= batasBaris; r++) {
-    const row = sheet.getRow(r);
-    const petaKolom = {};
+    const row = sheet.getRow(r), petaKolom = {};
     let jumlahCocok = 0;
 
     row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
       const nilai = cell.value;
       if (nilai == null) return;
-      const teks = String(typeof nilai === "object" ? (nilai.text ?? nilai.result ?? "") : nilai)
-        .trim()
-        .toLowerCase();
+
+      let teks = "";
+
+      if (typeof nilai === "object") {
+        teks =
+          nilai.text ??
+          nilai.result ??
+          "";
+      } else {
+        teks = nilai;
+      }
+
+      teks = normalisasiHeader(teks);
       if (!teks) return;
-      for (const [key, alias] of Object.entries(KOLOM_ALIAS)) {
-        if (alias.includes(teks) && petaKolom[key] === undefined) {
+      for (const [key, aliases] of Object.entries(KOLOM_ALIAS)) {
+        const cocok = aliases.some(
+          alias => normalisasiHeader(alias) === teks
+        );
+
+        if (cocok && petaKolom[key] === undefined) {
           petaKolom[key] = colNumber;
           jumlahCocok++;
         }
       }
     });
+    // Debug: tampilkan hasil pencocokan header
+    console.log(`HEADER CHECK ROW ${r}:`, petaKolom, "MATCH:", jumlahCocok);
 
-    if (jumlahCocok >= 4) {
-      return { headerRowNum: r, petaKolom };
-    }
+    if (jumlahCocok >= 4) return { headerRowNum: r, petaKolom };
   }
   return null;
 }
 
+
 function ambilNilaiSel(row, colNumber) {
   if (!colNumber) return null;
+
   const cell = row.getCell(colNumber);
-  const nilai = cell?.value;
+  if (!cell) return null;
+
+  const nilai = cell.value;
   if (nilai == null) return null;
+
+  if (nilai instanceof Date) return nilai.toISOString().slice(0, 10);
+
+  if (typeof nilai === "string" || typeof nilai === "number" || typeof nilai === "boolean") {
+    const teks = String(nilai).trim();
+    return teks === "" ? null : teks;
+  }
+
   if (typeof nilai === "object") {
-    if (nilai.text) return String(nilai.text).trim() || null;
-    if (nilai.result != null) return String(nilai.result).trim() || null;
-    if (nilai instanceof Date) return nilai.toISOString().slice(0, 10);
+    if (nilai.result != null) {
+      if (nilai.result instanceof Date) return nilai.result.toISOString().slice(0, 10);
+      const teks = String(nilai.result).trim();
+      return teks === "" ? null : teks;
+    }
+
+    if (Array.isArray(nilai.richText)) {
+      const teks = nilai.richText.map(item => item?.text ?? "").join("").trim();
+      return teks === "" ? null : teks;
+    }
+
+    if (typeof nilai.text === "string") {
+      const teks = nilai.text.trim();
+      return teks === "" ? null : teks;
+    }
+
+    if (nilai.hyperlink) {
+      const teks = nilai.text ?? nilai.hyperlink;
+      return String(teks).trim() || null;
+    }
+
+    console.log("⚠️ VALUE EXCEL TIDAK DIKENALI:", JSON.stringify(nilai));
     return null;
   }
-  const teks = String(nilai).trim();
-  return teks === "" ? null : teks;
+  return String(nilai).trim() || null;
 }
 
 async function uploadArsipRekap(req, res) {
   try {
     if (!req.file) {
       return res.status(400).json({
-        success: false,
-        message: "File Excel wajib diunggah.",
+        success: false, message: "File Excel wajib diunggah.",
       });
     }
 
@@ -579,30 +595,118 @@ async function uploadArsipRekap(req, res) {
     }
     const { headerRowNum, petaKolom } = hasilHeader;
 
-    const barisSiapInsert = [];
-    for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
-      const row     = sheet.getRow(r);
-      const kode    = ambilNilaiSel(row, petaKolom.kode);
-      const uraian  = ambilNilaiSel(row, petaKolom.uraian);
-      if (!kode && !uraian) continue;
+    console.log("=================================");
+    console.log("HEADER ROW:", headerRowNum);
+    console.log("PETA KOLOM:", petaKolom);
 
-      barisSiapInsert.push([
-        tahun,
-        kode,
-        ambilNilaiSel(row, petaKolom.jenis),
-        ambilNilaiSel(row, petaKolom.tglMasuk),
-        uraian,
-        ambilNilaiSel(row, petaKolom.unit),
-        ambilNilaiSel(row, petaKolom.penyebab),
-        ambilNilaiSel(row, petaKolom.rencana),
-        ambilNilaiSel(row, petaKolom.hasil),
-        ambilNilaiSel(row, petaKolom.tglPelaks),
-        ambilNilaiSel(row, petaKolom.statusReview),
-        ambilNilaiSel(row, petaKolom.statusBoxing),
-        req.file.originalname,
-        req.user?.id ?? null,
-      ]);
-    }
+    const headerDebug = sheet.getRow(headerRowNum);
+
+    headerDebug.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      console.log(
+        `HEADER COL ${colNumber}:`,
+        JSON.stringify(cell.value)
+      );
+    });
+
+    console.log("=================================");
+
+    const barisSiapInsert = [];
+    let laporanSaatIni = null;
+
+    console.log("DEBUG TAHUN:", tahun);
+    console.log("DEBUG TYPE TAHUN:", typeof tahun);
+
+for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
+  const row = sheet.getRow(r);
+
+  const kode = ambilNilaiSel(row, petaKolom.kode);
+  const jenis = ambilNilaiSel(row, petaKolom.jenis);
+  const tglMasuk = ambilNilaiSel(row, petaKolom.tglMasuk);
+  const uraian = ambilNilaiSel(row, petaKolom.uraian);
+  const unit = ambilNilaiSel(row, petaKolom.unit);
+  const penyebab = ambilNilaiSel(row, petaKolom.penyebab);
+  const rencana = ambilNilaiSel(row, petaKolom.rencana);
+  const hasil = ambilNilaiSel(row, petaKolom.hasil);
+  const tglPelaks = ambilNilaiSel(row, petaKolom.tglPelaks);
+  const statusReview = ambilNilaiSel(row, petaKolom.statusReview);
+  const statusBoxing = ambilNilaiSel(row, petaKolom.statusBoxing);
+
+  const semuaNilai = [
+    kode, jenis, tglMasuk, uraian, unit,
+    penyebab, rencana, hasil, tglPelaks,
+    statusReview, statusBoxing
+  ].filter(Boolean).join(" ").trim();
+
+  // ================================
+  // STOP FOOTER
+  // ================================
+  if (
+    /^Batam,\s*\d{1,2}\s+\w+\s+\d{4}$/i.test(semuaNilai) ||
+    /^Kepala P4M$/i.test(semuaNilai) ||
+    /^\(Evaliata Br\. Sembiring\)$/i.test(semuaNilai)
+  ) {
+    console.log("STOP FOOTER:", r);
+    break;
+  }
+
+  // ================================
+  // NORMALISASI KODE
+  // ================================
+  const kodeText = kode == null
+    ? null
+    : String(kode).trim();
+
+  const kodeAngka =
+    kodeText && /^\d+$/.test(kodeText)
+      ? parseInt(kodeText, 10)
+      : null;
+
+  // DEBUG
+  console.log(`ROW ${r}`, {
+    kode: kodeText, kodeAngka, jenis, adaUraian: !!uraian, adaPenyebab: !!penyebab,
+    adaRencana: !!rencana, adaHasil: !!hasil
+  });
+
+  // KODE BARU
+  const kodeBaru = kodeAngka !== null && (!laporanSaatIni || Number(laporanSaatIni.kode) !== kodeAngka);
+
+  console.log("CHECK:", r, "RAW KODE:", JSON.stringify(kode), "KODE TEXT:", kodeText, "KODE ANGKA:", kodeAngka);
+
+  if (kodeBaru) {
+    laporanSaatIni = {
+      tahun, kode: kodeAngka, jenis, tglMasuk, uraian, unit, penyebab, rencana, hasil,
+      tglPelaks, statusReview, statusBoxing, namaFileAsal: req.file.originalname,
+      diuploadOleh: req.user?.id ?? null
+    };
+
+    barisSiapInsert.push(laporanSaatIni);
+    console.log(">>> LAPORAN BARU:", kodeAngka);
+    continue;
+  }
+
+  // BARIS LANJUTAN
+  if (!laporanSaatIni) {
+    continue;
+  }
+
+  if (jenis) laporanSaatIni.jenis = jenis;
+  if (tglMasuk) laporanSaatIni.tglMasuk = tglMasuk;
+  if (unit) laporanSaatIni.unit = unit;
+  if (tglPelaks) laporanSaatIni.tglPelaks = tglPelaks;
+  if (statusReview) laporanSaatIni.statusReview = statusReview;
+  if (statusBoxing) laporanSaatIni.statusBoxing = statusBoxing;
+
+  if (uraian) laporanSaatIni.uraian = laporanSaatIni.uraian ? `${laporanSaatIni.uraian}\n${uraian}` : uraian;
+  if (penyebab) laporanSaatIni.penyebab = laporanSaatIni.penyebab ? `${laporanSaatIni.penyebab}\n${penyebab}` : penyebab;
+  if (rencana) laporanSaatIni.rencana = laporanSaatIni.rencana ? `${laporanSaatIni.rencana}\n${rencana}` : rencana;
+  if (hasil) laporanSaatIni.hasil = laporanSaatIni.hasil ? `${laporanSaatIni.hasil}\n${hasil}` : hasil;
+}
+
+  console.log("=================================");
+  console.log("TOTAL LAPORAN:", barisSiapInsert.length);
+  console.log("KODE:", barisSiapInsert.map(x => x.kode));
+  console.log("=================================");
+
 
     if (barisSiapInsert.length === 0) {
       return res.status(400).json({
@@ -611,17 +715,54 @@ async function uploadArsipRekap(req, res) {
       });
     }
 
-    await pool.query(`DELETE FROM arsip_rekapitulasi WHERE tahun = ?`, [tahun]);
+    const connection = await pool.getConnection();
 
-    const placeholder = barisSiapInsert.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").join(",");
-    await pool.query(
-      `INSERT INTO arsip_rekapitulasi
-        (tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian, unit,
-         penyebab, rencana_tindakan, hasil_tindakan, tgl_pelaksanaan, status_review,
-         status_boxing, nama_file_asal, diupload_oleh)
-       VALUES ${placeholder}`,
-      barisSiapInsert.flat()
-    );
+try {
+  await connection.beginTransaction();
+
+  await connection.query(
+    `DELETE FROM arsip_rekapitulasi WHERE tahun = ?`,
+    [tahun]
+  );
+
+  const sqlInsert = `
+    INSERT INTO arsip_rekapitulasi
+    (tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian, unit, penyebab, rencana_tindakan, hasil_tindakan, tgl_pelaksanaan, status_review, status_boxing, nama_file_asal, diupload_oleh)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  for (const laporan of barisSiapInsert) {
+    const dataInsert = [
+      laporan.tahun,
+      laporan.kode,
+      laporan.jenis,
+      laporan.tglMasuk,
+      laporan.uraian,
+      laporan.unit,
+      laporan.penyebab,
+      laporan.rencana,
+      laporan.hasil,
+      laporan.tglPelaks,
+      laporan.statusReview,
+      laporan.statusBoxing,
+      laporan.namaFileAsal,
+      laporan.diuploadOleh,
+    ];
+
+    console.log("INSERT DATA:", dataInsert);
+    await connection.query(sqlInsert, dataInsert);
+  }
+
+  await connection.commit();
+
+} catch (error) {
+  await connection.rollback();
+  throw error;
+
+} finally {
+  connection.release();
+}
+
 
     return res.status(200).json({
       success: true,
