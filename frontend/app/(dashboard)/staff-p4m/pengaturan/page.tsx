@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Moon,
@@ -15,12 +15,18 @@ import {
 
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+// True hanya setelah hydration selesai di browser (di server selalu false).
+// Dipakai supaya render pertama di server & client SAMA, karena state di
+// bawah dibaca dari localStorage yang cuma ada di browser.
+const subscribeNoop = () => () => {};
+
 const MAX_PASSWORD_LENGTH = 12;
 const PASSWORD_MAX_MESSAGE =
   'Password boleh kurang dari 12 karakter, tapi tidak boleh lebih dari 12 karakter.';
 
 export default function PengaturanStaffPage() {
   const router = useRouter();
+  const hydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const [isAuthorized] = useState(() => {
     if (typeof window === 'undefined') return false;
     const token = localStorage.getItem('token');
@@ -157,7 +163,7 @@ export default function PengaturanStaffPage() {
     }
   };
 
-  if (!isAuthorized) {
+  if (!hydrated || !isAuthorized) {
     return (
       <div className="min-h-100 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
