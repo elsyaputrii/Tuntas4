@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Moon,
@@ -47,6 +47,15 @@ export default function PengaturanKaP4MPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
+  const [redirectIn, setRedirectIn] = useState<number | null>(null);
+  const redirectTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Bersihkan timer kalau user pindah halaman sebelum hitung mundur selesai.
+  useEffect(() => {
+    return () => {
+      if (redirectTimer.current) clearInterval(redirectTimer.current);
+    };
+  }, []);
   const [pwMessage, setPwMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Auth check — redirect kalau belum login/role salah
@@ -116,16 +125,25 @@ export default function PengaturanKaP4MPage() {
         setConfirmPassword('');
         setPwMessage({
           type: 'success',
-          text: 'Password berhasil diubah. Anda akan dialihkan ke halaman login...',
+          text: 'Password berhasil diubah. Silakan login kembali menggunakan password baru Anda.',
         });
 
-        // Password berubah → paksa logout & balik ke halaman login.
-        setTimeout(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('role');
-          localStorage.removeItem('user');
-          router.replace('/ka-p4m/login');
-        }, 1500);
+        // Tampilkan pesan 5 detik, lalu logout & pindah ke halaman login otomatis.
+        // Flag ini dibaca LoginForm untuk menampilkan "Silakan login kembali".
+        sessionStorage.setItem('passwordDiubah', '1');
+        let sisa = 5;
+        setRedirectIn(sisa);
+        redirectTimer.current = setInterval(() => {
+          sisa -= 1;
+          setRedirectIn(sisa);
+          if (sisa <= 0) {
+            if (redirectTimer.current) clearInterval(redirectTimer.current);
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
+            localStorage.removeItem('user');
+            router.replace('/login');
+          }
+        }, 1000);
       } else {
         setPwMessage({
           type: 'error',
@@ -247,7 +265,7 @@ export default function PengaturanKaP4MPage() {
           />
           <button
             onClick={handleChangePassword}
-            disabled={pwLoading}
+            disabled={pwLoading || redirectIn !== null}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-sm transition"
           >
             <Lock size={14} /> {pwLoading ? 'Menyimpan...' : 'Ubah Password'}
@@ -262,6 +280,8 @@ export default function PengaturanKaP4MPage() {
               }`}
             >
               {pwMessage.text}
+              {redirectIn !== null &&
+                ` Anda akan dialihkan ke halaman login dalam ${redirectIn} detik...`}
             </p>
           )}
         </div>

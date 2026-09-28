@@ -30,6 +30,7 @@ export default function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
@@ -41,6 +42,17 @@ export default function LoginForm({
   // (bocor keliatan tembus overlay-nya).
   useEffect(() => {
     setMounted(true);
+
+    // Pesan setelah user berhasil ganti password di halaman Pengaturan.
+    try {
+      if (sessionStorage.getItem("passwordDiubah")) {
+        sessionStorage.removeItem("passwordDiubah");
+        setInfo("Password berhasil diubah. Silakan login kembali menggunakan password baru Anda.");
+      }
+    } catch {
+      // abaikan, tidak fatal
+    }
+
     // Kunci scroll body selama modal terbuka
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -55,6 +67,7 @@ export default function LoginForm({
       return;
     }
     setError("");
+    setInfo("");
 
     try {
       setLoading(true);
@@ -133,6 +146,12 @@ export default function LoginForm({
           <h2 className="text-white text-center font-bold text-sm mb-8 uppercase tracking-wider">
             Pengelolaan Ketidaksesuaian <br /> Politeknik Negeri Batam
           </h2>
+
+          {info && (
+            <p className="w-full mb-4 -mt-4 rounded-lg bg-white/20 px-4 py-2 text-center text-sm font-semibold text-white">
+              {info}
+            </p>
+          )}
 
           {/* Form */}
           <div className="w-full space-y-4">
