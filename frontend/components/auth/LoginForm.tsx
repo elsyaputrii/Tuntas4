@@ -216,7 +216,7 @@ export default function LoginForm({
               </Link>
 
               <a
-                href="https://drive.google.com/drive/folders/1Ps1zKsj1fspl03RdMvs1A6Zpc8d9ap13?usp=sharing"
+                href="https://drive.google.com/file/d/1qSjorwYWEE_JhEM1algevP4tBkNwjm0I/preview"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-200 hover:underline"
