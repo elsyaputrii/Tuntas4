@@ -191,7 +191,17 @@ export default function RiwayatTable() {
   const [periodFilterMode, setPeriodFilterMode] = useState<PeriodFilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [searchQuery, setSearchQuery] = useState("");
+  const ITEMS_PER_PAGE = 15;
+  const [currentPage, setCurrentPage] = useState(1);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    filterMode,
+    periodFilterMode,
+    selectedDate,
+    searchQuery,
+  ]);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -270,10 +280,9 @@ export default function RiwayatTable() {
     }
   }
 
-  // ✅ FIX: filter "Selesai" tetap murni status_boxing === 'selesai' —
+  // FIX: filter "Selesai" tetap murni status_boxing === 'selesai' —
   // laporan yang masih berjalan (menunggu Ka P4M, di unit, dsb) TIDAK
   // ikut dihitung/ditampilkan sebagai selesai.
-  // 🔍 UBAH FUNGSI INI:
   const filteredData = useMemo(
     () =>
       data.filter((item) => {
@@ -302,6 +311,20 @@ export default function RiwayatTable() {
         return statusMatch && periodMatch && searchMatch;
       }),
     [data, filterMode, periodFilterMode, selectedDate, searchQuery] 
+  );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredData.length / ITEMS_PER_PAGE)
+  );
+
+  const paginatedData = useMemo(
+    () =>
+      filteredData.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+      ),
+    [filteredData, currentPage]
   );
 
   if (loading) return (
@@ -423,7 +446,7 @@ export default function RiwayatTable() {
               </p>
             </div>
           ) : (
-            filteredData.map((item) => {
+            paginatedData.map((item) => {
               const badge = statusBadge(item);
               return (
               <div key={item.id_boxing} className="flex min-w-175 border-t-2 border-black text-[11px]">
@@ -489,7 +512,7 @@ export default function RiwayatTable() {
                 : "Belum ada laporan yang pernah ditangani unit ini."}
             </div>
           ) : (
-            filteredData.map((item) => {
+            paginatedData.map((item) => {
               const badge = statusBadge(item);
               return (
               <div key={item.id_boxing} className="border-t-2 border-black p-4 space-y-3">
@@ -539,6 +562,71 @@ export default function RiwayatTable() {
             })
           )}
         </div>
+        {/* PAGINATION */}
+        {filteredData.length > ITEMS_PER_PAGE && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-3">
+
+            <p className="text-[10px] text-gray-500">
+              Menampilkan{" "}
+              <span className="font-semibold text-gray-700">{(currentPage - 1) * ITEMS_PER_PAGE + 1}
+              </span>
+              {" - "}
+              <span className="font-semibold text-gray-700">{Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)}
+              </span>
+              {" dari "}
+              <span className="font-semibold text-gray-700">{filteredData.length}
+              </span>
+              {" laporan"}
+            </p>
+
+            <div className="flex items-center gap-1">
+
+              <button onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage === 1}>‹ Prev
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((page) => {
+                  if (totalPages <= 7) return true;
+                  if (page === 1 || page === totalPages) return true;
+                  return Math.abs(page - currentPage) <= 1;
+                })
+                .map((page, index, pages) => {
+                  const previousPage = pages[index - 1];
+                  return (
+                    <div
+                      key={page}
+                      className="flex items-center gap-1">
+                      {previousPage && page - previousPage > 1 && (
+                        <span className="px-1 text-gray-400 text-[10px]">...</span>
+                      )}
+
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`min-w-8 px-2.5 py-1.5 text-[10px] font-semibold rounded border transition-all ${
+                          currentPage === page
+                            ? "bg-dark-header text-white border-dark-header"
+                            : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                        }`}>
+                        {page}
+                      </button>
+                    </div>
+                  );
+                })}
+
+              <button
+                onClick={() =>
+                  setCurrentPage((page) =>
+                    Math.min(totalPages, page + 1)
+                  )
+                }
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1.5 text-[10px] font-semibold rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                Next ›
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

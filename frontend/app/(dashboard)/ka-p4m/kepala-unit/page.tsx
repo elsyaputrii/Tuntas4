@@ -2,72 +2,22 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from 'next/navigation';
-import {
-  FileText,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  TrendingUp,
-  LayoutDashboard,
-  PieChart as PieChartIcon,
-  BarChart3,
-  ClipboardList,
-} from "lucide-react";
-import {
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { FileText, CheckCircle2, Clock, AlertCircle, TrendingUp, LayoutDashboard, PieChart as PieChartIcon, BarChart3, ClipboardList } from "lucide-react";
+import { LineChart, Line, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { kepalaUnitApi } from "@/lib/api";
 
-// ✅ Definisikan tipe data
-interface LaporanItem {
-  id: string;
-  id_boxing?: string;
-  isi_laporan?: string;
-  status: string;
-  tanggal_submit: string;
-  created_at?: string;
-  tanggal_laporan?: string;
-  approval_staf?: string;
-  id_pelaksanaan?: string | null;
-}
-
-interface BulanData {
-  total: number;
-  selesai: number;
-}
-
-interface ChartDataItem {
-  bulan: string;
-  total: number;
-  selesai: number;
-}
-
-interface StatusDataItem {
-  name: string;
-  value: number;
-  color: string;
-}
+// Definisikan tipe data
+interface LaporanItem { id: string; id_boxing?: string; isi_laporan?: string; status: string; tanggal_submit: string; created_at?: string; tanggal_laporan?: string; approval_staf?: string; id_pelaksanaan?: string | null; }
+interface BulanData { total: number; selesai: number; }
+interface ChartDataItem { bulan: string; total: number; selesai: number; }
+interface StatusDataItem { name: string; value: number; color: string; }
 
 export default function DashboardKepalaUnitP4MPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const isMounted = useRef(true);
-
   const [dataLaporan, setDataLaporan] = useState<LaporanItem[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [chartData, setChartData] = useState<ChartDataItem[]>([
     { bulan: "Jan", total: 0, selesai: 0 },
     { bulan: "Feb", total: 0, selesai: 0 },

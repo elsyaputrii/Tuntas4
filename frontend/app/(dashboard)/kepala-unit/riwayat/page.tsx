@@ -16,7 +16,7 @@ export default function RiwayatPage() {
       router.replace('/kepala-unit/login');
       return;
     }
-    // ✅ FIX ESLint react-hooks/set-state-in-effect
+    // FIX ESLint react-hooks/set-state-in-effect
     Promise.resolve().then(() => {
       if (!cancelled) setIsChecking(false);
     });
