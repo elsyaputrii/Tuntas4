@@ -546,6 +546,8 @@ export default function RecapitulationTable() {
   const [searchQuery, setSearchQuery] = useState("");
   const [arsipData, setArsipData] = useState<ArsipItem[]>([]);
   const [loadingArsip, setLoadingArsip] = useState(false);
+  const ITEMS_PER_PAGE = 15;
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     userApi.getUsers()
@@ -694,6 +696,17 @@ export default function RecapitulationTable() {
   const totalAll        = filteredItems.length;
   const ditindakCount   = filteredItems.filter(d=>d.isSelesai).length;
   const menungguCount   = filteredItems.filter(d=>!d.isSelesai).length;
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+
+  const paginatedItems = filteredItems.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterMode, selectedDate]);
 
   const mingguSelected = getWeekOfMonth(selectedDate);
   const labelFilter:Record<FilterMode,string>={
@@ -905,12 +918,12 @@ export default function RecapitulationTable() {
             <p className="text-gray-400 italic text-sm">Tidak ada data untuk periode ini.</p>
           </div>
         ):(
-          filteredItems.map((item,index)=>{
+          paginatedItems.map((item,index)=>{
             const { statusInfo } = statusFor(item);
             return (
               <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-175 border-t-2 border-black text-[11px]">
                 <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
-                  <span className="font-bold text-sm">{index+1}</span>
+                  <span className="font-bold text-sm"><span className="font-bold text-sm">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span></span>
                 </div>
                 <div className="w-78 border-r-2 border-black p-3">
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
@@ -962,13 +975,13 @@ export default function RecapitulationTable() {
         {filteredItems.length===0 ? (
           <div className="p-8 text-center text-gray-400 italic">Tidak ada data untuk periode ini.</div>
         ) : (
-          filteredItems.map((item,index)=>{
+          paginatedItems.map((item,index)=>{
             const { statusInfo } = statusFor(item);
             return (
               <div key={`m-${item.id_boxing}-${index}`} className="border-t-2 border-black p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div>
-                    <span className="text-[10px] font-bold text-gray-600">{index+1}. {item.kode}</span>
+                    <span className="text-[10px] font-bold text-gray-600">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}. {item.kode}</span>
                     {item.unit!=="—"&&<span className="text-[10px] text-gray-400 ml-1">· {item.unit}</span>}
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${statusInfo.cls}`}>{statusInfo.label}</span>
@@ -1013,6 +1026,65 @@ export default function RecapitulationTable() {
           })
         )}
       </div>
+      {/* PAGINATION */}
+      {filteredItems.length > ITEMS_PER_PAGE && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-3">
+
+          <p className="text-[10px] text-gray-500"> Menampilkan{" "}
+            <span className="font-semibold text-gray-700"> {(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>
+            {" - "}
+            <span className="font-semibold text-gray-700">{Math.min(currentPage * ITEMS_PER_PAGE, filteredItems.length)}</span>
+            {" dari "}
+            <span className="font-semibold text-gray-700">{filteredItems.length}</span>
+            {" laporan"}
+          </p>
+
+          <div className="flex items-center gap-1">
+
+            <button
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}
+              className="px-2.5 py-1.5 text-[10px] font-semibold rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+              ‹ Prev
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((page) => {
+                if (totalPages <= 7) return true;
+                if (page === 1 || page === totalPages) return true;
+                return Math.abs(page - currentPage) <= 1;
+              })
+              .map((page, index, pages) => {
+                const previousPage = pages[index - 1];
+                return (
+                  <div key={page} className="flex items-center gap-1">
+
+                    {previousPage && page - previousPage > 1 && (
+                      <span className="px-1 text-gray-400 text-[10px]">...</span>
+                    )}
+
+                    <button
+                      onClick={() => setCurrentPage(page)}
+                      className={`min-w-8 px-2.5 py-1.5 text-[10px] font-semibold rounded border transition-all ${
+                        currentPage === page
+                          ? "bg-dark-header text-white border-dark-header"
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  </div>
+                );
+              })}
+
+            <button
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage === totalPages}
+              className="px-2.5 py-1.5 text-[10px] font-semibold rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+              Next ›
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
