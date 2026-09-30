@@ -216,7 +216,7 @@ export default function LoginForm({
               </Link>
 
               <a
-                href="/manual-book-tuntas.pdf"
+                href="/manual_book_tuntas_.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-200 hover:underline"
