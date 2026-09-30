@@ -25,6 +25,36 @@ function formatTglAman(v: string | null): string {
   return isNaN(d.getTime()) ? v : fmtTgl(v);
 }
 
+const BULAN_ID_SINGKAT: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, jun: 6,
+  jul: 7, agu: 8, ags: 8, sep: 9, okt: 10, nov: 11, des: 12,
+};
+
+/** Ubah tanggal arsip (ISO / dd/mm/yyyy / "10 Mei 2023") jadi "YYYY-MM-DD"
+ *  yang pasti bisa dibaca Date. Kalau gagal, atau tahunnya beda dengan tahun
+ *  arsip yang dipilih saat upload, pakai tanggal cadangan `${tahun}-06-15`. */
+function tglMasukArsip(teks: string | null, tahun: number): string {
+  const fallback = `${tahun}-06-15`;
+  if (!teks) return fallback;
+  const s = String(teks).trim();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  let y = 0, m = 0, d = 0;
+  let mt: RegExpExecArray | null;
+
+  if ((mt = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) {
+    y = +mt[1]; m = +mt[2]; d = +mt[3];
+  } else if ((mt = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(s))) {
+    d = +mt[1]; m = +mt[2]; y = +mt[3];
+  } else if ((mt = /^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})/.exec(s))) {
+    const bln = BULAN_ID_SINGKAT[mt[2].slice(0, 3).toLowerCase()];
+    if (bln) { d = +mt[1]; m = bln; y = +mt[3]; }
+  }
+
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return fallback;
+  if (y !== tahun) return fallback;
+  return `${y}-${pad(m)}-${pad(d)}`;
+}
+
 // 1. Helper untuk memisahkan teks rencana berdasarkan kata "Rencana 1", "Rencana 2", dst.
 function parseRencana(rencana: string | null | undefined): string[] {
   if (!rencana) return [];
@@ -408,7 +438,7 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
       </button>
 
       {showUploadArsip && (
-        <div className="absolute bottom-full left-0 mb-2 z-[999] w-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
+        <div className="absolute bottom-full left-0 mb-2 z-999 w-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
           {msg && (
             <p className="text-green-700 text-[10px] font-bold px-2 py-1.5 bg-green-50 border border-green-200 rounded">
               ✅ {msg}
@@ -651,7 +681,7 @@ export default function RecapitulationTable() {
         statusReview: a.status_review ?? "",
         statusBoxing: a.status_boxing ?? (isCloseOrSelesai ? "selesai" : "menunggu"),
         approvalStaf: null as string | null,
-        tglMasuk: a.tgl_masuk ? formatTglAman(a.tgl_masuk) : `${a.tahun}-06-15`,
+        tglMasuk: tglMasukArsip(a.tgl_masuk, a.tahun),
         isSelesai: isCloseOrSelesai,
       };
     }),
