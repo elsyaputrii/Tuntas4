@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import NotifikasiBell from '@/components/notifikasi/NotifikasiBell';
 import UbahPasswordWajibModal from '@/components/auth/UbahPasswordWajibModal';
+import FlowGambarModal from '@/components/auth/FlowGambarModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
@@ -31,9 +32,6 @@ export default function StaffP4MLayout({
   const pathname = usePathname();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  // Pola sama kayak ka-p4m/kepala-unit: baca darkMode langsung pas
-  // inisialisasi state (bukan lewat useEffect + setState terpisah),
-  // biar nggak kena warning "setState synchronously within an effect".
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true';
@@ -42,11 +40,8 @@ export default function StaffP4MLayout({
   });
   const [showProfile, setShowProfile] = useState(false);
   const [fotoProfil, setFotoProfil] = useState<string | null>(null);
-  // Pop up "Ganti Password Anda" — muncul MENUMPUK di atas dashboard ini,
-  // bukan lagi lempar ke halaman /ubah-password terpisah.
-  // Dihitung langsung dari localStorage lewat lazy initializer (BUKAN di
-  // dalam useEffect) supaya tidak kena warning React "Calling setState
-  // synchronously within an effect".
+
+  // Pop up "Ganti Password Anda"
   const [showUbahPasswordModal, setShowUbahPasswordModal] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -59,9 +54,11 @@ export default function StaffP4MLayout({
     }
   });
 
+  // 🔥 BARU: state untuk pop-up flow gambar (muncul DULUAN)
+  const [showFlowGambar, setShowFlowGambar] = useState(true);
+
   // Auth check
   useEffect(() => {
-    // Halaman reset password diakses TANPA login (dari link email)
     if (pathname?.includes('/reset-password')) return;
 
     const token = localStorage.getItem('token');
@@ -76,51 +73,44 @@ export default function StaffP4MLayout({
         router.push('/login');
         return;
       }
-      // wajibGantiPassword sudah ditangani lewat lazy initializer di atas —
-      // di sini tinggal validasi role & token saja.
     } catch {
       router.push('/login');
     }
   }, [router, pathname]);
 
-  // Auto-logout saat token JWT expired — nggak nunggu ada request ke server dulu.
-// Baca field "exp" dari payload token, lalu pasang timer yang otomatis
-// logout + redirect ke login TEPAT saat waktunya habis.
-useEffect(() => {
-  const token = localStorage.getItem('token');
-  if (!token) return;
+  // Auto-logout saat token JWT expired
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
 
-  let expiredAtMs: number | null = null;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.exp) expiredAtMs = payload.exp * 1000; // exp dari JWT dalam detik
-  } catch {
-    return; // token rusak/format aneh, biar auth check di atas yang tangani
-  }
-  if (!expiredAtMs) return;
+    let expiredAtMs: number | null = null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp) expiredAtMs = payload.exp * 1000;
+    } catch {
+      return;
+    }
+    if (!expiredAtMs) return;
 
-  const doAutoLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    router.push('/login'); // beda per file: /ka-p4m/login, /kepala-unit/login
-  };
+    const doAutoLogout = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('role');
+      router.push('/login');
+    };
 
-  const sisaWaktu = expiredAtMs - Date.now();
+    const sisaWaktu = expiredAtMs - Date.now();
 
-  // Kalau ternyata pas dibuka token sudah kadaluarsa (misal tab lama dibuka lagi)
-  if (sisaWaktu <= 0) {
-    doAutoLogout();
-    return;
-  }
+    if (sisaWaktu <= 0) {
+      doAutoLogout();
+      return;
+    }
 
-  const timer = setTimeout(doAutoLogout, sisaWaktu);
-  return () => clearTimeout(timer);
-}, [router]);
+    const timer = setTimeout(doAutoLogout, sisaWaktu);
+    return () => clearTimeout(timer);
+  }, [router]);
 
-  // Ambil foto profil buat ditampilkan di navbar. Dipanggil ulang tiap
-  // pindah halaman (pathname berubah) biar foto langsung update kalau
-  // baru saja diganti di halaman Profil Saya.
+  // Ambil foto profil
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -132,15 +122,12 @@ useEffect(() => {
       .then((data) => {
         if (data?.foto_profil) setFotoProfil(data.foto_profil);
       })
-      .catch(() => {
-        // Gagal ambil foto bukan hal fatal, cukup tampilkan icon default
-      });
+      .catch(() => {});
   }, [pathname]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
-
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -294,10 +281,8 @@ useEffect(() => {
                         Pengaturan
                       </button>
 
-                      {/* GARIS PEMBATAS / SEPARATOR (OPSIONAL) */}
                       <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
 
-                      {/* TOMBOL LOGOUT */}
                       <button 
                         onClick={() => {
                           setShowProfile(false);
@@ -324,7 +309,15 @@ useEffect(() => {
         </div>
       </div>
 
-      {showUbahPasswordModal && (
+      {/* 🔥 1️⃣ POP-UP FLOW GAMBAR — muncul DULUAN */}
+      {showFlowGambar && (
+        <FlowGambarModal
+          onDone={() => setShowFlowGambar(false)}
+        />
+      )}
+
+      {/* 🔥 2️⃣ POP-UP UBAH PASSWORD — muncul SETELAH flow gambar hilang */}
+      {!showFlowGambar && showUbahPasswordModal && (
         <UbahPasswordWajibModal onDone={() => setShowUbahPasswordModal(false)} />
       )}
     </div>

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import NotifikasiBell from '@/components/notifikasi/NotifikasiBell';
 import UbahPasswordWajibModal from '@/components/auth/UbahPasswordWajibModal';
+import FlowGambarModal from '@/components/auth/FlowGambarModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
@@ -40,11 +41,8 @@ export default function KaP4MLayout({
   });
   const [showProfile, setShowProfile] = useState(false);
   const [fotoProfil, setFotoProfil] = useState<string | null>(null);
-  // Pop up "Ganti Password Anda" — muncul MENUMPUK di atas dashboard ini,
-  // bukan lagi lempar ke halaman /ubah-password terpisah.
-  // Dihitung langsung dari localStorage lewat lazy initializer (BUKAN di
-  // dalam useEffect) supaya tidak kena warning React "Calling setState
-  // synchronously within an effect".
+
+  // Pop up "Ganti Password Anda"
   const [showUbahPasswordModal, setShowUbahPasswordModal] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -57,9 +55,11 @@ export default function KaP4MLayout({
     }
   });
 
+  // 🔥 BARU: pop-up flow gambar (muncul DULUAN)
+  const [showFlowGambar, setShowFlowGambar] = useState(true);
+
   // Auth check
   useEffect(() => {
-    // Halaman reset password diakses TANPA login (dari link email)
     if (pathname?.includes('/reset-password')) return;
 
     const token = localStorage.getItem('token');
@@ -74,55 +74,48 @@ export default function KaP4MLayout({
         router.push('/login');
         return;
       }
-      // wajibGantiPassword sudah ditangani lewat lazy initializer di atas —
-      // di sini tinggal validasi role & token saja.
     } catch {
       router.push('/login');
     }
   }, [router, pathname]);
 
-  // Auto-logout saat token JWT expired — nggak nunggu ada request ke server dulu.
-// Baca field "exp" dari payload token, lalu pasang timer yang otomatis
-// logout + redirect ke login TEPAT saat waktunya habis.
-useEffect(() => {
-  const token = localStorage.getItem('token');
-  if (!token) return;
+  // Auto-logout saat token JWT expired
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
 
-  let expiredAtMs: number | null = null;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (payload.exp) expiredAtMs = payload.exp * 1000; // exp dari JWT dalam detik
-  } catch {
-    return; // token rusak/format aneh, biar auth check di atas yang tangani
-  }
-  if (!expiredAtMs) return;
+    let expiredAtMs: number | null = null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp) expiredAtMs = payload.exp * 1000;
+    } catch {
+      return;
+    }
+    if (!expiredAtMs) return;
 
-  const doAutoLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    router.push('/login'); // beda per file: /ka-p4m/login, /kepala-unit/login
-  };
+    const doAutoLogout = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('role');
+      router.push('/login');
+    };
 
-  const sisaWaktu = expiredAtMs - Date.now();
+    const sisaWaktu = expiredAtMs - Date.now();
 
-  // Kalau ternyata pas dibuka token sudah kadaluarsa (misal tab lama dibuka lagi)
-  if (sisaWaktu <= 0) {
-    doAutoLogout();
-    return;
-  }
+    if (sisaWaktu <= 0) {
+      doAutoLogout();
+      return;
+    }
 
-  const timer = setTimeout(doAutoLogout, sisaWaktu);
-  return () => clearTimeout(timer);
-}, [router]);
+    const timer = setTimeout(doAutoLogout, sisaWaktu);
+    return () => clearTimeout(timer);
+  }, [router]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
-  // Ambil foto profil buat ditampilkan di navbar. Dipanggil ulang tiap
-  // pindah halaman biar foto langsung update kalau baru saja diganti di
-  // halaman Profil Saya.
+  // Ambil foto profil
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -134,9 +127,7 @@ useEffect(() => {
       .then((data) => {
         if (data?.foto_profil) setFotoProfil(data.foto_profil);
       })
-      .catch(() => {
-        // Gagal ambil foto bukan hal fatal, cukup tampilkan icon default
-      });
+      .catch(() => {});
   }, [pathname]);
 
   const toggleDarkMode = () => {
@@ -327,41 +318,39 @@ useEffect(() => {
                         <p className="text-xs text-slate-400">ka.p4m@polibatam.ac.id</p>
                       </div>
                       <div className="p-2 space-y-1">
-  <button
-    onClick={() => {
-      setShowProfile(false);
-      router.push('/ka-p4m/profil');
-    }}
-    className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-  >
-    Profil Saya
-  </button>
-  <button
-    onClick={() => {
-      setShowProfile(false);
-      router.push('/ka-p4m/pengaturan');
-    }}
-    className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
-  >
-    Pengaturan
-  </button>
+                        <button
+                          onClick={() => {
+                            setShowProfile(false);
+                            router.push('/ka-p4m/profil');
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        >
+                          Profil Saya
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowProfile(false);
+                            router.push('/ka-p4m/pengaturan');
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                        >
+                          Pengaturan
+                        </button>
 
-  {/* Garis Pemisah / Divider */}
-  <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                        <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
 
-  {/* Tombol Logout */}
-  <button
-    onClick={() => {
-      setShowProfile(false);
-      localStorage.clear();
-      router.push('/login');
-    }}
-    className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition flex items-center gap-2 font-medium"
-  >
-    <LogOut size={16} />
-    Logout
-  </button>
-</div>
+                        <button
+                          onClick={() => {
+                            setShowProfile(false);
+                            localStorage.clear();
+                            router.push('/login');
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition flex items-center gap-2 font-medium"
+                        >
+                          <LogOut size={16} />
+                          Logout
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -375,6 +364,14 @@ useEffect(() => {
             </div>
           </div>
         </div>
+
+        {/* 🔥 Modal di RETURN PERTAMA (Kepala Unit section) — ini bug fix */}
+        {showFlowGambar && (
+          <FlowGambarModal onDone={() => setShowFlowGambar(false)} />
+        )}
+        {!showFlowGambar && showUbahPasswordModal && (
+          <UbahPasswordWajibModal onDone={() => setShowUbahPasswordModal(false)} />
+        )}
       </div>
     );
   }
@@ -509,10 +506,8 @@ useEffect(() => {
                         Pengaturan
                       </button>
 
-                      {/* Garis Pemisah / Divider */}
                       <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
 
-                      {/* Tombol Logout */}
                       <button
                         onClick={() => {
                           setShowProfile(false);
@@ -539,7 +534,11 @@ useEffect(() => {
         </div>
       </div>
 
-      {showUbahPasswordModal && (
+      {/* 🔥 Modal di RETURN KEDUA (Ka-P4M biasa) */}
+      {showFlowGambar && (
+        <FlowGambarModal onDone={() => setShowFlowGambar(false)} />
+      )}
+      {!showFlowGambar && showUbahPasswordModal && (
         <UbahPasswordWajibModal onDone={() => setShowUbahPasswordModal(false)} />
       )}
     </div>
