@@ -10,11 +10,11 @@
 // kedua tab memakai komponen yang sama, keduanya otomatis konsisten dan
 // tersambung ke backend dengan benar.
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import { Plus, Pencil, Trash2, Calendar } from "lucide-react";
 
-const todayStr = () => new Date().toISOString().split("T")[0];
+// const todayStr = () => new Date().toISOString().split("T")[0];
 
 export interface RencanaItem {
   id: number;
@@ -25,11 +25,14 @@ export interface RencanaItem {
 export default function RencanaPanel({
   idBoxing,
   onCountChange,
+  onChange, 
 }: {
   idBoxing: number;
   onCountChange?: (idBoxing: number, count: number) => void;
+  onChange?: (idBoxing: number, changed: boolean) => void;
 }) {
   const [items, setItems]             = useState<RencanaItem[]>([]);
+  const initialItems                  = useRef<RencanaItem[]>([]); 
   const [loading, setLoading]         = useState(true);
   const [errMsg, setErrMsg]           = useState("");
 
@@ -52,6 +55,8 @@ export default function RencanaPanel({
           tanggal: String(r.tanggal).slice(0, 10),
         }));
         setItems(data);
+        initialItems.current = data;
+        onChange?.(idBoxing, false);
         onCountChange?.(idBoxing, data.length);
       }
     } catch (e: unknown) {
@@ -95,10 +100,10 @@ export default function RencanaPanel({
       setFormErr("Tanggal harus diisi.");
       return false;
     }
-    if (formTanggal < todayStr()) {
-      setFormErr("Tanggal tidak boleh lewat.");
-      return false;
-    }
+    // if (formTanggal < todayStr()) {
+     // setFormErr("Tanggal tidak boleh lewat.");
+     // return false;
+    // }
     return true;
   };
 
@@ -118,6 +123,7 @@ export default function RencanaPanel({
         ];
         setItems(newList);
         onCountChange?.(idBoxing, newList.length);
+        onChange?.(idBoxing, true);
         setFormMode(null);
       }
     } catch (e: unknown) {
@@ -129,19 +135,30 @@ export default function RencanaPanel({
 
   const handleSaveEdit = async () => {
     if (typeof formMode !== "number" || !validateForm()) return;
-    setSavingForm(true); setFormErr("");
+    setSavingForm(true);
+    setFormErr("");
+
     try {
       await kepalaUnitApi.updateRencana(formMode, {
         teks: formTeks.trim(),
         tanggal: formTanggal,
       });
+
       setItems((prev) =>
         prev.map((it) =>
           it.id === formMode
-            ? { ...it, teks: formTeks.trim(), tanggal: formTanggal }
+            ? {
+                ...it,
+                teks: formTeks.trim(),
+                tanggal: formTanggal,
+              }
             : it
         )
       );
+
+      // Menandakan bahwa rencana sudah diubah
+      onChange?.(idBoxing, true);
+
       setFormMode(null);
     } catch (e: unknown) {
       setFormErr(e instanceof Error ? e.message : "Gagal memperbarui.");
@@ -150,6 +167,7 @@ export default function RencanaPanel({
     }
   };
 
+
   const handleDelete = async (item: RencanaItem) => {
     if (!confirm(`Hapus rencana "${item.teks}"?`)) return;
     try {
@@ -157,6 +175,7 @@ export default function RencanaPanel({
       const newList = items.filter((it) => it.id !== item.id);
       setItems(newList);
       onCountChange?.(idBoxing, newList.length);
+      onChange?.(idBoxing, true);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Gagal menghapus.");
     }
@@ -197,7 +216,7 @@ export default function RencanaPanel({
             type="date"
             className="w-full border border-black p-1.5 text-[10px] outline-none focus:border-blue-polibatam rounded"
             value={formTanggal}
-            min={todayStr()}
+            // min={todayStr()} gak pernah dipakai karena user bisa edit tanggal rencana yang sudah lewat
             onChange={(e) => setFormTanggal(e.target.value)}
           />
 

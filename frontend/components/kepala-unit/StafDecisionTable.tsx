@@ -4,7 +4,7 @@ import { kepalaUnitApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
-import RencanaPanel from "@/components/kepala-unit/RencanaPanel";
+import RencanaPanel, { RencanaItem } from "@/components/kepala-unit/RencanaPanel";
 import {
   Image as ImageIcon,
   XCircle,
@@ -48,6 +48,7 @@ export default function StafDecisionTable({ onCountChange }: StafDecisionTablePr
   const [penyebab, setPenyebab] = useState<Record<number, string>>({});
 
   const [rencanaCount, setRencanaCount] = useState<Record<number, number>>({});
+  const [rencanaChanged, setRencanaChanged] = useState<Record<number, boolean>>({});
 
   const handleCountChange = useCallback((idBoxing: number, count: number) => {
     setRencanaCount((prev) => {
@@ -55,6 +56,16 @@ export default function StafDecisionTable({ onCountChange }: StafDecisionTablePr
       return { ...prev, [idBoxing]: count };
     });
   }, []);
+
+  const handleRencanaChange = useCallback(
+    (idBoxing: number, changed: boolean) => {
+      setRencanaChanged((prev) => {
+        if (prev[idBoxing] === changed) return prev;
+        return { ...prev, [idBoxing]: changed };
+      });
+    },
+    []
+  );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -95,9 +106,11 @@ export default function StafDecisionTable({ onCountChange }: StafDecisionTablePr
   const isFormUnchanged = (item: StafDecisionItem) => {
     const originalPenyebab = (item.penyebab || "").trim();
     const currentPenyebab = (penyebab[item.id_boxing] || "").trim();
-    const isPenyebabSame = originalPenyebab === currentPenyebab;  // Cek apakah teks penyebab masih persis sama dengan data asli
-    return isPenyebabSame; // Jika belum diedit sama sekali, tombol mati
+    const isPenyebabSame = originalPenyebab === currentPenyebab;
+    const isRencanaSame = !rencanaChanged[item.id_boxing];
+    return isPenyebabSame && isRencanaSame;
   };
+
 
   const handleSubmitRevisi = (id_boxing: number) => {
     if (!penyebab[id_boxing]?.trim()) {
@@ -245,7 +258,7 @@ export default function StafDecisionTable({ onCountChange }: StafDecisionTablePr
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Tindak Lanjut</p>
-                  <RencanaPanel idBoxing={item.id_boxing} onCountChange={handleCountChange} />
+                  <RencanaPanel idBoxing={item.id_boxing} onCountChange={handleCountChange} onChange={handleRencanaChange} />
                 </div>
                 <button
                   onClick={() => handleSubmitRevisi(item.id_boxing)}
@@ -293,7 +306,7 @@ export default function StafDecisionTable({ onCountChange }: StafDecisionTablePr
 
                 {/* Kolom 4: Rencana Tindak Lanjut */}
                 <div className="w-[20%] border-r-2 border-black p-3">
-                  <RencanaPanel idBoxing={item.id_boxing} onCountChange={handleCountChange} />
+                  <RencanaPanel idBoxing={item.id_boxing} onCountChange={handleCountChange} onChange={handleRencanaChange} />
                 </div>
 
                 {/* Kolom 5: Status Staf + Catatan */}

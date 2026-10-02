@@ -508,7 +508,7 @@ export async function exportPDFRiwayatKepalaUnit(
 
   const statusLabel = isSelesai
     ? "Selesai — Disetujui Staf P4M"
-    : "Menunggu Approval Staf P4M";
+    : "Dalam Proses";
   const tglCetak = fmtTglWaktu(new Date().toISOString());
   const qrText = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nUnit: ${namaUnit}\nStatus: ${statusLabel}\nPenandatangan: ${jabatanPenandatangan}\nDicetak: ${tglCetak}`;
   const qrDataUrl = await generateQrDataUrl(qrText);
@@ -543,7 +543,7 @@ ${CLOSE_BUTTON}
   <div class="field"><span class="lbl">Unit</span><span class="val">${namaUnit}</span></div>
   <div class="field"><span class="lbl">Tanggal Masuk</span><span class="val">${fmtTgl(item.tanggal_laporan ?? null)}</span></div>
   <div class="field"><span class="lbl">Status</span><span class="val">
-    <span class="badge ${isSelesai ? "badge-green" : "badge-yellow"}">${isSelesai ? "✓ Selesai" : "⏳ Menunggu Approval Staf P4M"}</span>
+    <span class="badge ${isSelesai ? "badge-green" : "badge-yellow"}">${isSelesai ? "✓ Selesai" : "⏳ Dalam Proses"}</span>
   </span></div>
 </div>
 

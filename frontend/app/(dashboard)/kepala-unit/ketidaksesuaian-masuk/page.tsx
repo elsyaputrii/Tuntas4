@@ -12,7 +12,7 @@ export default function KetidaksesuaianMasukPage() {
   const [isChecking, setIsChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('baru');
 
-  // 🔴 1. State untuk menyimpan jumlah notifikasi dari StafDecisionTable
+  // 1. State untuk menyimpan jumlah notifikasi dari StafDecisionTable
   const [keputusanStafCount, setKeputusanStafCount] = useState<number>(0);
 
   const isMounted = useRef(true);
@@ -65,7 +65,7 @@ export default function KetidaksesuaianMasukPage() {
           📋 Laporan Baru
         </button>
 
-        {/* 🔴 2. Menampilkan badge angka jika ada revisi/penolakan dari Staf */}
+        {/* 2. Menampilkan badge angka jika ada revisi/penolakan dari Staf */}
         <button
           onClick={() => setActiveTab('keputusan-staf')}
           className={`px-6 py-3 text-sm font-semibold transition-all border-b-2 flex items-center gap-2 ${
@@ -84,12 +84,13 @@ export default function KetidaksesuaianMasukPage() {
       </div>
 
       <div>
-        {activeTab === 'baru' && <DiscrepancyTable />}
-
-        {/* 🔴 3. Oper fungsi setKeputusanStafCount ke child component */}
-        {activeTab === 'keputusan-staf' && (
+        <div className={activeTab === 'baru' ? 'block' : 'hidden'}>
+          <DiscrepancyTable />
+        </div>
+              
+        <div className={activeTab === 'keputusan-staf' ? 'block' : 'hidden'}>
           <StafDecisionTable onCountChange={setKeputusanStafCount} />
-        )}
+        </div>
       </div>
     </div>
   );
