@@ -13,10 +13,10 @@ export default function FlowGambarModal({ onDone }: FlowGambarModalProps) {
       <div className="absolute inset-0 bg-black/60" onClick={onDone} />
 
       {/* Kartu pop-up */}
-      {/* 🔥 DIUBAH: max-w-lg -> max-w-4xl, ditambah max-h-[90vh] & flex-col */}
+      {/* DIUBAH: max-w-lg -> max-w-4xl, ditambah max-h-[90vh] & flex-col */}
       <div className="relative z-10 w-full max-w-4xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         
-        {/* 🔥 TOMBOL SILANG DI KANAN ATAS */}
+        {/*TOMBOL SILANG DI KANAN ATAS */}
         <button
           type="button"
           onClick={onDone}
@@ -26,7 +26,7 @@ export default function FlowGambarModal({ onDone }: FlowGambarModalProps) {
           <X size={20} />
         </button>
 
-        {/* 🔥 AREA GAMBAR YANG BISA DI-SCROLL */}
+        {/*AREA GAMBAR YANG BISA DI-SCROLL */}
         <div className="flex-1 overflow-y-auto p-6 pt-14 pb-16">
           <img
             src="/Flow Tuntas.jpg"
@@ -35,7 +35,7 @@ export default function FlowGambarModal({ onDone }: FlowGambarModalProps) {
           />
         </div>
 
-        {/* 🔥 BUTTON KECIL DI KIRI BAWAH — Panduan */}
+        {/*BUTTON KECIL DI KIRI BAWAH — Panduan */}
         <a
           href="/manual_book_tuntas_.pdf"
           target="_blank"
