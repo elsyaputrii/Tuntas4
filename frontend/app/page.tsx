@@ -28,7 +28,6 @@ function Tooltip({
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"form" | "status" | null>(null);
   const [statusKode, setStatusKode] = useState("");
-  // 🔥 Modal otomatis terbuka saat landing page dibuka
   const [isFlowModalOpen, setIsFlowModalOpen] = useState(true);
   const router = useRouter();
 

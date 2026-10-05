@@ -37,7 +37,7 @@ export default function FlowGambarModal({ onDone }: FlowGambarModalProps) {
 
         {/* 🔥 BUTTON KECIL DI KIRI BAWAH — Panduan */}
         <a
-          href="/manual_book_tuntas_.pdf"
+          href="/manual-book.pdf"
           target="_blank"
           rel="noopener noreferrer"
           className="absolute bottom-4 left-4 text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm z-20"
