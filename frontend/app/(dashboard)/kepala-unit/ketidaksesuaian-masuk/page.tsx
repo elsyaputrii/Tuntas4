@@ -74,9 +74,9 @@ export default function KetidaksesuaianMasukPage() {
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
           }`}
         >
-          <span>📋 Keputusan Staf</span>
+          <span>📋 Status tindakan Staf P4M</span>
           {keputusanStafCount > 0 && (
-            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold text-white bg-red-500 rounded-full">
+            <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-[11px] font-bold text-white bg-red-500 rounded-full">
               {keputusanStafCount}
             </span>
           )}
