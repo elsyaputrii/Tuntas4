@@ -44,6 +44,7 @@ export type PdfKategori = "harian" | "mingguan" | "bulanan" | "tahunan";
 // Base URL backend (tanpa /api) — dipakai untuk membangun URL gambar lampiran
 // hasil tindak lanjut (foto perbaikan dari Kepala Unit) dan gambar tanda tangan.
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
+const LOGO_POLIBATAM_URL = "/logo-polibatam.png";
 
 function getUploadUrl(file: string | null | undefined): string | null {
   if (!file) return null;
@@ -60,47 +61,48 @@ const BULAN_PANJANG = [
 // ─── CSS bersama untuk semua PDF ────────────────────────────
 const BASE_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:Arial,sans-serif; font-size:10pt; color:#111; padding:20px; }
-  .header { text-align:center; margin-bottom:16px; border-bottom:3px double #4d5e71; padding-bottom:12px; }
-  .header h1 { font-size:15pt; font-weight:900; color:#4d5e71; }
-  .header h2 { font-size:12pt; font-weight:700; color:#222; margin-top:4px; }
-  .header p  { font-size:9pt; color:#555; margin-top:3px; }
-  .footer { margin-top:16px; display:flex; justify-content:space-between; align-items:flex-end; font-size:9pt; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:8px; }
-  .ttd { text-align:center; }
+  body { font-family:Arial,sans-serif; font-size:10pt; color:#111; padding:34px 30px; }
+  .header-borang { display:flex; flex-direction:row; align-items:center; gap:14px; width:100%; margin-bottom:18px; border-bottom:3px double #111; padding-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
+  .header-borang .logo { display:block; flex:0 0 80px; width:80px; height:80px; max-width:80px; object-fit:contain; }
+  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}  
+  .header-borang .doc-number { font-weight:700; white-space:nowrap; }
+  .header-borang .doc-title-text { text-decoration:underline; }
+  .header-borang .doc-date { font-size:9pt; font-weight:700; color:#000; margin-top:4px; }
+  .header-borang .doc-subtitle { font-size:8.5pt; color:#555; margin-top:3px; line-height:1.4; }
+
+  .footer { margin-top:16px; display:flex; justify-content:space-between; align-items:flex-end; gap:16px; font-size:9pt; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:8px; }
+  .ttd { text-align:center; flex-shrink:0; }
   .ttd .name { margin-top:64px; font-weight:700; border-top:1px solid #333; padding-top:4px; width:180px; margin:64px auto 0; }
+
   table { width:100%; border-collapse:collapse; font-size:9pt; }
   thead tr { background:#4d5e71; color:#fff; }
   thead th { padding:6px 5px; text-align:center; font-weight:700; border:1px solid #3a4d5e; }
   tbody tr:nth-child(even) { background:#f8fafc; }
-  tbody td { padding:5px; border:1px solid #e2e8f0; vertical-align:top; line-height:1.4; }
+  tbody td { padding:5px; border:1px solid #e2e8f0; vertical-align:top; line-height:1.4; overflow-wrap:break-word; }
+
   .center { text-align:center; }
   .badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:8pt; font-weight:bold; }
-  .badge-green  { background:#d1fae5; color:#065f46; }
-  .badge-red    { background:#fee2e2; color:#991b1b; }
+  .badge-green { background:#d1fae5; color:#065f46; }
+  .badge-red { background:#fee2e2; color:#991b1b; }
   .badge-yellow { background:#fef3c7; color:#92400e; }
-  .badge-blue   { background:#dbeafe; color:#1e40af; }
-  .badge-gray   { background:#f3f4f6; color:#374151; }
+  .badge-blue { background:#dbeafe; color:#1e40af; }
+  .badge-gray { background:#f3f4f6; color:#374151; }
+
   .hasil-img { display:block; margin-top:5px; max-width:90px; max-height:70px; object-fit:cover; border:1px solid #cbd5e1; border-radius:3px; }
   .hasil-img-cap { display:block; font-size:7.5pt; color:#94a3b8; font-style:italic; margin-top:1px; }
   .ttd .signature-img { display:block; max-height:58px; max-width:170px; margin:8px auto 2px; object-fit:contain; }
   .ttd .signature-placeholder { height:64px; }
   .ttd .qr-img { display:block; width:88px; height:88px; margin:8px auto 2px; }
   .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
-  .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px;
-    padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold;
-    cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
+
+  .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px; padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
   .close-btn:hover { background:#3a4d5e; }
+
   @media print {
-    body { padding:8px; }
-    @page { size:A4 landscape; margin:12mm; }
+    body { padding:32px; padding-top:20px; }
+    @page { size:A4 landscape; margin:18mm; }
     tr { page-break-inside:avoid; break-inside:avoid; }
-    /* ✅ FIX: tanda tangan (.ttd, di dalam .footer) kepotong di
-       tengah kalau kebetulan jatuh persis di batas halaman —
-       sebelumnya cuma <tr> yang dilindungi dari page-break, blok
-       tanda tangan di bawah tabel tidak. Sekarang seluruh blok
-       .footer (nama, jabatan, gambar TTD/QR) dipaksa selalu utuh
-       di satu halaman yang sama; kalau tidak muat, browser akan
-       mendorongnya ke halaman berikutnya, bukan memotongnya. */
+    .header-borang { page-break-inside:avoid; break-inside:avoid; }
     .footer, .ttd { page-break-inside:avoid; break-inside:avoid; }
     .close-btn { display:none !important; }
   }
@@ -140,10 +142,23 @@ const PRINT_SCRIPT = `
 `;
 
 const CLOSE_BUTTON = `<button class="close-btn" onclick="window.close()" title="Tutup halaman ini">✕ Tutup</button>`;
-
-// ═══════════════════════════════════════════════════════════════
+// header
+function renderHeaderBorang(subtitleInfo?: string) {
+  return `
+  <div class="header-borang">
+    <img src="${LOGO_POLIBATAM_URL}" alt="Logo Polibatam" class="logo" />
+    <div class="title-container">
+      <div class="doc-title">
+        No.BO.34.3.1-V6 Borang Registrasi Ketidaksesuaian dan Permintaan
+        <br />
+        Tindakan Koreksi/Pencegahan
+      </div>
+      <div class="doc-date">23 September 2020</div>
+      ${subtitleInfo ? `<div class="doc-subtitle">${subtitleInfo}</div>` : ""}
+    </div>
+  </div>`;
+}
 // 1. PDF REKAPITULASI — per kategori waktu
-// ═══════════════════════════════════════════════════════════════
 export async function exportPDFRekap(
   rekapData: RekapItem[],
   prosesData: ProsesItem[],
@@ -285,12 +300,7 @@ export async function exportPDFRekap(
 <style>${BASE_CSS}</style>
 </head><body>
 ${CLOSE_BUTTON}
-<div class="header">
-  <h1>TUNTAS — Politeknik Negeri Batam</h1>
-  <h2>Laporan Rekapitulasi Ketidaksesuaian</h2>
-  <p>Periode: <strong>${labelKat[kategori]}</strong></p>
-  <p>Dicetak: ${fmtTglWaktu(new Date().toISOString())}</p>
-</div>
+${renderHeaderBorang(`Periode: <strong>${labelKat[kategori]}</strong> | Dicetak: ${tglCetakRekap}`)}
 <table>
   <thead><tr>
     <th style="width:28px">No</th>
@@ -393,11 +403,7 @@ export async function exportPDFProses(
 </style>
 </head><body>
 ${CLOSE_BUTTON}
-<div class="header">
-  <h1>TUNTAS — Politeknik Negeri Batam</h1>
-  <h2>Laporan Ketidaksesuaian</h2>
-  <p>Kode: <strong>${item.kode_laporan}</strong> &nbsp;|&nbsp; Dicetak: ${fmtTglWaktu(new Date().toISOString())}</p>
-</div>
+${renderHeaderBorang(`Kode Laporan: <strong>${item.kode_laporan}</strong> | Dicetak: ${tglCetakProses}`)}
 
 <div class="section">
   <div class="section-title">Identitas Laporan</div>
@@ -530,11 +536,7 @@ export async function exportPDFRiwayatKepalaUnit(
 </style>
 </head><body>
 ${CLOSE_BUTTON}
-<div class="header">
-  <h1>TUNTAS — Politeknik Negeri Batam</h1>
-  <h2>Riwayat Laporan Ketidaksesuaian — Kepala Unit</h2>
-  <p>Kode: <strong>${item.kode_laporan}</strong> &nbsp;|&nbsp; Dicetak: ${tglCetak}</p>
-</div>
+${renderHeaderBorang(`Kode: <strong>${item.kode_laporan}</strong> | Dicetak: ${tglCetak}`)}
 
 <div class="section">
   <div class="section-title">Identitas Laporan</div>

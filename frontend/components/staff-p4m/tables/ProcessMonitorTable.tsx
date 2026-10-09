@@ -548,7 +548,7 @@ export default function ProcessMonitorTable() {
               onChange={(e) => setFilterApprovalStaf(e.target.value)}
               className="border border-black px-2 py-1.5 text-xs bg-white outline-none cursor-pointer rounded-md"
             >
-              <option value="semua">Semua Keputusan Staf</option>
+              <option value="semua">Status</option>
               <option value="menunggu">⏳ Menunggu Tindakan</option>
               <option value="diterima">✅ Siap / Diterima</option>
               <option value="ditolak">❌ Belum Siap / Ditolak</option>

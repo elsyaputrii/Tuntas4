@@ -329,7 +329,7 @@ async function setKeputusanBoxing(req, res) {
   } catch (error) {
     console.error("Error setKeputusanBoxing:", error);
     return res.status(500).json({
-      success: false, message: "Gagal menyimpan keputusan.",});
+      success: false, message: "Gagal menyimpan tinjauan.",});
   }
 }
 
