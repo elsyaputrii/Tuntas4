@@ -66,7 +66,7 @@ function statusBadge(item: RiwayatItem): { label: string; cls: string } {
     if (item.approval_staf === "ditolak") {
       return { label: "🔄 Perbaikan Berkelanjutan", cls: "bg-red-100 text-red-700" };
     }
-    return { label: "⏳ Menunggu Keputusan Akhir Staf", cls: "bg-amber-100 text-amber-700" };
+    return { label: "⏳ Menunggu Tindakan Akhir Staf", cls: "bg-amber-100 text-amber-700" };
   }
   if (item.status_boxing === "menunggu_pelaksanaan") {
     return { label: "🔧 Menunggu Pelaksanaan", cls: "bg-blue-100 text-blue-700" };

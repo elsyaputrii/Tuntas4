@@ -195,7 +195,7 @@ async function submitRancangan(req, res) {
         return res.status(400).json({
           success: false,
           message:
-            "Rancangan sudah diputuskan Ka P4M dan tidak bisa diubah dari sini.",
+            "Rancangan sudah ditinjau Ka P4M dan tidak bisa diubah dari sini.",
         });
       }
       await pool.query(
@@ -219,8 +219,8 @@ async function submitRancangan(req, res) {
 
     // Kasih tau Ka P4M ada rancangan tindakan yang perlu diputuskan
     notifikasiUntukRole("ka_p4m", {
-      judul: "Rancangan Tindakan Perlu Diputuskan",
-      pesan: `Kepala unit ${kepala.unit} mengirim rancangan tindakan yang perlu keputusan Anda (ditindaklanjuti atau tidak).`,
+      judul: "Rancangan Tindakan Perlu Ditinjau",
+      pesan: `Kepala unit ${kepala.unit} mengirim rancangan tindakan yang perlu tinjauan Anda (ditindaklanjuti atau tidak).`,
       jenis: "rancangan_masuk",
       link: "/ka-p4m/proses-pengaduan",
     });
@@ -228,7 +228,7 @@ async function submitRancangan(req, res) {
     return res.status(200).json({
       success: true,
       message:
-        "Rancangan dikirim ke Ka P4M untuk keputusan ditindaklanjuti atau tidak.",
+        "Rancangan dikirim ke Ka P4M untuk tinjauan ditindaklanjuti atau tidak.",
     });
   } catch (error) {
     console.error("Error submitRancangan:", error);
@@ -579,7 +579,7 @@ async function addRencana(req, res) {
         existing[0].status_review !== "menunggu_keputusan_ka") {
       return res.status(400).json({
         success: false,
-        message: "Rancangan sudah diputuskan Ka P4M, tidak bisa diubah lagi.",
+        message: "Rancangan sudah ditinjau Ka P4M, tidak bisa diubah lagi.",
       });
     }
 
@@ -667,7 +667,7 @@ async function updateRencana(req, res) {
         rows[0].status_review !== "menunggu_keputusan_ka") {
       return res.status(400).json({
         success: false,
-        message: "Rancangan sudah diputuskan Ka P4M, tidak bisa diubah lagi.",
+        message: "Rancangan sudah ditinjau Ka P4M, tidak bisa diubah lagi.",
       });
     }
 
@@ -721,7 +721,7 @@ async function deleteRencana(req, res) {
         rows[0].status_review !== "menunggu_keputusan_ka") {
       return res.status(400).json({
         success: false,
-        message: "Rancangan sudah diputuskan Ka P4M, tidak bisa dihapus.",
+        message: "Rancangan sudah ditinjau Ka P4M, tidak bisa dihapus.",
       });
     }
 

@@ -982,8 +982,8 @@ async function setApprovalStaf(req, res) {
       approval === "diterima"
         ? "Hasil tindak lanjut unit DITERIMA. Laporan otomatis ditandai SELESAI dan masuk Rekapitulasi."
         : row.status_review === "ditindaklanjuti"
-        ? "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Laporan Hasil Kepala Unit untuk direvisi (Penyebab & Rencana tidak perlu diulang), lalu menunggu keputusan ulang Staf P4M."
-        : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Ketidaksesuaian Masuk Kepala Unit untuk direvisi Penyebab & Rencana Tindak Lanjut (data lama tetap ada), lalu menunggu keputusan ulang Ka P4M.";
+        ? "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Laporan Hasil Kepala Unit untuk direvisi (Penyebab & Rencana tidak perlu diulang), lalu menunggu hasil tindakan ulang Staf P4M."
+        : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Ketidaksesuaian Masuk Kepala Unit untuk direvisi Penyebab & Rencana Tindak Lanjut (data lama tetap ada), lalu menunggu tinjauan ulang Ka P4M.";
 
     console.log("✅ [setApprovalStaf] === SELESAI — kirim response sukses ===");
     return res.status(200).json({ success: true, message: pesan });

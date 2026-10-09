@@ -221,7 +221,7 @@ export function labelStatusLengkap(
     // ✅ FIX LABEL: approvalStaf null/"menunggu"/undefined → laporan
     // sudah dikerjakan unit, sedang menunggu Keputusan Staff (✅ Siap /
     // ❌ Belum Siap) dari Staf P4M sendiri lewat tab "Proses & Pantau".
-    return { label: "⏳ Menunggu Keputusan Staf P4M", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: true };
+    return { label: "⏳ Menunggu TindakanStaf P4M", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: true };
   }
 
   if (statusBoxing === "menunggu_pelaksanaan" || statusBoxing === "diproses" || statusBoxing === "terdistribusi") {

@@ -188,7 +188,7 @@ function buildTahapProgres(laporan, ringkasan, detailUnit = []) {
   // Teks Deskripsi Tahap 5
   let deskripsiTahap5 = "";
   if (!semuaUnitSudahDireview) {
-    deskripsiTahap5 = "Menunggu keputusan Ka P4M untuk seluruh unit.";
+    deskripsiTahap5 = "Menunggu tinjauan Ka P4M untuk seluruh unit.";
   } else if (unitSesuai.length === totalUnitSeharusnya) {
     deskripsiTahap5 = "Tidak memerlukan tindakan lanjutan.";
   } else if (unitPerbaikanBelumHasil.length > 0) {
@@ -234,11 +234,11 @@ function buildTahapProgres(laporan, ringkasan, detailUnit = []) {
     },
     {
       id: "keputusan_ka",
-      title: "Keputusan Ka P4M",
+      title: "Tinjauan Ka P4M",
       selesai: semuaUnitSudahDireview,
       deskripsi: semuaUnitSudahDireview
-        ? "Ka P4M telah memberikan keputusan untuk seluruh unit."
-        : "Menunggu keputusan Ka P4M.",
+        ? "Ka P4M telah memberikan Tinjauan untuk seluruh unit."
+        : "Menunggu tinjauan Ka P4M.",
     },
     {
       id: "pelaksanaan",
@@ -289,7 +289,7 @@ function buildUpdateTerbaru(laporan, ringkasan, detailUnit = []) {
       .map((u) => u.unit_tujuan);
 
     if (unitBelum.length === 0) {
-      return `Semua unit (${unitSudah.join(", ")}) telah mengajukan rencana. Menunggu keputusan Ka P4M.`;
+      return `Semua unit (${unitSudah.join(", ")}) telah mengajukan rencana. Menunggu tinjauan Ka P4M.`;
     }
 
     if (unitSudah.length > 0) {

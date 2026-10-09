@@ -414,7 +414,7 @@ export default function ProcessMonitorTable() {
         )}
 
         <div>
-          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Keputusan Staff:</p>
+          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Tindakan Staf:</p>
           <div className="flex flex-wrap gap-2">
             {diStaff || isSelesai ? (
               <div className="w-full flex justify-center">
@@ -548,8 +548,8 @@ export default function ProcessMonitorTable() {
               onChange={(e) => setFilterApprovalStaf(e.target.value)}
               className="border border-black px-2 py-1.5 text-xs bg-white outline-none cursor-pointer rounded-md"
             >
-              <option value="semua">Semua Keputusan Staff</option>
-              <option value="menunggu">⏳ Menunggu Keputusan</option>
+              <option value="semua">Semua Keputusan Staf</option>
+              <option value="menunggu">⏳ Menunggu Tindakan</option>
               <option value="diterima">✅ Siap / Diterima</option>
               <option value="ditolak">❌ Belum Siap / Ditolak</option>
             </select>
@@ -564,9 +564,6 @@ export default function ProcessMonitorTable() {
       </div>
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
-        <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
-          Staf P4M: pantau proses &amp; berikan Keputusan Staff — ✅ Siap (laporan otomatis Selesai) atau ❌ Belum Siap (balik ke Kepala Unit untuk revisi hasil). Klik 📄 untuk export PDF.
-        </p>
         {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
         {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
 
@@ -578,9 +575,9 @@ export default function ProcessMonitorTable() {
           >
             <div style={{ display: "table-row" }}>
               <div style={{ display: "table-cell", width: "38%" }} className="border-r-2 border-black p-3 align-middle">Laporan</div>
-              <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Ka</div>
+              <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-middle">Tinjauan Ka</div>
               <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Hasil Unit</div>
-              <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Keputusan Staff</div>
+              <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Tindakan Staf</div>
               <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">Dokumen</div>
             </div>
           </div>

@@ -32,7 +32,7 @@ interface LaporanItem {
 }
 
 const statusBadge: Record<string, { label: string; cls: string }> = {
-  menunggu_keputusan_ka: { label: "⏳ Menunggu Keputusan Ka P4M", cls: "text-blue-500 bg-blue-50 border-blue-200" },
+  menunggu_keputusan_ka: { label: "⏳ Menunggu Tinjauan Ka P4M", cls: "text-blue-500 bg-blue-50 border-blue-200" },
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

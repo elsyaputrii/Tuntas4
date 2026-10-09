@@ -32,7 +32,7 @@ type FilterPeriod = "semua" | "harian" | "mingguan" | "bulanan" | "tahunan";
 
 const statusBadge: Record<string, { label: string; cls: string; Icon: typeof Clock }> = {
   menunggu_keputusan_ka: {
-    label: "Menunggu Keputusan",
+    label: "Menunggu Tinjauan",
     cls: "text-blue-600 bg-blue-50 border-blue-200",
     Icon: Clock,
   },
@@ -511,7 +511,7 @@ const highlightedDates = useMemo(() => {
                 className="text-xs bg-transparent outline-none cursor-pointer w-full"
               >
                 <option value="semua">Semua Status Review</option>
-                <option value="menunggu_keputusan_ka">Menunggu Keputusan</option>
+                <option value="menunggu_keputusan_ka">Menunggu Tinjauan</option>
                 <option value="ditindaklanjuti">Perbaikan Berkelanjutan</option>
                 <option value="tidak_ditindaklanjuti">Sesuai</option>
               </select>
@@ -632,7 +632,7 @@ const highlightedDates = useMemo(() => {
                             onClick={() => openModalEdit(item)}
                             className="flex-1 bg-blue-polibatam text-white font-bold py-2 text-[10px] rounded"
                           >
-                            Beri Keputusan
+                            Hasil Review Tindakan
                           </button>
                         ) : sudahDiputus ? (
                           <>
@@ -781,7 +781,7 @@ const highlightedDates = useMemo(() => {
                                 onClick={() => openModalEdit(item)}
                                 className="w-full bg-blue-polibatam text-white font-bold py-2 text-[10px] rounded hover:bg-blue-600 transition-colors"
                               >
-                                Beri Keputusan
+                                Hasil Review Tindakan
                               </button>
                             ) : sudahDiputus ? (
                               <div className="flex items-center gap-1 w-full">

@@ -212,7 +212,7 @@ export default function KaP4MHasilTable() {
         };
       case "diproses":
         return {
-          label: "Menunggu keputusan Anda (Proses Pengaduan)",
+          label: "Menunggu tinjauan Anda (Proses Pengaduan)",
           cls: "text-blue-600 bg-blue-50 border-blue-300",
           Icon: ClipboardCheck,
         };
@@ -224,7 +224,7 @@ export default function KaP4MHasilTable() {
         };
       case "di_staff":
         return {
-          label: "Menunggu Keputusan Staf P4M",
+          label: "Menunggu Tindakan Staf P4M",
           cls: "text-blue-600 bg-blue-50 border-blue-300",
           Icon: Clock,
         };
@@ -309,7 +309,7 @@ export default function KaP4MHasilTable() {
           <option value="semua">Semua Status</option>
           <option value="diterima">Siap (Selesai)</option>
           <option value="ditolak">Belum Siap (Revisi)</option>
-          <option value="menunggu">Menunggu Keputusan / Proses</option>
+          <option value="menunggu">Menunggu Tindakan / Proses</option>
         </select>
       </div>
     </div>
@@ -334,7 +334,7 @@ export default function KaP4MHasilTable() {
               <th className="border-r-2 border-b-2 border-black p-3">Laporan</th>
               <th className="border-r-2 border-b-2 border-black p-3">Rencana / Aksi Masukan</th>
               <th className="border-r-2 border-b-2 border-black p-3">Hasil Tindak Lanjut Unit</th>
-              <th className="border-b-2 border-black p-3">Status Keputusan Staff</th>
+              <th className="border-b-2 border-black p-3">Status Tindakan Staf</th>
             </tr>
           </thead>
           <tbody>

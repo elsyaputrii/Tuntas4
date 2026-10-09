@@ -986,7 +986,7 @@ export default function RecapitulationTable() {
                   {item.isSelesai ? (
                     <span className="text-[9px] text-green-600 italic text-center font-semibold">✓ Selesai</span>
                   ) : statusInfo.butuhAksiStaf ? (
-                    <span className="text-[9px] text-blue-600 italic text-center font-semibold">⏳ Menunggu Keputusan Staff</span>
+                    <span className="text-[9px] text-blue-600 italic text-center font-semibold">⏳ Menunggu Tindakan Staf</span>
                   ) : (
                     <span className="text-[9px] text-gray-400 italic text-center">Menunggu proses</span>
                   )}
@@ -1046,7 +1046,7 @@ export default function RecapitulationTable() {
                   {item.isSelesai ? (
                     <span className="text-[10px] text-green-600 italic font-semibold">✓ Selesai</span>
                   ) : statusInfo.butuhAksiStaf ? (
-                    <span className="text-[10px] text-blue-600 italic font-semibold">⏳ Menunggu Keputusan Staff</span>
+                    <span className="text-[10px] text-blue-600 italic font-semibold">⏳ Menunggu Tindakan Staf</span>
                   ) : (
                     <span className="text-[10px] text-gray-400 italic">Menunggu proses</span>
                   )}
