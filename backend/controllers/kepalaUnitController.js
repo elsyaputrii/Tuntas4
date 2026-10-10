@@ -1,45 +1,32 @@
 // FILE: backend/controllers/kepalaUnitController.js
 //
-// // ── ALUR "DIBUKA KEMBALI KE UNIT" (baca ini sebelum ubah query di bawah) ──
+// ── ALUR "DIBUKA KEMBALI KE UNIT" ──
 // Keputusan akhir (Siap/Belum Siap atas hasil tindak lanjut) HANYA wewenang
 // Staf P4M, lewat PATCH /api/staf/approval-hasil (fungsi setApprovalStaf di
-// stafController.js). Sempat dipindah ke Ka P4M (PATCH /api/ka-p4m/approval-hasil),
-// tapi route itu sudah DICABUT — sekarang Ka P4M cuma read-only monitor lewat
-// GET /api/ka-p4m/proses (lihat KaP4MHasilTable.tsx di frontend). Kalau Staf
-// P4M menolak ("Belum Siap") hasil tindak lanjut unit:
-//     (status_boxing TETAP 'di_staff', tidak diubah)
-//   - rancangan_tindakan.status_review → 'menunggu_keputusan_ka'
-//   - rancangan_tindakan.penyebab & deskripsi → TETAP DIPERTAHANKAN
-//     (TIDAK di-NULL-kan) supaya Kepala Unit tidak perlu mengetik ulang
-//     dari nol; kotaknya hanya dibuka lagi supaya bisa diedit.
-//   - pelaksanaan_tindakan lama → DIHAPUS (memang ini yang mau direvisi)
+// stafController.js).
 //
-// Efeknya: laporan tersebut otomatis muncul LAGI di getLaporanMasuk
-// (tab "Ketidaksesuaian Masuk" Kepala Unit) — bukan di getLaporanHasil —
-// dengan Penyebab & Rencana Tindak Lanjut SEBELUMNYA sudah terisi (siap
-// diedit ulang oleh Kepala Unit), lalu harus lewat keputusan Ka P4M lagi
-// sebelum Kepala Unit bisa isi pelaksanaan baru di "Laporan Hasil".
+// ✅ REVISI (permintaan user/dosen):
+//   Tab "Laporan Hasil" sekarang menampilkan DUA jalur keputusan Ka P4M:
+//     1. status_review = 'ditindaklanjuti'       (Tindak Lanjut)
+//     2. status_review = 'tidak_ditindaklanjuti' (Sesuai)
+//   Keduanya harus lewat Laporan Hasil dulu (status_boxing =
+//   'menunggu_pelaksanaan') supaya Kepala Unit mengisi bukti pelaksanaan.
 //
-// Query getLaporanMasuk menangkap kasus ini lewat kondisi:
-//   r.status_review = 'menunggu_keputusan_ka' OR b.approval_staf = 'ditolak'
+// ✅ FIX getLaporanMasuk:
+//   Sebelumnya pakai kondisi `r.status_review = 'menunggu_keputusan_ka'`
+//   yang bikin laporan yang SUDAH dikirim ke Ka P4M (status_boxing =
+//   'diproses') tetap nangkring di tab "Laporan Baru" — karena
+//   status_review masih 'menunggu_keputusan_ka' sampai Ka P4M kasih
+//   keputusan.
 //
-// Sedangkan getLaporanHasil di bawah HANYA menampilkan laporan yang
-// status_review-nya 'ditindaklanjuti' DAN status_boxing-nya
-// 'menunggu_pelaksanaan' — kondisi ini otomatis TIDAK terpenuhi lagi
-// setelah reopen di atas, jadi laporan yang baru saja ditolak tidak akan
-// nyangkut/duplikat di tab "Laporan Hasil".
-//
-// Field approval_staf tetap disertakan di SELECT getLaporanHasil supaya
-// frontend (ResultReportTable.tsx) masih bisa menampilkan riwayat
-// "pernah ditolak, sudah direvisi" untuk laporan yang sudah lolos revisi.
+//   Sekarang pakai `b.status = 'terdistribusi'` sebagai penanda
+//   "belum pernah dikirim" — begitu Kepala Unit klik Kirim, status
+//   berubah jadi 'diproses' dan laporan otomatis hilang dari "Laporan
+//   Baru" (pindah ke Ka P4M).
 
 const { pool } = require("../config/db");
 const { notifikasiUntukRole } = require("../utils/notifikasi");
 
-// ✅ FITUR BARU: akun Ka P4M digabung dengan Kepala Unit P4M.
-// Kalau yang login role-nya ka_p4m, langsung anggap dia Kepala Unit
-// unit 'P4M' (tanpa perlu akun kepala_unit terpisah). Kalau role-nya
-// kepala_unit biasa, cari datanya sendiri seperti biasa lewat id_pengguna.
 async function getKepalaInfo(req) {
   if (req.user.role === "ka_p4m") {
     const [rows] = await pool.query(
@@ -77,13 +64,6 @@ async function getLaporanMasuk(req, res) {
         l.created_at,
         COALESCE(l.tanggal_kejadian, l.created_at) AS tanggal_laporan,
         r.id_rancangan,
-        -- ✅ FIX (permintaan user): tiap unit tujuan (baris boxing_ketidaksesuaian
-        -- miliknya sendiri, dibedakan lewat id_boxing) WAJIB independen —
-        -- Penyebab & Rencana Tindak Lanjut yang ditampilkan HANYA milik unit
-        -- ini sendiri (r.penyebab / r.deskripsi), tidak lagi diisi otomatis
-        -- dari draft/isian Kepala Unit lain untuk laporan yang sama. Kalau
-        -- unit ini belum pernah mengirim, kotaknya kosong — bukan hasil
-        -- salinan unit lain.
         r.penyebab,
         r.deskripsi AS rencana_tindakan,
         r.tanggal_rencana,
@@ -94,8 +74,9 @@ async function getLaporanMasuk(req, res) {
       WHERE b.id_kepala = ?
         AND b.status NOT IN ('selesai')
         AND (
-          r.id_rancangan IS NULL
-          OR r.status_review = 'menunggu_keputusan_ka'
+          -- (a) Belum pernah kirim: status masih 'terdistribusi' dari Staf P4M
+          b.status = 'terdistribusi'
+          -- (b) Ditolak Staf P4M, perlu revisi penyebab/rencana
           OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
         )
       ORDER BY b.created_at DESC`,
@@ -113,9 +94,6 @@ async function getLaporanMasuk(req, res) {
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SUBMIT RANCANGAN (kirim ke Ka P4M)
-// ✅ UPDATE: sekarang ambil rencana dari tabel `rencana_tindak_lanjut`
-// (multi-item) lalu gabungkan jadi 1 teks untuk backward-compat kolom
-// `rancangan_tindakan.deskripsi` yang masih dipakai query lama.
 // ═════════════════════════════════════════════════════════════════════════════
 
 async function submitRancangan(req, res) {
@@ -137,7 +115,6 @@ async function submitRancangan(req, res) {
       });
     }
 
-    // Pastikan laporan ini milik unit ini
     const [boxingRows] = await pool.query(
       `SELECT id_boxing, id_laporan, status FROM boxing_ketidaksesuaian
        WHERE id_boxing = ? AND id_kepala = ?`,
@@ -150,7 +127,6 @@ async function submitRancangan(req, res) {
       });
     }
 
-    // ✅ Ambil semua rencana dari tabel rencana_tindak_lanjut
     const [rencanaRows] = await pool.query(
       `SELECT teks, tanggal FROM rencana_tindak_lanjut
        WHERE id_boxing = ? ORDER BY urutan ASC, id ASC`,
@@ -160,11 +136,10 @@ async function submitRancangan(req, res) {
     if (rencanaRows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Minimal 1 rencana tindak lanjut harus ditambahkan. Klik '📝 Kelola Rencana' dulu.",
+        message: "Minimal 1 rancangan tindak lanjut harus ditambahkan.",
       });
     }
 
-    // ✅ Gabungkan jadi 1 teks: "1. Teks A (20/09/2026); 2. Teks B (25/09/2026)"
     const gabunganTeks = rencanaRows
       .map((r, i) => {
         const tgl = new Date(r.tanggal).toLocaleDateString("id-ID", {
@@ -176,21 +151,18 @@ async function submitRancangan(req, res) {
       })
       .join("\n");
 
-    // Tanggal rencana = tanggal paling akhir dari semua item
     const tanggalTerakhir = rencanaRows.reduce((max, r) => {
       const t = new Date(r.tanggal);
       return t > max ? t : max;
     }, new Date(rencanaRows[0].tanggal));
     const tanggalTerakhirStr = tanggalTerakhir.toISOString().split("T")[0];
 
-    // Cek apakah rancangan sudah ada
     const [existing] = await pool.query(
       `SELECT id_rancangan, status_review FROM rancangan_tindakan WHERE id_boxing = ?`,
       [id_boxing],
     );
 
     if (existing.length > 0) {
-      // Hanya boleh update kalau status_review masih 'menunggu_keputusan_ka'
       if (existing[0].status_review !== "menunggu_keputusan_ka") {
         return res.status(400).json({
           success: false,
@@ -217,7 +189,6 @@ async function submitRancangan(req, res) {
       [id_boxing],
     );
 
-    // Kasih tau Ka P4M ada rancangan tindakan yang perlu diputuskan
     notifikasiUntukRole("ka_p4m", {
       judul: "Rancangan Tindakan Perlu Ditinjau",
       pesan: `Kepala unit ${kepala.unit} mengirim rancangan tindakan yang perlu tinjauan Anda (ditindaklanjuti atau tidak).`,
@@ -267,21 +238,7 @@ async function getLaporanHasil(req, res) {
       JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.id_kepala = ?
-        -- ✅ FIX (permintaan user): tab "Laporan Hasil" HANYA untuk laporan
-        -- yang benar-benar sedang/pernah diminta mengisi hasil tindak lanjut
-        -- (Ka P4M memutuskan 'ditindaklanjuti' dan menunggu pelaksanaan unit).
-        -- Sebelumnya ada tambahan "OR (b.status = 'di_staff' AND
-        -- b.approval_staf = 'ditolak')" yang membuat laporan yang DITOLAK
-        -- Staf P4M ikut nongol di sini — termasuk laporan "Sesuai / tidak
-        -- ditindaklanjuti" yang MEMANG TIDAK PERNAH punya laporan hasil sama
-        -- sekali. Laporan yang ditolak Staf P4M sekarang HANYA muncul di tab
-        -- "Ketidaksesuaian Masuk" → "Keputusan Staf" (lihat StafDecisionTable
-        -- & getLaporanMasuk) untuk direvisi Penyebab & Rencana lalu dikirim
-        -- ulang ke Ka P4M. Kalau Ka P4M memutuskan 'ditindaklanjuti' lagi,
-        -- laporan itu baru akan muncul lagi di sini secara alami lewat
-        -- kondisi di bawah (status_review='ditindaklanjuti' AND
-        -- status_boxing='menunggu_pelaksanaan').
-        AND r.status_review = 'ditindaklanjuti'
+        AND r.status_review IN ('ditindaklanjuti', 'tidak_ditindaklanjuti')
         AND b.status = 'menunggu_pelaksanaan'
       ORDER BY b.created_at DESC`,
       [kepala.id_kepala],
@@ -330,15 +287,7 @@ async function submitPelaksanaan(req, res) {
        JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
        JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
        WHERE b.id_boxing = ? AND b.id_kepala = ?
-         AND r.status_review = 'ditindaklanjuti'
-         -- ✅ FIX (sinkron dengan getLaporanHasil): cabang
-         -- "OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')"
-         -- yang lama sudah tidak pernah tercapai — begitu Staf P4M
-         -- menolak, setApprovalStaf mereset status_review balik ke
-         -- 'menunggu_keputusan_ka' (bukan tetap 'ditindaklanjuti'), jadi
-         -- laporan yang ditolak justru wajib lewat revisi Penyebab &
-         -- Rencana di tab "Keputusan Staf" dulu, baru bisa isi Laporan
-         -- Hasil baru lewat jalur normal di bawah ini.
+         AND r.status_review IN ('ditindaklanjuti', 'tidak_ditindaklanjuti')
          AND b.status = 'menunggu_pelaksanaan'`,
       [id_boxing, kepala.id_kepala],
     );
@@ -464,18 +413,7 @@ async function getRiwayat(req, res) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// ✅ FITUR BARU: CRUD Rencana Tindak Lanjut (multi-item per laporan)
-//
-// Sebelumnya: 1 laporan = 1 teks "rencana_tindakan" + 1 "tanggal_rencana"
-// Sekarang:   1 laporan = BANYAK rencana, masing-masing punya teks + tanggal
-// Disimpan di tabel baru: rencana_tindak_lanjut (FK ke id_boxing)
-//
-// Alur:
-//   1. Kepala Unit buka modal "Kelola Rencana" di frontend
-//   2. Tambah/edit/hapus item rencana → tersimpan via endpoint ini
-//   3. Klik "Kirim" di tabel utama → submitRancangan gabungkan semua
-//      rencana jadi 1 teks panjang di rancangan_tindakan.deskripsi
-//      (backward compat) + update status_review
+// ✅ CRUD Rencana Tindak Lanjut (multi-item per laporan)
 // ═════════════════════════════════════════════════════════════════════════════
 
 // GET /api/kepala-unit/rencana/:id_boxing
@@ -522,7 +460,6 @@ async function getRencana(req, res) {
 }
 
 // POST /api/kepala-unit/rencana
-// Body: { id_boxing, teks, tanggal }
 async function addRencana(req, res) {
   const { id_boxing, teks, tanggal } = req.body;
 
@@ -543,12 +480,6 @@ async function addRencana(req, res) {
       message: "Tanggal tidak valid.",
     });
   }
-  // if (tgl < today) {
-  //   return res.status(400).json({
-  //     success: false,
-  //     message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
-  //   });
-  // }
 
   try {
     const kepala = await getKepalaInfo(req);
@@ -611,7 +542,6 @@ async function addRencana(req, res) {
 }
 
 // PUT /api/kepala-unit/rencana/:id
-// Body: { teks, tanggal }
 async function updateRencana(req, res) {
   const { id } = req.params;
   const { teks, tanggal } = req.body;
@@ -633,12 +563,6 @@ async function updateRencana(req, res) {
       message: "Tanggal tidak valid.",
     });
   }
-  // if (tgl < today) {
-  //   return res.status(400).json({
-  //     success: false,
-  //     message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
-  //   });
-  // }
 
   try {
     const kepala = await getKepalaInfo(req);
@@ -743,20 +667,12 @@ async function deleteRencana(req, res) {
   }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// ✅ EXPORT — HARUS DI PALING BAWAH, setelah SEMUA fungsi didefinisikan.
-// Sebelumnya module.exports ada di tengah file (setelah submitPelaksanaan),
-// jadi 4 fungsi CRUD rencana di bawahnya TIDAK ikut ke-export → bikin
-// error "Route.get() requires a callback function but got [object Undefined]"
-// di kepalaUnitRoutes.js.
-// ═════════════════════════════════════════════════════════════════════════════
 module.exports = {
   getLaporanMasuk,
   submitRancangan,
   getLaporanHasil,
   getRiwayat,
   submitPelaksanaan,
-  // ✅ FITUR BARU: CRUD rencana tindak lanjut (multi-item)
   getRencana,
   addRencana,
   updateRencana,

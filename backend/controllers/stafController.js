@@ -725,15 +725,6 @@ for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
 // ============================================================
 // 7c. GET ARSIP REKAP
 // ============================================================
-
-// ✅ FIX: ambil nomor bulan (1-12) dari tanggal arsip yang disimpan sbg teks.
-// Kalau cell Excel aslinya native Date, uploadArsipRekap sudah menormalkan
-// ke "YYYY-MM-DD" (lihat ambilNilaiSel) — itu kasus paling umum & langsung
-// kena regex ISO di bawah. Format lain (dd/mm/yyyy, teks bebas, dst) dicoba
-// lewat Date.parse sebagai fallback. Kalau tetap gagal diparse → return
-// null, dan baris itu SENGAJA TETAP DIIKUTKAN oleh pemanggilnya (fail-open)
-// supaya data arsip lama nggak pernah hilang diam-diam gara-gara format
-// tanggal yang nggak konsisten dari file-file lama.
 function bulanDariTeksTanggal(teks) {
   if (!teks) return null;
   const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(teks);
@@ -757,20 +748,10 @@ async function getArsipRekap(req, res) {
       query += ` WHERE tahun = ?`;
       params.push(tahun);
     }
-    // ✅ FIX: filter tahun di SQL (kolom int, ada index) SELALU dipakai kalau
-    // ada — ini yang benar-benar menghemat query besar (dari "s/d 10 tahun"
-    // jadi 1 tahun saja). Kolom `tahun` (int) reliable buat difilter di SQL.
     query += ` ORDER BY tahun DESC, tgl_masuk DESC, id_arsip ASC`;
 
     const [rows] = await pool.query(query, params);
 
-    // ✅ FIX: filter per-bulan (opsional, query param `bulan`) dilakukan di
-    // JS — BUKAN di SQL — karena tgl_masuk/tgl_pelaksanaan disimpan sbg
-    // varchar dengan format campur-campur dari file lama (lihat komentar di
-    // migrasi add_arsip_rekapitulasi.sql). Filter SQL langsung pakai
-    // MONTH(tgl_masuk) nggak reliable buat kolom teks begini dan berisiko
-    // diam-diam ngilangin baris yang formatnya beda. Ini cuma jalan SETELAH
-    // filter tahun di atas, jadi paling banter cuma nyortir dalam 1 tahun.
     const bulanInt = bulan ? parseInt(bulan, 10) : null;
     const rowsTerfilter = bulanInt
       ? rows.filter((r) => {
@@ -779,9 +760,6 @@ async function getArsipRekap(req, res) {
         })
       : rows;
 
-    // ✅ tahunTersedia tetap dihitung dari SEMUA baris tahun itu (sebelum
-    // difilter bulan), supaya dropdown/label tahun di frontend nggak
-    // ke-pengaruh oleh filter bulan yang cuma dipakai internal buat PDF.
     const tahunTersedia = [...new Set(rows.map((r) => r.tahun))].sort((a, b) => b - a);
 
     return res.status(200).json({ success: true, data: rowsTerfilter, tahunTersedia });
@@ -838,29 +816,25 @@ async function deleteArsipRekap(req, res) {
 
 // ============================================================
 // 8. APPROVAL STAF — PATCH /api/staf/approval-hasil
-//    ✅ DITAMBAHKAN console.log DEBUG di beberapa titik untuk
-//    melacak error "Unexpected token '1', '19' is not valid JSON".
-//    Hapus log-log ini setelah bug ketemu.
+//
+// ✅ REVISI (permintaan user/dosen):
+//   Dua jalur keputusan Ka P4M — 'ditindaklanjuti' (Tindak Lanjut) dan
+//   'tidak_ditindaklanjuti' (Sesuai) — sekarang SAMA-SAMA lewat tab
+//   "Laporan Hasil" Kepala Unit dulu. Jadi kalau Staf P4M menolak
+//   ("Belum Siap"), dua-duanya harus dikembalikan ke "Laporan Hasil"
+//   (revisi bukti pelaksanaan), BUKAN ke "Ketidaksesuaian Masuk".
 // ============================================================
 async function setApprovalStaf(req, res) {
-  console.log("🎯 [setApprovalStaf] === DIPANGGIL ===");
-  console.log("🎯 [setApprovalStaf] req.body:", JSON.stringify(req.body));
-  console.log("🎯 [setApprovalStaf] req.user:", JSON.stringify(req.user));
-
   const { id_boxing, approval, catatan } = req.body;
   const validApproval = ["diterima", "ditolak"];
 
-  console.log("🎯 [setApprovalStaf] id_boxing:", id_boxing, "| approval:", approval, "| catatan:", catatan);
-
   if (!id_boxing || !validApproval.includes(approval)) {
-    console.log("❌ [setApprovalStaf] VALIDASI GAGAL — id_boxing atau approval tidak valid");
     return res.status(400).json({
       success: false,
       message: "id_boxing dan approval (diterima|ditolak) wajib diisi.",
     });
   }
   if (!catatan || !String(catatan).trim()) {
-    console.log("❌ [setApprovalStaf] VALIDASI GAGAL — catatan kosong");
     return res.status(400).json({
       success: false,
       message: "Catatan / alasan approval wajib diisi.",
@@ -877,17 +851,14 @@ async function setApprovalStaf(req, res) {
       [id_boxing]
     );
     if (rows.length === 0) {
-      console.log("❌ [setApprovalStaf] Boxing tidak ditemukan untuk id_boxing:", id_boxing);
       return res.status(404).json({
         success: false,
         message: "Data boxing tidak ditemukan.",
       });
     }
     const row = rows[0];
-    console.log("🎯 [setApprovalStaf] row dari DB:", JSON.stringify(row));
 
     if (row.status_boxing !== "di_staff") {
-      console.log("❌ [setApprovalStaf] status_boxing bukan di_staff:", row.status_boxing);
       return res.status(400).json({
         success: false,
         message: "Approval hanya bisa dilakukan jika laporan sudah ada di Staf P4M (di_staff).",
@@ -895,82 +866,28 @@ async function setApprovalStaf(req, res) {
     }
 
     if (approval === "diterima") {
-      console.log("🎯 [setApprovalStaf] Proses 'diterima' — UPDATE status=selesai");
+      // ✅ SIAP → Selesai
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?, status = 'selesai'
          WHERE id_boxing = ?`,
         [approval, catatan.trim(), id_boxing]
       );
-      console.log("✅ [setApprovalStaf] UPDATE boxing sukses, panggil syncStatusLaporan");
       await syncStatusLaporan(row.id_laporan);
-      console.log("✅ [setApprovalStaf] syncStatusLaporan sukses");
-    } else if (row.status_review === "ditindaklanjuti") {
-      // ✅ FIX (permintaan user): laporan ini datang lewat jalur "Keberlanjutan
-      // Rencana" — Ka P4M sudah memutuskan ditindaklanjuti, Kepala Unit sudah
-      // ISI LAPORAN HASIL (pelaksanaan_tindakan) lewat tab "Laporan Hasil", baru
-      // SETELAH ITU sampai ke Staf P4M untuk keputusan akhir centang/silang.
-      // Kalau Staf P4M silang (ditolak) di sini, revisinya HARUS balik ke tab
-      // "Laporan Hasil" Kepala Unit (cuma bagian hasil tindak lanjut yang
-      // diperbaiki) — BUKAN ke "Ketidaksesuaian Masuk" (Penyebab & Rencana
-      // sama sekali tidak perlu diulang, karena itu sudah lama disetujui
-      // Ka P4M).
-      //
-      // Jadi: status_review TETAP 'ditindaklanjuti' (tidak direset ke
-      // 'menunggu_keputusan_ka'), status_boxing DIKEMBALIKAN ke
-      // 'menunggu_pelaksanaan' supaya query getLaporanHasil di
-      // kepalaUnitController.js menangkapnya lagi, dan pelaksanaan_tindakan
-      // LAMA TETAP DIPERTAHANKAN (tidak dihapus) supaya form "Laporan Hasil"
-      // terisi otomatis dengan data lama dan tinggal diperbaiki (bukan isi
-      // dari nol). approval_staf & catatan_approval tetap 'ditolak' + alasan,
-      // supaya ResultReportTable.tsx bisa menampilkan badge "🔁 Perlu Revisi"
-      // beserta alasan penolakannya.
-      console.log("🎯 [setApprovalStaf] Proses 'ditolak' (jalur Keberlanjutan Rencana) — kembalikan ke Laporan Hasil Kepala Unit");
+    } else {
+      // ❌ BELUM SIAP → revisi balik ke Laporan Hasil Kepala Unit
+      // (untuk KEDUA jalur: 'ditindaklanjuti' maupun 'tidak_ditindaklanjuti').
       await pool.query(
         `UPDATE boxing_ketidaksesuaian
          SET approval_staf = ?, catatan_approval = ?, status = 'menunggu_pelaksanaan'
          WHERE id_boxing = ?`,
         [approval, catatan.trim(), id_boxing]
       );
-      console.log("✅ [setApprovalStaf] UPDATE boxing (ditolak) sukses — status_boxing dikembalikan ke 'menunggu_pelaksanaan'");
 
-      await pool.query(
-        `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
-        [row.id_laporan]
-      );
-    } else {
-      // Jalur "Sesuai" (Ka P4M memutuskan tidak_ditindaklanjuti) — laporan ini
-      // TIDAK PERNAH lewat tahap isi Laporan Hasil sama sekali, jadi kalau
-      // Staf P4M silang di sini, satu-satunya yang bisa direvisi Kepala Unit
-      // adalah Penyebab & Rencana Tindak Lanjut lewat tab "Ketidaksesuaian
-      // Masuk" → "Keputusan Staf", lalu menunggu keputusan ulang Ka P4M.
-      //
-      // status_boxing TETAP 'di_staff', status_review dikembalikan ke
-      // 'menunggu_keputusan_ka' supaya laporan otomatis muncul lagi di tab
-      // "Ketidaksesuaian Masuk" Kepala Unit (penyebab & rencana lama TETAP
-      // ada, tidak perlu diketik ulang dari nol).
-      console.log("🎯 [setApprovalStaf] Proses 'ditolak' (jalur Sesuai) — kembalikan ke Ka P4M lewat Kepala Unit");
-      await pool.query(
-        `UPDATE boxing_ketidaksesuaian
-         SET approval_staf = ?, catatan_approval = ?
-         WHERE id_boxing = ?`,
-        [approval, catatan.trim(), id_boxing]
-      );
-      console.log("✅ [setApprovalStaf] UPDATE boxing (ditolak) sukses — status_boxing TETAP 'di_staff'");
-
-      await pool.query(
-        `UPDATE rancangan_tindakan
-         SET status_review = 'menunggu_keputusan_ka', aksi_masukan = NULL, updated_at = NOW()
-         WHERE id_boxing = ?`,
-        [id_boxing]
-      );
-      console.log("✅ [setApprovalStaf] rancangan_tindakan.status_review direset ke 'menunggu_keputusan_ka'");
-
-      await pool.query(
-        `DELETE FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
-        [id_boxing]
-      );
-      console.log("✅ [setApprovalStaf] DELETE pelaksanaan lama sukses");
+      // status_review DIBIARKAN seperti semula ('ditindaklanjuti' atau
+      // 'tidak_ditindaklanjuti') supaya getLaporanHasil tetap menangkapnya.
+      // pelaksanaan_tindakan LAMA TETAP DIPERTAHANKAN agar form revisi
+      // terisi otomatis dengan data lama.
 
       await pool.query(
         `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
@@ -981,16 +898,11 @@ async function setApprovalStaf(req, res) {
     const pesan =
       approval === "diterima"
         ? "Hasil tindak lanjut unit DITERIMA. Laporan otomatis ditandai SELESAI dan masuk Rekapitulasi."
-        : row.status_review === "ditindaklanjuti"
-        ? "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Laporan Hasil Kepala Unit untuk direvisi (Penyebab & Rencana tidak perlu diulang), lalu menunggu hasil tindakan ulang Staf P4M."
-        : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Ketidaksesuaian Masuk Kepala Unit untuk direvisi Penyebab & Rencana Tindak Lanjut (data lama tetap ada), lalu menunggu tinjauan ulang Ka P4M.";
+        : "Hasil tindak lanjut unit DITOLAK oleh Staf P4M. Laporan dikirim kembali ke tab Laporan Hasil Kepala Unit untuk direvisi (Penyebab & Rencana tidak perlu diulang).";
 
-    console.log("✅ [setApprovalStaf] === SELESAI — kirim response sukses ===");
     return res.status(200).json({ success: true, message: pesan });
   } catch (error) {
     console.error("❌ [setApprovalStaf] ERROR:", error);
-    console.error("❌ [setApprovalStaf] error.message:", error.message);
-    console.error("❌ [setApprovalStaf] error.stack:", error.stack);
     return res.status(500).json({
       success: false,
       message: "Gagal menyimpan approval.",

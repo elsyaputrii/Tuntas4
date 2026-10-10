@@ -4,7 +4,7 @@ const router  = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const uploadExcel = require("../middleware/excelUploadMiddleware");
 const {
-   getLaporanMasuk,
+  getLaporanMasuk,
   getKepalaUnit,
   distribusiLaporan,
   getProsesMonitor,
@@ -16,12 +16,6 @@ const {
   deleteArsipRekap,
   setApprovalStaf,
 } = require("../controllers/stafController");
-// ✅ FITUR DIKEMBALIKAN: setApprovalStaf ("Siap"/"Belum Siap" atas hasil
-// tindak lanjut Kepala Unit) sempat dipindah ke Ka P4M (PATCH
-// /api/ka-p4m/approval-hasil), tapi sekarang dikembalikan lagi ke Staf
-// P4M sebagai satu-satunya pemegang keputusan ini. Lihat juga
-// kaP4MRoutes.js (route approval-hasil di sana sudah dicabut) dan
-// KaP4MHasilTable.tsx / ProcessMonitorTable.tsx di frontend.
 
 // Semua route di bawah ini wajib:
 //   1. Punya token valid (authMiddleware)
@@ -40,9 +34,6 @@ router.get("/rekap/arsip",         roleMiddleware("staf_p4m"), getArsipRekap);
 router.delete("/rekap/arsip",      roleMiddleware("staf_p4m"), deleteArsipRekap);
 
 // ── Tab Proses & Pantau (khusus Staf P4M — pantau + Keputusan Staff) ─
-// Review rancangan (ditindaklanjuti/tidak) tetap wewenang Ka P4M lewat
-// /api/ka-p4m/keputusan. Tapi keputusan akhir atas HASIL tindak lanjut
-// unit (✅ Selesai / ❌ Di tindaklanjutin) sekarang wewenang Staf P4M lagi.
 router.get("/proses",      roleMiddleware("staf_p4m"), getProsesMonitor);
 router.post("/pemantauan", roleMiddleware("staf_p4m"), inputHasilPemantauan);
 router.patch("/keputusan-boxing", roleMiddleware("staf_p4m"), setKeputusanBoxing);

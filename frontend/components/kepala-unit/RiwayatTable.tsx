@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import { exportPDFRiwayatKepalaUnit } from "@/lib/exportPdf";
-import { PeriodFilterBar, isInPeriodFilter, type FilterMode as PeriodFilterMode } from "@/components/shared/PeriodFilterBar";
+import { PeriodFilterBarKepalaUnit as PeriodFilterBar, isInPeriodFilter, type FilterMode as PeriodFilterMode } from "@/components/shared/PeriodFilterBarKepalaUnit";
 import {
   CheckCircle2,
   RefreshCw,

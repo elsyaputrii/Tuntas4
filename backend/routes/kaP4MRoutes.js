@@ -50,6 +50,18 @@ router.get("/proses", async (req, res) => {
 });
 
 // Ka P4M: ditindaklanjuti (+ aksi masukan) atau tidak ditindaklanjuti
+//
+// ✅ REVISI (permintaan user/dosen):
+//   Dua-duanya — baik "ditindaklanjuti" maupun "tidak" (Sesuai) — sekarang
+//   WAJIB lewat tab "Laporan Hasil" Kepala Unit dulu (status_boxing =
+//   'menunggu_pelaksanaan'), supaya Kepala Unit tetap mengisi bukti
+//   pelaksanaan. Yang membedakan cuma `status_review` (untuk badge "Tindak
+//   Lanjut" vs "Sesuai"), tapi alurnya sama: Kepala Unit isi bukti → Staf
+//   P4M putuskan ✅ Siap / ❌ Belum Siap.
+//
+//   Kalau Staf P4M tolak, revisi balik ke "Laporan Hasil" (bukan ke
+//   "Ketidaksesuaian Masuk"), karena Penyebab & Rencana sudah disetujui
+//   Ka P4M — yang perlu direvisi hanya bukti pelaksanaannya.
 router.patch("/keputusan", async (req, res) => {
   const { id_rancangan, keputusan, aksi_masukan } = req.body;
 
@@ -109,44 +121,36 @@ router.patch("/keputusan", async (req, res) => {
     await conn.beginTransaction();
 
     if (keputusan === "ditindaklanjuti") {
+      // ── Keputusan: Tindak Lanjut ──
       await conn.query(
         `UPDATE rancangan_tindakan
          SET status_review = 'ditindaklanjuti', aksi_masukan = ?, updated_at = NOW()
          WHERE id_rancangan = ?`,
         [aksi_masukan.trim(), id_rancangan]
       );
-      // ✅ FIX: reset approval_staf & catatan_approval setiap kali Ka P4M
-      // mengambil keputusan baru (termasuk saat ini adalah keputusan
-      // ULANG setelah laporan sempat DITOLAK Staf P4M lalu direvisi
-      // Kepala Unit di tab "Keputusan Staf"). Tanpa reset ini,
-      // approval_staf lama ('ditolak') tetap nyangkut sampai ke siklus
-      // berikutnya — bikin tombol ✅❌ Staf P4M di "Proses & Pantau"
-      // tidak muncul lagi (ketutup badge "❌ Belum Siap" lama) dan badge
-      // status di "Riwayat" Kepala Unit ikut salah nampilin "Perbaikan
-      // Berkelanjutan" padahal seharusnya "Menunggu Keputusan Akhir Staf".
       await conn.query(
         `UPDATE boxing_ketidaksesuaian
-         SET status = 'menunggu_pelaksanaan', approval_staf = 'menunggu', catatan_approval = NULL
+         SET status = 'menunggu_pelaksanaan',
+             approval_staf = 'menunggu',
+             catatan_approval = NULL
          WHERE id_boxing = ?`,
         [row.id_boxing]
       );
     } else {
+      // ── Keputusan: Sesuai ──
+      // ✅ REVISI: sekarang juga masuk 'menunggu_pelaksanaan' (ke Laporan
+      //    Hasil Kepala Unit), bukan langsung 'di_staff'.
       await conn.query(
         `UPDATE rancangan_tindakan
          SET status_review = 'tidak_ditindaklanjuti', aksi_masukan = ?, updated_at = NOW()
          WHERE id_rancangan = ?`,
         [aksi_masukan?.trim() || null, id_rancangan]
       );
-      // ✅ FIX: sama seperti di atas — reset approval_staf & catatan_approval.
-      // Kasus ini ("Sesuai" / tidak ditindaklanjuti) langsung lompat ke
-      // status_boxing 'di_staff' TANPA lewat submitPelaksanaan (yang
-      // biasanya me-reset approval_staf), jadi kalau tidak direset di
-      // sini, laporan yang tadinya ditolak Staf P4M lalu direvisi &
-      // diputuskan ulang oleh Ka P4M akan langsung ketemu approval_staf
-      // 'ditolak' yang basi begitu sampai lagi di Staf P4M.
       await conn.query(
         `UPDATE boxing_ketidaksesuaian
-         SET status = 'di_staff', approval_staf = 'menunggu', catatan_approval = NULL
+         SET status = 'menunggu_pelaksanaan',
+             approval_staf = 'menunggu',
+             catatan_approval = NULL
          WHERE id_boxing = ?`,
         [row.id_boxing]
       );
@@ -161,22 +165,22 @@ router.patch("/keputusan", async (req, res) => {
 
     const pesan =
       keputusan === "ditindaklanjuti"
-        ? "Laporan ditindaklanjuti. Masukan telah dikirim ke Kepala Unit."
-        : "Laporan tidak ditindaklanjuti. Langsung ke Staf P4M.";
+        ? "Laporan ditindaklanjuti. Masukan telah dikirim ke Kepala Unit untuk diisi bukti pelaksanaannya."
+        : "Laporan dinyatakan Sesuai. Kepala Unit tetap perlu mengisi bukti pelaksanaan di tab Laporan Hasil.";
 
-    // Kasih tau kepala unit terkait soal keputusan Ka P4M
+    // ✅ REVISI: notifikasi ke Kepala Unit — dua-duanya minta isi Laporan Hasil.
     if (row.id_pengguna_kepala) {
       notifikasiUntukPengguna(row.id_pengguna_kepala, {
         judul:
           keputusan === "ditindaklanjuti"
             ? "Rancangan Disetujui Ka P4M"
-            : "Rancangan Tidak Ditindaklanjuti",
+            : "Rancangan Disetujui Ka P4M (Sesuai)",
         pesan:
           keputusan === "ditindaklanjuti"
-            ? `Rancangan tindakan untuk unit ${row.unit_tujuan} disetujui Ka P4M. Silakan lanjutkan pelaksanaan.`
-            : `Rancangan tindakan untuk unit ${row.unit_tujuan} tidak ditindaklanjuti oleh Ka P4M.`,
+            ? `Rancangan tindakan untuk unit ${row.unit_tujuan} disetujui Ka P4M. Silakan isi bukti pelaksanaan di tab Laporan Hasil.`
+            : `Rancangan tindakan untuk unit ${row.unit_tujuan} disetujui Ka P4M (Sesuai). Silakan isi bukti pelaksanaan di tab Laporan Hasil.`,
         jenis: "keputusan_ka",
-        link: "/kepala-unit/ketidaksesuaian-masuk",
+        link: "/kepala-unit/laporan-hasil",
       });
     }
 
@@ -192,12 +196,8 @@ router.patch("/keputusan", async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────
 // FITUR BARU: KA-P4M → Kepala Unit (read-only, semua unit)
-// Tujuan: Ka P4M bisa memantau semua data yang berkaitan dengan
-// Kepala Unit (bukan cuma unit tertentu), tanpa bisa mengubah apa-apa.
 // ─────────────────────────────────────────────────────────────
 
-// Mirror dari getLaporanMasuk milik Kepala Unit, tapi TANPA filter
-// per id_kepala (jadi menampilkan laporan dari SEMUA unit).
 router.get("/kepala-unit/laporan-masuk", async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -223,8 +223,6 @@ router.get("/kepala-unit/laporan-masuk", async (req, res) => {
   }
 });
 
-// Mirror dari getLaporanHasil milik Kepala Unit, tapi TANPA filter
-// per id_kepala (jadi menampilkan laporan hasil dari SEMUA unit).
 router.get("/kepala-unit/laporan-hasil", async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -250,16 +248,5 @@ router.get("/kepala-unit/laporan-hasil", async (req, res) => {
     return res.status(500).json({ success: false, message: "Gagal mengambil data laporan hasil kepala unit." });
   }
 });
-
-// ─────────────────────────────────────────────────────────────
-// ✅ FITUR DIKEMBALIKAN KE STAF P4M: keputusan atas hasil tindak lanjut
-// Kepala Unit (✅ Siap → laporan otomatis Selesai | ❌ Belum Siap → balik
-// ke Kepala Unit untuk revisi hasil) sempat dipindah ke sini (Ka P4M),
-// tapi sekarang dikembalikan lagi jadi wewenang Staf P4M sepenuhnya
-// (lihat PATCH /api/staf/approval-hasil di stafRoutes.js). Ka P4M di
-// sisi ini sekarang HANYA read-only monitor lewat GET /ka-p4m/proses
-// (lihat KaP4MHasilTable.tsx — tombol centang/silangnya sudah dicabut).
-// Route PATCH approval-hasil di bawah ini SENGAJA dihapus supaya Ka P4M
-// tidak lagi punya jalur backend untuk mengambil keputusan ini.
 
 module.exports = router;
