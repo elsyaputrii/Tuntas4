@@ -228,7 +228,7 @@ export default function StaffP4MLayout({
                 Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👩‍💻Staff P4M
+                Staff P4M
               </p>
             </div>
 

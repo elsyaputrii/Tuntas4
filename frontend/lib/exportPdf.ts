@@ -3,6 +3,7 @@
 // Dipakai oleh:
 //   - RecapitulationTable.tsx  → exportPDFRekap (per harian/mingguan/bulanan/tahunan)
 //   - ProcessMonitorTable.tsx  → exportPDFProses (per laporan individual)
+//   - RiwayatTable.tsx         → exportPDFRiwayatKepalaUnit (per laporan individual Kepala Unit)
 
 import QRCode from "qrcode";
 import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
@@ -16,16 +17,15 @@ import {
   sameDay,
 } from "./exportHelpers";
 
-// ─── QR Code TTD ─────────────────────────────────────────────
-// Menggantikan gambar tanda tangan dengan QR code yang bisa discan.
-// QR berisi teks info penandatangan (offline, tidak butuh endpoint
-// verifikasi di backend) — cukup dipindai pakai kamera/QR scanner
-// apa pun untuk menampilkan info TTD-nya.
+// ─── QR Code TTE ─────────────────────────────────────────────
+// QR berisi info TTE (TTE oleh / Perihal / Hashing) — di-scan pakai
+// kamera/QR scanner apa pun untuk menampilkan info TTE-nya.
 async function generateQrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, {
-      width: 130,
+      width: 260,
       margin: 1,
+      errorCorrectionLevel: "M",
       color: { dark: "#111111", light: "#ffffff" },
     });
   } catch {
@@ -33,16 +33,82 @@ async function generateQrDataUrl(text: string): Promise<string | null> {
   }
 }
 
-// Menghapus gelar "Dr." di depan nama penandatangan (Ka P4M / Staff P4M)
-// supaya tidak muncul di teks nama PDF maupun di hasil scan QR code TTD.
+// ─── HELPER TTE ─────────────────────────────────────────────
+// Format tanggal Indonesia: "24 Juli 2026"
+function formatTanggalIndonesia(d: Date): string {
+  const bulan = [
+    "Januari","Februari","Maret","April","Mei","Juni",
+    "Juli","Agustus","September","Oktober","November","Desember",
+  ];
+  return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Hash SHA-256 (hex) — pakai Web Crypto API (bawaan browser modern)
+async function sha256Hex(text: string): Promise<string> {
+  try {
+    const buf = new TextEncoder().encode(text);
+    const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(hashBuf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    // Fallback super-sederhana kalau crypto.subtle tidak tersedia (harusnya
+    // tidak pernah terjadi di browser modern). Tetap deterministic.
+    let h = 0;
+    for (let i = 0; i < text.length; i++) {
+      h = (h << 5) - h + text.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h).toString(16).padStart(64, "0");
+  }
+}
+
+/**
+ * Bangun teks QR TTE dengan format:
+ *
+ *   TTE oleh:
+ *   <nama penandatangan>
+ *   <tanggal Indonesia>
+ *
+ *   Perihal:
+ *   <jenis> — <kode/periode>
+ *
+ *   Hashing:
+ *   <hash baris 1 (40 char)>
+ *   <hash baris 2 (24 char)>
+ */
+async function buildQrTteText(opts: {
+  penandatangan: string;
+  perihal: string;
+  hashSeed: string;
+  tanggal?: Date;
+}): Promise<string> {
+  const tgl = opts.tanggal ?? new Date();
+  const hash = await sha256Hex(opts.hashSeed);
+  const hashBaris1 = hash.slice(0, 40);
+  const hashBaris2 = hash.slice(40);
+
+  return [
+    "TTE oleh:",
+    opts.penandatangan,
+    formatTanggalIndonesia(tgl),
+    "",
+    "Perihal:",
+    opts.perihal,
+    "",
+    "Hashing:",
+    hashBaris1,
+    hashBaris2,
+  ].join("\n");
+}
+
+// Menghapus gelar "Dr." di depan nama penandatangan
 function stripGelarDr(nama: string): string {
   return nama.replace(/^\s*dr\.?\s+/i, "").trim();
 }
 
 export type PdfKategori = "harian" | "mingguan" | "bulanan" | "tahunan";
 
-// Base URL backend (tanpa /api) — dipakai untuk membangun URL gambar lampiran
-// hasil tindak lanjut (foto perbaikan dari Kepala Unit) dan gambar tanda tangan.
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 const LOGO_POLIBATAM_URL = "/logo-polibatam.png";
 
@@ -64,7 +130,7 @@ const BASE_CSS = `
   body { font-family:Arial,sans-serif; font-size:10pt; color:#111; padding:34px 30px; }
   .header-borang { display:flex; flex-direction:row; align-items:center; gap:14px; width:100%; margin-bottom:18px; border-bottom:3px double #111; padding-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
   .header-borang .logo { display:block; flex:0 0 80px; width:80px; height:80px; max-width:80px; object-fit:contain; }
-  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}  
+  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}
   .header-borang .doc-number { font-weight:700; white-space:nowrap; }
   .header-borang .doc-title-text { text-decoration:underline; }
   .header-borang .doc-date { font-size:9pt; font-weight:700; color:#000; margin-top:4px; }
@@ -92,7 +158,7 @@ const BASE_CSS = `
   .hasil-img-cap { display:block; font-size:7.5pt; color:#94a3b8; font-style:italic; margin-top:1px; }
   .ttd .signature-img { display:block; max-height:58px; max-width:170px; margin:8px auto 2px; object-fit:contain; }
   .ttd .signature-placeholder { height:64px; }
-  .ttd .qr-img { display:block; width:88px; height:88px; margin:8px auto 2px; }
+  .ttd .qr-img { display:block; width:110px; height:110px; margin:8px auto 2px; }
   .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
 
   .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px; padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
@@ -108,19 +174,7 @@ const BASE_CSS = `
   }
 `;
 
-// ─── FIX: window PDF TIDAK auto-close lagi ──────────────────────
-// Sebelumnya dipasang auto-close via event 'afterprint', tapi ini
-// menyebabkan bug: begitu user pilih "Save as PDF" (bukan Cancel),
-// proses simpan file di OS/browser masih berjalan di belakang layar
-// saat 'afterprint' ditembak duluan → window dipaksa close() padahal
-// dialog simpan file belum selesai → nge-freeze/error.
-// Sekarang window dibiarkan terbuka apa pun aksinya (print/save/cancel),
-// dan user tutup sendiri lewat tombol "✕ Tutup" di pojok halaman.
 function printWindow(html: string) {
-  // Buka window seukuran layar penuh (bukan ukuran tetap 1100x750) supaya
-  // panel "Print Preview" browser menutupi seluruh konten halaman —
-  // sebelumnya window kecil menyebabkan sisa konten di bawah "nongol"
-  // dan terlihat seperti ada 2 lapisan/QR code dobel saat preview cetak.
   const w = window.screen.availWidth;
   const h = window.screen.availHeight;
   const win = window.open("", "_blank", `width=${w},height=${h},left=0,top=0`);
@@ -132,7 +186,6 @@ function printWindow(html: string) {
   win.document.close();
 }
 
-// ─── Script + tombol tutup manual — dipakai di setiap HTML template ──
 const PRINT_SCRIPT = `
 <script>
   window.onload = function() {
@@ -142,7 +195,7 @@ const PRINT_SCRIPT = `
 `;
 
 const CLOSE_BUTTON = `<button class="close-btn" onclick="window.close()" title="Tutup halaman ini">✕ Tutup</button>`;
-// header
+
 function renderHeaderBorang(subtitleInfo?: string) {
   return `
   <div class="header-borang">
@@ -158,16 +211,16 @@ function renderHeaderBorang(subtitleInfo?: string) {
     </div>
   </div>`;
 }
-// 1. PDF REKAPITULASI — per kategori waktu
+
+// ═══════════════════════════════════════════════════════════════
+// 1. PDF REKAPITULASI
+// ═══════════════════════════════════════════════════════════════
 export async function exportPDFRekap(
   rekapData: RekapItem[],
   prosesData: ProsesItem[],
   kategori: PdfKategori,
   selectedDate: Date,
   penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null,
-  // ✅ FIX: data hasil "Upload Data Lama" (tabel arsip_rekapitulasi) — sebelumnya
-  // nggak pernah dikirim ke sini sama sekali, jadi nggak pernah muncul di PDF
-  // Harian/Mingguan/Bulanan/Tahunan walaupun sudah masuk ke Export Excel.
   arsipData: ArsipItem[] = []
 ) {
   function isInRange(iso: string | null): boolean {
@@ -187,8 +240,6 @@ export async function exportPDFRekap(
 
   const filteredSelesai  = rekapData.filter((d) => isInRange(d.created_at ?? null));
   const filteredDipantau = dipantauData.filter((p) => isInRange(p.created_at ?? null));
-  // ✅ FIX: arsip nggak punya created_at (bukan dibuat sistem, tapi diimpor dari
-  // Excel), jadi difilter pakai tgl_pelaksanaan — fallback ke tgl_masuk kalau kosong.
   const filteredArsip = arsipData.filter((a) => isInRange(a.tgl_pelaksanaan ?? a.tgl_masuk ?? null));
 
   const mingguIni = getWeekOfMonth(selectedDate);
@@ -229,8 +280,6 @@ export async function exportPDFRekap(
     isSelesai: false,
   }));
 
-  // ✅ FIX: baris arsip dipetakan ke bentuk row yang sama dengan selesaiRows,
-  // lalu digabung dan dinomori ulang bareng data live supaya urut di tabel PDF.
   const arsipRows = filteredArsip.map((a) => ({
     no: 0,
     kode: a.kode_laporan ?? "—",
@@ -251,15 +300,17 @@ export async function exportPDFRekap(
   const allRows = [...selesaiRows, ...dipantauRows, ...arsipRows]
     .map((r, i) => ({ ...r, no: i + 1 }));
 
-  const jabatanPenandatanganRekap = stripGelarDr(penandatangan?.nama?.trim() || "Ka P4M");
+  const jabatanPenandatanganRekap = stripGelarDr(penandatangan?.nama?.trim() || "Kepala P4M");
   const tglCetakRekap = fmtTglWaktu(new Date().toISOString());
-  const qrTextRekap = `LAPORAN REKAPITULASI TUNTAS - Polibatam\nPeriode: ${labelKat[kategori]}\nPenandatangan: ${jabatanPenandatanganRekap}\nDicetak: ${tglCetakRekap}`;
+
+  // ✅ TTE format baru
+  const qrTextRekap = await buildQrTteText({
+    penandatangan: jabatanPenandatanganRekap,
+    perihal: `Laporan Rekapitulasi TUNTAS — ${labelKat[kategori]}`,
+    hashSeed: `REKAP|${kategori}|${labelKat[kategori]}|${allRows.length} laporan|${tglCetakRekap}`,
+  });
   const qrDataUrlRekap = await generateQrDataUrl(qrTextRekap);
 
-  // ✅ Sama seperti exportExcel.ts: "Selesai" (rekapData) SELALU tampil
-  // "Ditindaklanjuti", "Masih Dipantau" (dipantauData) SELALU tampil
-  // "Menunggu / Proses" — nggak lihat raw status_review lagi, supaya
-  // nggak ada satu tabel yang isinya campur dua label berbeda.
   function badgeReview(isSelesai: boolean) {
     return isSelesai
       ? `<span class="badge badge-green">✓ Ditindaklanjuti</span>`
@@ -327,7 +378,7 @@ ${renderHeaderBorang(`Periode: <strong>${labelKat[kategori]}</strong> | Dicetak:
     <p style="margin-top:4px;">Kepala P4M,</p>
     ${
       qrDataUrlRekap
-        ? `<img src="${qrDataUrlRekap}" class="qr-img" alt="QR TTD Kepala P4M"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
+        ? `<img src="${qrDataUrlRekap}" class="qr-img" alt="QR TTE Kepala P4M"/><span class="qr-cap">Scan untuk verifikasi TTE</span>`
         : `<div class="signature-placeholder"></div>`
     }
     <div class="name" style="margin-top:4px;">( ${jabatanPenandatanganRekap} )</div>
@@ -363,20 +414,18 @@ export async function exportPDFProses(
   item: ProsesDetailItem,
   penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null
 ) {
-  // Parameter 'penandatangan' sengaja tidak dipakai lagi di bawah — label
-  // penandatangan di bagian ini sudah di-hardcode "Staff P4M" (lihat
-  // jabatanPenandatanganProses). Parameter tetap dipertahankan di signature
-  // supaya pemanggil (ProcessMonitorTable.tsx) yang masih mengirim 2 argumen
-  // tidak perlu diubah.
   void penandatangan;
 
   const gambarHasilUrl = getUploadUrl(item.lampiran_hasil);
-  // Sengaja di-hardcode "Staff P4M" (bukan ikut nama akun individu, mis.
-  // "Admin Staf P4M") — baik untuk teks yang dicetak maupun yang di-encode
-  // ke QR, supaya tidak ada kata "Admin" muncul di bagian Proses & Pantau ini.
   const jabatanPenandatanganProses = "Staff P4M";
   const tglCetakProses = fmtTglWaktu(new Date().toISOString());
-  const qrTextProses = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nPenandatangan: ${jabatanPenandatanganProses}\nDicetak: ${tglCetakProses}`;
+
+  // ✅ TTE format baru
+  const qrTextProses = await buildQrTteText({
+    penandatangan: jabatanPenandatanganProses,
+    perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
+    hashSeed: `PROSES|${item.kode_laporan}|${item.isi_laporan ?? ""}|${item.tanggal_pelaksanaan ?? ""}|${tglCetakProses}`,
+  });
   const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
   const hasilTindakLanjutPdf =
@@ -457,7 +506,7 @@ ${item.aksi_masukan ? `
     <p style="margin-top:4px;">Staff P4M,</p>
     ${
       qrDataUrlProses
-        ? `<img src="${qrDataUrlProses}" class="qr-img" alt="QR TTD Staff P4M"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
+        ? `<img src="${qrDataUrlProses}" class="qr-img" alt="QR TTE Staff P4M"/><span class="qr-cap">Scan untuk verifikasi TTE</span>`
         : `<div class="signature-placeholder"></div>`
     }
     <div class="name" style="margin-top:4px;">( ${jabatanPenandatanganProses} )</div>
@@ -470,10 +519,7 @@ ${PRINT_SCRIPT}
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 3. PDF RIWAYAT KEPALA UNIT — per laporan individual, TTD Kepala Unit
-//    (sama strukturnya dengan exportPDFProses milik Staf P4M, tapi
-//    penandatangannya "Kepala Unit — {unit}", dipakai oleh tab Riwayat
-//    di halaman Kepala Unit)
+// 3. PDF RIWAYAT KEPALA UNIT
 // ═══════════════════════════════════════════════════════════════
 export interface RiwayatKepalaUnitItem {
   kode_laporan: string;
@@ -499,11 +545,8 @@ export async function exportPDFRiwayatKepalaUnit(
 ) {
   const gambarHasilUrl = getUploadUrl(item.lampiran_hasil);
   const namaUnit = item.nama_unit ?? "—";
-  // Sengaja pakai label jabatan generik "Kepala Unit — {unit}" (bukan nama
-  // akun pribadi) supaya konsisten dengan pola TTD "Staff P4M" di Proses &
-  // Pantau — baik di teks cetak maupun yang di-encode ke QR.
   const jabatanPenandatangan = `Kepala Unit — ${namaUnit}`;
-  void penandatangan; // tersedia untuk pemakaian di masa depan (nama individu), tidak dipakai sekarang
+  void penandatangan;
   const isSelesai = item.status_boxing === "selesai";
   const hasilTindakLanjutPdf =
   item.hasil_tindakan
@@ -516,7 +559,13 @@ export async function exportPDFRiwayatKepalaUnit(
     ? "Selesai — Disetujui Staf P4M"
     : "Dalam Proses";
   const tglCetak = fmtTglWaktu(new Date().toISOString());
-  const qrText = `LAPORAN TUNTAS - Polibatam\nKode: ${item.kode_laporan}\nUnit: ${namaUnit}\nStatus: ${statusLabel}\nPenandatangan: ${jabatanPenandatangan}\nDicetak: ${tglCetak}`;
+
+  // ✅ TTE format baru
+  const qrText = await buildQrTteText({
+    penandatangan: jabatanPenandatangan,
+    perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
+    hashSeed: `RIWAYAT|${item.kode_laporan}|${namaUnit}|${statusLabel}|${tglCetak}`,
+  });
   const qrDataUrl = await generateQrDataUrl(qrText);
 
   const html = `<!DOCTYPE html>
@@ -597,7 +646,7 @@ ${isSelesai && item.catatan_approval ? `
     <p style="margin-top:4px;">${jabatanPenandatangan},</p>
     ${
       qrDataUrl
-        ? `<img src="${qrDataUrl}" class="qr-img" alt="QR TTD Kepala Unit"/><span class="qr-cap">Scan untuk verifikasi TTD</span>`
+        ? `<img src="${qrDataUrl}" class="qr-img" alt="QR TTE Kepala Unit"/><span class="qr-cap">Scan untuk verifikasi TTE</span>`
         : `<div class="signature-placeholder"></div>`
     }
     <div class="name" style="margin-top:4px;">( ${jabatanPenandatangan} )</div>

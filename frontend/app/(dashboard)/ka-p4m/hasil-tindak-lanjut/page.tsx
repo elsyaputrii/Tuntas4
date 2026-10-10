@@ -46,7 +46,7 @@ export default function HasilTindakLanjutPage() {
           ✅ Hasil Tindak Lanjut
         </h2>
         {namaUser && (
-          <p className="text-sm text-gray-500">👤 {namaUser}</p>
+          <p className="text-sm text-gray-500"> {namaUser}</p>
         )}
       </div>
 

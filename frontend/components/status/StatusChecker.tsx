@@ -217,15 +217,16 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
               {data.unit_tujuan.length > 0 && (
                 <div className="flex justify-between border-b pb-3 gap-4">
                   <span className="text-gray-500 shrink-0">Unit Tujuan</span>
-                  <span className="font-semibold text-gray-800 text-right text-xs leading-relaxed">
+                  <span className="font-semibold text-gray-800 text-right text-xs leading-snug">
                     {data.unit_tujuan.join(", ")}
                   </span>
                 </div>
               )}
 
+              {/* ✅ ISI LAPORAN — diperbaiki */}
               <div>
                 <p className="text-gray-500 mb-2">Isi Laporan</p>
-                <div className="bg-gray-50 rounded-2xl p-4 text-gray-700 leading-relaxed">
+                <div className="bg-gray-50 rounded-2xl p-4 text-gray-700 leading-snug whitespace-pre-wrap break-words text-justify">
                   {data.deskripsi}
                 </div>
               </div>
@@ -237,9 +238,6 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                     const adaRencana = !!unit.rencana_tindakan;
                     const adaCatatan = !!unit.catatan_staf;
 
-                    // Rencana Ka Unit disembunyikan (lihat TAMPILKAN_RENCANA_KA_UNIT),
-                    // jadi block ini cuma dianggap "ada isinya" kalau ada catatan,
-                    // atau kalau rencana lagi ditampilkan.
                     const adaKontenDitampilkan =
                       adaCatatan || (TAMPILKAN_RENCANA_KA_UNIT && adaRencana);
                     if (!adaKontenDitampilkan) return null;
@@ -262,7 +260,8 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                             <p className="text-gray-500 mb-2">
                               Rencana Tindak Lanjut
                             </p>
-                            <div className="bg-blue-50 rounded-2xl p-4 text-gray-700 text-sm">
+                            {/* ✅ RENCANA — diperbaiki */}
+                            <div className="bg-blue-50 rounded-2xl p-4 text-gray-700 text-sm leading-snug whitespace-pre-wrap break-words text-justify">
                               {unit.rencana_tindakan}
                             </div>
                           </div>
@@ -273,7 +272,8 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                             <p className="text-gray-500 mb-2">
                               Catatan P4M
                             </p>
-                            <div className="bg-yellow-50 rounded-2xl p-4 text-gray-700 text-sm">
+                            {/* ✅ CATATAN — diperbaiki */}
+                            <div className="bg-yellow-50 rounded-2xl p-4 text-gray-700 text-sm leading-snug whitespace-pre-wrap break-words text-justify">
                               {unit.catatan_staf}
                             </div>
                           </div>
@@ -345,7 +345,8 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                       {item.title}
                     </h3>
 
-                    <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                    {/* ✅ DESKRIPSI PROGRESS — diperbaiki */}
+                    <p className="text-sm text-gray-500 mt-1 leading-snug whitespace-pre-wrap break-words text-justify">
                       {item.deskripsi}
                     </p>
                   </div>
@@ -362,7 +363,8 @@ export default function StatusChecker({ initialKode = "" }: StatusCheckerProps) 
                     Update Terbaru
                   </h4>
 
-                  <p className="text-sm text-gray-700 leading-relaxed">
+                  {/* ✅ UPDATE TERBARU — diperbaiki */}
+                  <p className="text-sm text-gray-700 leading-snug whitespace-pre-wrap break-words text-justify">
                     {data.update_terbaru}
                   </p>
                 </div>

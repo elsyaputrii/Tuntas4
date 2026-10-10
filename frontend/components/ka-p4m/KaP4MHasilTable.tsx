@@ -54,7 +54,6 @@ type LucideIcon = typeof Clock;
 
 /**
  * HELPER PARSING RENCANA
- * Hapus enter liar, lalu pisah baris HANYA bila menemukan kata "Rencana".
  */
 function parseRencana(rencana: string | null | undefined): string[] {
   if (!rencana) return [];
@@ -70,7 +69,7 @@ function parseRencana(rencana: string | null | undefined): string[] {
 }
 
 /**
- * KOMPONEN RENCANA LIST (Tampilan Rapat & Rapi)
+ * KOMPONEN RENCANA LIST (rata kiri-kanan + jarak antar paragraf)
  */
 function RencanaList({
   rencana,
@@ -93,9 +92,12 @@ function RencanaList({
 
   return (
     <div className={`border border-gray-400 p-2 min-h-16 ${textClass} text-gray-800`}>
-      <div>
+      <div className="space-y-2">
         {items.map((item, i) => (
-          <div key={i} className="whitespace-normal break-words leading-tight mb-1 last:mb-0">
+          <div
+            key={i}
+            className="whitespace-pre-wrap break-words leading-relaxed text-justify"
+          >
             {item}
           </div>
         ))}
@@ -131,11 +133,9 @@ export default function KaP4MHasilTable() {
 
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      // 1. Filter Periode Tanggal
       const matchPeriod = isInPeriodFilter(filterMode, selectedDate, toLocalDate, item.created_at ?? null);
       if (!matchPeriod) return false;
 
-      // 2. Filter Status Keputusan Staff (Diterima / Ditolak / Menunggu)
       if (statusFilter !== "semua") {
         const approval = item.approval_staf ?? "menunggu";
         if (statusFilter === "diterima" && approval !== "diterima") return false;
@@ -143,7 +143,6 @@ export default function KaP4MHasilTable() {
         if (statusFilter === "menunggu" && approval !== "menunggu") return false;
       }
 
-      // 3. Filter Kata Kunci Pencarian (Search Query)
       if (searchQuery.trim() !== "") {
         const q = searchQuery.toLowerCase();
         const matchKode = item.kode_laporan?.toLowerCase().includes(q);
@@ -267,54 +266,48 @@ export default function KaP4MHasilTable() {
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
 
       {/* FILTER PERIODE, SEARCH, & STATUS */}
-<div className="mb-3 space-y-2">
-  {/* Filter Periode Utama */}
-  <PeriodFilterBar
-    filterMode={filterMode}
-    onFilterModeChange={setFilterMode}
-    selectedDate={selectedDate}
-    onSelectedDateChange={setSelectedDate}
-    highlightedDates={highlightedDates}
-    showCalendar={false}
-  />
-
-  {/* BARIS INFO (KIRI) + SEARCH & STATUS FILTER (KANAN SEJAJAR) */}
-  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-    {/* TEKS INFO LAPORAN (KIRI) */}
-    <p className="text-[10px] text-gray-400 font-bold uppercase shrink-0">
-      {filteredData.length} item tindak lanjut ({groupedData.length} laporan) · {labelPeriodFilter(filterMode, selectedDate, fmtTglShared)}
-    </p>
-
-    {/* CONTROLS SEARCH & STATUS FILTER (KANAN, TIDAK FULL WIDTH) */}
-    <div className="flex items-center gap-2">
-      {/* SEARCH BAR (Lebar pas/compact) */}
-      <div className="relative w-56 sm:w-64">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-        <input
-          type="text"
-          placeholder="Cari laporan, unit, hasil..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-8 pr-2 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:border-black bg-white"
+      <div className="mb-3 space-y-2">
+        <PeriodFilterBar
+          filterMode={filterMode}
+          onFilterModeChange={setFilterMode}
+          selectedDate={selectedDate}
+          onSelectedDateChange={setSelectedDate}
+          highlightedDates={highlightedDates}
+          showCalendar={false}
         />
-      </div>
 
-      {/* DROPDOWN STATUS STAFF */}
-      <div className="flex items-center gap-1 shrink-0">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="text-xs border border-gray-300 rounded-md px-2 py-2 bg-white font-medium focus:outline-none focus:border-black"
-        >
-          <option value="semua">Semua Status</option>
-          <option value="diterima">Siap (Selesai)</option>
-          <option value="ditolak">Belum Siap (Revisi)</option>
-          <option value="menunggu">Menunggu Tindakan / Proses</option>
-        </select>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <p className="text-[10px] text-gray-400 font-bold uppercase shrink-0">
+            {filteredData.length} item tindak lanjut ({groupedData.length} laporan) · {labelPeriodFilter(filterMode, selectedDate, fmtTglShared)}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <div className="relative w-56 sm:w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+              <input
+                type="text"
+                placeholder="Cari laporan, unit, hasil..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-2 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:border-black bg-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs border border-gray-300 rounded-md px-2 py-2 bg-white font-medium focus:outline-none focus:border-black"
+              >
+                <option value="semua">Semua Status</option>
+                <option value="diterima">Siap (Selesai)</option>
+                <option value="ditolak">Belum Siap (Revisi)</option>
+                <option value="menunggu">Menunggu Tindakan / Proses</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <p className="text-[10px] text-gray-500 px-3 py-2 bg-gray-50 border-b">
@@ -358,7 +351,7 @@ export default function KaP4MHasilTable() {
 
                       return (
                         <tr key={item.id_boxing}>
-                          {/* Kolom Laporan — align-TOP, konten laporan utama di atas */}
+                          {/* Kolom Laporan */}
                           {isFirstUnit && (
                             <td
                               rowSpan={rowSpan}
@@ -376,7 +369,8 @@ export default function KaP4MHasilTable() {
                                     </span>
                                   )}
                                 </div>
-                                <div className="border border-gray-400 p-2 min-h-16 text-[10px]">
+                                {/* ✅ Laporan civitas rata kiri-kanan + jarak paragraf */}
+                                <div className="border border-gray-400 p-2 min-h-16 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
                                   {group.isi_laporan}
                                 </div>
                                 <p className="text-[9px] text-gray-400 flex items-center gap-1">
@@ -398,10 +392,8 @@ export default function KaP4MHasilTable() {
 
                           {/* Rencana / Aksi Masukan */}
                           <td className={`border-r-2 border-black p-3 align-top ${isLastUnit ? "border-b-2" : "border-b"}`}>
-                            {/* GANTI DENGAN KOMPONEN INI */}
                             <RencanaList rencana={item.aksi_masukan || item.rencana_tindakan} />
-                            
-                            {/* Label unit di BAWAH kotak */}
+
                             <p className="text-[9px] text-gray-500 font-bold mt-1.5 flex items-center gap-1">
                               <Building2 size={10} className="shrink-0" />
                               {item.nama_unit || "—"}
@@ -413,18 +405,16 @@ export default function KaP4MHasilTable() {
                             </p>
                           </td>
 
-                          {/* Hasil Tindak Lanjut Unit — TANPA label unit (udah ada di kolom Rencana) */}
+                          {/* Hasil Tindak Lanjut Unit — rata kiri-kanan */}
                           <td className={`border-r-2 border-black p-3 align-top ${isLastUnit ? "border-b-2" : "border-b"}`}>
-                            <div className="border border-gray-400 min-h-16 p-2 text-[10px] flex ">
-                              <span className="w-full">
-                                {item.hasil_tindakan ? (
-                                  item.hasil_tindakan
-                                ) : item.approval_staf === "diterima" ? (
-                                  <span className="text-gray-400 italic ">Sudah sesuai, tidak ditindaklanjuti</span>
-                                ) : (
-                                  <span className="text-gray-400 italic">Belum diisi Kepala Unit</span>
-                                )}
-                              </span>
+                            <div className="border border-gray-400 min-h-16 p-2 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                              {item.hasil_tindakan ? (
+                                item.hasil_tindakan
+                              ) : item.approval_staf === "diterima" ? (
+                                <span className="text-gray-400 italic">Sudah sesuai, tidak ditindaklanjuti</span>
+                              ) : (
+                                <span className="text-gray-400 italic">Belum diisi Kepala Unit</span>
+                              )}
                             </div>
                             {item.tanggal_pelaksanaan && (
                               <p className="text-[9px] text-gray-400 flex items-center gap-1 mt-1.5">
@@ -443,7 +433,7 @@ export default function KaP4MHasilTable() {
                             )}
                           </td>
 
-                          {/* Status Keputusan Staff — align-middle */}
+                          {/* Status Keputusan Staff */}
                           <td className={`p-3 align-middle text-center ${isLastUnit ? "border-b-2" : "border-b"}`}>
                             {item.approval_staf && item.approval_staf !== "menunggu" ? (
                               <div className="flex flex-col items-center gap-1.5">
@@ -469,7 +459,7 @@ export default function KaP4MHasilTable() {
                                   {formatTanggal(item.tanggal_keputusan_ka)}
                                 </p>
                                 {item.catatan_approval && (
-                                  <p className="text-[9px] text-gray-500 italic text-center leading-tight max-w-32">
+                                  <p className="text-[9px] text-gray-500 italic text-center leading-relaxed max-w-32 text-justify whitespace-pre-wrap break-words">
                                     &ldquo;{item.catatan_approval}&rdquo;
                                   </p>
                                 )}

@@ -251,7 +251,7 @@ export default function KepalaUnitLayout({
                 Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👩‍💻Kepala Unit {userData?.nama_unit || userData?.unit ? `(${userData?.nama_unit || userData?.unit})` : userData?.nama ? `(${userData?.nama})` : ''}
+                Kepala Unit {userData?.nama_unit || userData?.unit ? `(${userData?.nama_unit || userData?.unit})` : userData?.nama ? `(${userData?.nama})` : ''}
               </p>
             </div>
 

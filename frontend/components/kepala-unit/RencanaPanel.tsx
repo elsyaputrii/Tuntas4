@@ -1,20 +1,8 @@
 // FILE: frontend/components/kepala-unit/RencanaPanel.tsx
-//
-// ✅ Diekstrak dari DiscrepancyTable.tsx supaya bisa dipakai bersama oleh
-// tab "Ketidaksesuaian Masuk" (laporan baru) DAN tab "Keputusan Staf"
-// (revisi setelah ditolak Staf P4M). Sebelumnya StafDecisionTable punya
-// input "Rencana Tindak Lanjut" sendiri berupa <textarea> polos yang
-// datanya TIDAK PERNAH dibaca oleh backend (submitRancangan selalu ambil
-// dari tabel rencana_tindak_lanjut lewat panel ini) — itu sebabnya edit
-// rencana di "Keputusan Staf" tidak pernah nyampai ke Ka P4M. Dengan
-// kedua tab memakai komponen yang sama, keduanya otomatis konsisten dan
-// tersambung ke backend dengan benar.
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import { Plus, Pencil, Trash2, Calendar } from "lucide-react";
-
-// const todayStr = () => new Date().toISOString().split("T")[0];
 
 export interface RencanaItem {
   id: number;
@@ -25,11 +13,13 @@ export interface RencanaItem {
 export default function RencanaPanel({
   idBoxing,
   onCountChange,
-  onChange, 
+  onChange,
+  readOnly = false, // ✅ BARU
 }: {
   idBoxing: number;
   onCountChange?: (idBoxing: number, count: number) => void;
   onChange?: (idBoxing: number, changed: boolean) => void;
+  readOnly?: boolean; // ✅ BARU
 }) {
   const [items, setItems]             = useState<RencanaItem[]>([]);
   const initialItems                  = useRef<RencanaItem[]>([]); 
@@ -42,8 +32,6 @@ export default function RencanaPanel({
   const [formErr, setFormErr]         = useState("");
   const [savingForm, setSavingForm]   = useState(false);
 
-  // useCallback cuma depend on idBoxing (bukan onCountChange) supaya
-  // tidak re-create tiap render → tidak infinite loop.
   const fetchRencana = useCallback(async () => {
     setLoading(true); setErrMsg("");
     try {
@@ -100,10 +88,6 @@ export default function RencanaPanel({
       setFormErr("Tanggal harus diisi.");
       return false;
     }
-    // if (formTanggal < todayStr()) {
-     // setFormErr("Tanggal tidak boleh lewat.");
-     // return false;
-    // }
     return true;
   };
 
@@ -147,18 +131,12 @@ export default function RencanaPanel({
       setItems((prev) =>
         prev.map((it) =>
           it.id === formMode
-            ? {
-                ...it,
-                teks: formTeks.trim(),
-                tanggal: formTanggal,
-              }
+            ? { ...it, teks: formTeks.trim(), tanggal: formTanggal }
             : it
         )
       );
 
-      // Menandakan bahwa rencana sudah diubah
       onChange?.(idBoxing, true);
-
       setFormMode(null);
     } catch (e: unknown) {
       setFormErr(e instanceof Error ? e.message : "Gagal memperbarui.");
@@ -166,7 +144,6 @@ export default function RencanaPanel({
       setSavingForm(false);
     }
   };
-
 
   const handleDelete = async (item: RencanaItem) => {
     if (!confirm(`Hapus rencana "${item.teks}"?`)) return;
@@ -183,7 +160,8 @@ export default function RencanaPanel({
 
   return (
     <div className="space-y-2">
-      {formMode === null && (
+      {/* ✅ Tombol + hanya muncul kalau tidak readOnly */}
+      {formMode === null && !readOnly && (
         <div className="flex justify-start">
           <button
             onClick={handleOpenAdd}
@@ -200,13 +178,13 @@ export default function RencanaPanel({
       {formMode !== null && (
         <div className="border border-black rounded p-2 space-y-1.5 bg-white">
           <p className="text-[9px] font-bold text-black uppercase">
-            {formMode === "new" ? "Tambah Rencana" : "Edit Rencana"}
+            {formMode === "new" ? "Tambah Rancangan" : "Edit Rancangan"}
           </p>
 
           <textarea
-            className="w-full border border-black p-1.5 text-[10px] outline-none focus:border-blue-polibatam rounded resize-none"
+            className="w-full border border-black p-1.5 text-[10px] outline-none focus:border-blue-polibatam rounded resize-none leading-relaxed text-justify"
             rows={3}
-            placeholder="tulis rencana tindak lanjut"
+            placeholder="tulis rancangan tindak lanjut"
             value={formTeks}
             onChange={(e) => setFormTeks(e.target.value)}
             autoFocus
@@ -216,7 +194,6 @@ export default function RencanaPanel({
             type="date"
             className="w-full border border-black p-1.5 text-[10px] outline-none focus:border-blue-polibatam rounded"
             value={formTanggal}
-            // min={todayStr()} gak pernah dipakai karena user bisa edit tanggal rencana yang sudah lewat
             onChange={(e) => setFormTanggal(e.target.value)}
           />
 
@@ -270,7 +247,7 @@ export default function RencanaPanel({
               <p className="text-[10px] font-semibold text-black">
                 Rencana {idx + 1}
               </p>
-              <p className="text-[10px] text-gray-800 leading-snug wrap-break-words">
+              <p className="text-[10px] text-gray-800 leading-relaxed text-justify whitespace-pre-wrap break-words">
                 {it.teks}
               </p>
               <p className="text-[9px] text-gray-600 flex items-center gap-1">
@@ -283,24 +260,27 @@ export default function RencanaPanel({
                     })
                   : "(belum diisi)"}
               </p>
-              <div className="flex items-center gap-1 pt-0.5">
-                <button
-                  onClick={() => handleOpenEdit(it)}
-                  disabled={formMode !== null}
-                  className="border border-black text-black hover:bg-black hover:text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 text-[9px] font-medium transition-all disabled:opacity-40"
-                  title="Edit"
-                >
-                  <Pencil size={9} /> edit
-                </button>
-                <button
-                  onClick={() => handleDelete(it)}
-                  disabled={formMode !== null}
-                  className="border border-black text-black hover:bg-black hover:text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 text-[9px] font-medium transition-all disabled:opacity-40"
-                  title="Hapus"
-                >
-                  <Trash2 size={9} /> hapus
-                </button>
-              </div>
+              {/* ✅ Tombol edit/hapus hanya muncul kalau tidak readOnly */}
+              {!readOnly && (
+                <div className="flex items-center gap-1 pt-0.5">
+                  <button
+                    onClick={() => handleOpenEdit(it)}
+                    disabled={formMode !== null}
+                    className="border border-black text-black hover:bg-black hover:text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 text-[9px] font-medium transition-all disabled:opacity-40"
+                    title="Edit"
+                  >
+                    <Pencil size={9} /> edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(it)}
+                    disabled={formMode !== null}
+                    className="border border-black text-black hover:bg-black hover:text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 text-[9px] font-medium transition-all disabled:opacity-40"
+                    title="Hapus"
+                  >
+                    <Trash2 size={9} /> hapus
+                  </button>
+                </div>
+              )}
             </div>
           );
         })

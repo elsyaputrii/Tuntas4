@@ -1,13 +1,24 @@
 // FILE: frontend/components/kepala-unit/RiwayatTable.tsx
-// Tab "Riwayat" — rekapitulasi SEMUA laporan yang pernah didistribusikan/
-// ditangani Kepala Unit ini (apa pun tahapnya sekarang), lengkap dengan
-// penanda status yang sebenarnya dan tombol export PDF (TTD QR code) per
-// laporan, mirror dari fitur "Proses & Pantau" milik Staf P4M.
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import { exportPDFRiwayatKepalaUnit } from "@/lib/exportPdf";
 import { PeriodFilterBar, isInPeriodFilter, type FilterMode as PeriodFilterMode } from "@/components/shared/PeriodFilterBar";
+import {
+  CheckCircle2,
+  RefreshCw,
+  Clock,
+  Wrench,
+  FileText,
+  Image as ImageIcon,
+  Calendar,
+  Search,
+  X,
+  FolderOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
@@ -41,62 +52,35 @@ interface RiwayatStats {
 
 type FilterMode = "semua" | "selesai";
 
-// ✅ FIX: sebelumnya SETIAP baris di tabel ini selalu ditandai "✓ Selesai"
-// secara hardcode — itu cocok SELAMA query backend cuma pernah
-// mengembalikan laporan yang benar-benar selesai (akibat INNER JOIN yang
-// jadi bug di getRiwayat). Sekarang backend mengembalikan SEMUA laporan
-// yang pernah ditangani unit ini (apa pun tahapnya), jadi badge status
-// per baris harus benar-benar mencerminkan tahap sebenarnya, bukan
-// selalu "Selesai".
-//
-// ✅ FIX (permintaan user): label untuk status_boxing === "di_staff"
-// (artinya: Kepala Unit SUDAH selesai mengisi Laporan Hasil, dan
-// laporan sedang menunggu keputusan akhir dari STAF P4M — bukan Ka
-// P4M) SEBELUMNYA salah tertulis "Menunggu Keputusan Ka P4M". Diganti
-// jadi "Menunggu Keputusan Akhir Staf" supaya sesuai alur yang benar
-// (keputusan Siap/Belum Siap atas hasil tindak lanjut adalah wewenang
-// Staf P4M, lihat setApprovalStaf di stafController.js), dan konsisten
-// dengan label yang sama di RecapitulationTable.tsx (labelStatusLengkap
-// di exportHelpers.ts).
-function statusBadge(item: RiwayatItem): { label: string; cls: string } {
+function statusBadge(item: RiwayatItem): { label: string; cls: string; Icon: typeof CheckCircle2 } {
   if (item.status_boxing === "selesai") {
-    return { label: "✓ Selesai", cls: "bg-green-100 text-green-700" };
+    return { label: "Selesai", cls: "bg-green-100 text-green-700", Icon: CheckCircle2 };
   }
   if (item.status_boxing === "di_staff") {
     if (item.approval_staf === "ditolak") {
-      return { label: "🔄 Perbaikan Berkelanjutan", cls: "bg-red-100 text-red-700" };
+      return { label: "Perbaikan Berkelanjutan", cls: "bg-red-100 text-red-700", Icon: RefreshCw };
     }
-    return { label: "⏳ Menunggu Tindakan Akhir Staf", cls: "bg-amber-100 text-amber-700" };
+    return { label: "Menunggu Tindakan Akhir Staf", cls: "bg-amber-100 text-amber-700", Icon: Clock };
   }
   if (item.status_boxing === "menunggu_pelaksanaan") {
-    return { label: "🔧 Menunggu Pelaksanaan", cls: "bg-blue-100 text-blue-700" };
+    return { label: "Menunggu Pelaksanaan", cls: "bg-blue-100 text-blue-700", Icon: Wrench };
   }
   if (item.status_review === "menunggu_keputusan_ka") {
-    return { label: "⏳ Menunggu Ka P4M", cls: "bg-amber-100 text-amber-700" };
+    return { label: "Menunggu Ka P4M", cls: "bg-amber-100 text-amber-700", Icon: Clock };
   }
-  return { label: "🔄 Diproses", cls: "bg-blue-100 text-blue-700" };
+  return { label: "Diproses", cls: "bg-blue-100 text-blue-700", Icon: RefreshCw };
 }
 
-/**
- * HELPER PARSING RENCANA
- * Hapus enter liar, lalu pisah baris HANYA bila menemukan kata "Rencana".
- */
 function parseRencana(rencana: string | null | undefined): string[] {
   if (!rencana) return [];
-
   const cleanText = rencana.replace(/\r?\n|\r/g, " ").trim();
-
   const items = cleanText
     .split(/(?=Rencana\s*\d+:?)/i)
     .map((s) => s.trim())
     .filter(Boolean);
-
   return items;
 }
 
-/**
- * KOMPONEN RENCANA LIST (Dengan spasi mb-1 antar poin rencana)
- */
 function RencanaList({
   rencana,
   emptyText = "—",
@@ -117,9 +101,12 @@ function RencanaList({
   }
 
   return (
-    <div className={`${textClass} text-gray-800`}>
+    <div className={`${textClass} text-gray-800 space-y-2`}>
       {items.map((item, i) => (
-        <div key={i} className="whitespace-normal break-words leading-tight mb-1 last:mb-0">
+        <div
+          key={i}
+          className="leading-relaxed text-justify whitespace-pre-wrap break-words"
+        >
           {item}
         </div>
       ))}
@@ -127,15 +114,6 @@ function RencanaList({
   );
 }
 
-// ✅ FIX (permintaan user): kolom "Hasil Tindak Lanjut" sebelumnya
-// menampilkan "—" polos kalau hasil_tindakan kosong — termasuk untuk
-// laporan yang statusnya SUDAH "selesai" (mis. kasus "Sesuai, tidak
-// perlu tindak lanjut" yang memang tidak pernah diisi pelaksanaannya).
-// Supaya tidak membingungkan / tidak muncul kesan "belum ada hasil"
-// padahal laporannya sudah tuntas, laporan yang sudah "selesai" tapi
-// tidak punya hasil_tindakan sekarang ditampilkan sebagai
-// "Sudah Terselesaikan" (dipakai juga oleh exportPDFRiwayatKepalaUnit
-// di exportPdf.ts supaya konsisten saat dicetak PDF).
 function hasilTindakLanjutText(item: RiwayatItem): string {
   if (item.hasil_tindakan) return item.hasil_tindakan;
   if (item.status_boxing === "selesai") return "Sudah Terselesaikan";
@@ -144,9 +122,11 @@ function hasilTindakLanjutText(item: RiwayatItem): string {
 
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
       <div className="relative" style={{ width: "85vw", maxWidth: "1100px" }} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300 z-10">✕</button>
+        <button onClick={onClose} className="absolute -top-10 right-0 text-white hover:text-gray-300 z-10" aria-label="Tutup">
+          <X size={32} strokeWidth={2.5} />
+        </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt="Bukti pelaksanaan"
           style={{ width: "100%", maxHeight: "85vh", objectFit: "contain", background: "white", borderRadius: "8px" }}
@@ -158,7 +138,7 @@ function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
               const msg = document.createElement("div");
               msg.className = "err-msg";
               msg.style.cssText = "color:#ef4444;padding:32px;text-align:center;background:white;border-radius:8px;font-size:13px";
-              msg.innerText = "❌ Gambar tidak ditemukan.\nURL: " + src;
+              msg.innerText = "Gambar tidak ditemukan.\nURL: " + src;
               parent.appendChild(msg);
             }
           }}
@@ -177,11 +157,6 @@ function fmtTglSingkat(iso: string | null): string {
 
 export default function RiwayatTable() {
   const [data, setData] = useState<RiwayatItem[]>([]);
-  // ✅ FIX: statistik sekarang diambil langsung dari backend (single
-  // source of truth — dihitung dari SEMUA laporan yang pernah
-  // didistribusikan/ditangani unit ini), bukan di-derive ulang di
-  // frontend dari `data` yang sebelumnya sudah salah/kepotong akibat
-  // bug INNER JOIN di getRiwayat.
   const [stats, setStats] = useState<RiwayatStats>({ total: 0, selesai: 0, persentase: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -196,12 +171,7 @@ export default function RiwayatTable() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [
-    filterMode,
-    periodFilterMode,
-    selectedDate,
-    searchQuery,
-  ]);
+  }, [filterMode, periodFilterMode, selectedDate, searchQuery]);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
@@ -209,8 +179,6 @@ export default function RiwayatTable() {
       const res = await kepalaUnitApi.getRiwayat();
       const items: RiwayatItem[] = res.data ?? [];
       setData(items);
-      // Fallback dihitung dari `items` kalau backend lama belum mengirim
-      // `stats` (mis. saat rolling deploy) — supaya tetap tampil benar.
       const total = res.stats?.total ?? items.length;
       const selesai =
         res.stats?.selesai ?? items.filter((d) => d.status_boxing === "selesai").length;
@@ -228,23 +196,17 @@ export default function RiwayatTable() {
 
   const highlightedDates = useMemo(() => {
     const dates = new Set<string>();
-
     data.forEach((item) => {
       if (!item.tanggal_laporan) return;
-
       const d = new Date(item.tanggal_laporan);
-
       if (isNaN(d.getTime())) return;
-
       const key = [
         d.getFullYear(),
         String(d.getMonth() + 1).padStart(2, "0"),
         String(d.getDate()).padStart(2, "0"),
       ].join("-");
-
       dates.add(key);
     });
-
     return dates;
   }, [data]);
 
@@ -280,19 +242,14 @@ export default function RiwayatTable() {
     }
   }
 
-  // FIX: filter "Selesai" tetap murni status_boxing === 'selesai' —
-  // laporan yang masih berjalan (menunggu Ka P4M, di unit, dsb) TIDAK
-  // ikut dihitung/ditampilkan sebagai selesai.
   const filteredData = useMemo(
     () =>
       data.filter((item) => {
-        // Filter status
         const statusMatch =
           filterMode === "semua"
             ? true
             : item.status_boxing === "selesai";
 
-        // Filter periode berdasarkan tanggal laporan
         const periodMatch = isInPeriodFilter(
           periodFilterMode,
           selectedDate,
@@ -313,10 +270,7 @@ export default function RiwayatTable() {
     [data, filterMode, periodFilterMode, selectedDate, searchQuery] 
   );
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredData.length / ITEMS_PER_PAGE)
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / ITEMS_PER_PAGE));
 
   const paginatedData = useMemo(
     () =>
@@ -345,20 +299,21 @@ export default function RiwayatTable() {
     return !item.hasil_tindakan && item.status_boxing === "selesai";
   }
 
-
   return (
     <>
       {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
 
       <div className="w-full space-y-4">
-        {/* Ringkasan rekap "selesai mengerjakan" */}
+        {/* Ringkasan rekap */}
         <div className="grid grid-cols-3 gap-3">
           <div className="border-2 border-black bg-white p-3 text-center">
             <p className="text-[9px] uppercase font-bold text-gray-400">Total Laporan</p>
             <p className="text-xl font-black text-gray-800">{stats.total}</p>
           </div>
           <div className="border-2 border-black bg-green-50 p-3 text-center">
-            <p className="text-[9px] uppercase font-bold text-green-600">✓ Selesai</p>
+            <p className="text-[9px] uppercase font-bold text-green-600 inline-flex items-center gap-1">
+              <CheckCircle2 size={10} /> Selesai
+            </p>
             <p className="text-xl font-black text-green-700">{stats.selesai}</p>
           </div>
           <div className="border-2 border-black bg-blue-50 p-3 text-center">
@@ -367,9 +322,8 @@ export default function RiwayatTable() {
           </div>
         </div>
 
-        {/* Filter periode + Input Pencarian + filter status */}
+        {/* Filter periode + pencarian + filter status */}
         <div className="flex flex-wrap items-center justify-between gap-2 w-full">
-          {/* Filter periode — kiri */}
           <div className="shrink-0">
             <PeriodFilterBar
               filterMode={periodFilterMode}
@@ -381,40 +335,48 @@ export default function RiwayatTable() {
             />
           </div>
 
-          {/* Area Kanan: Input Pencarian & Filter Status */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* ➕ TAMBAHKAN ELEMENT INPUT PENCARIAN INI: */}
             <div className="relative">
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Cari kode/uraian..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-52 sm:w-62 pl-3 pr-8 py-1.5 text-xs border-2 border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-52 sm:w-62 pl-8 pr-8 py-1.5 text-xs border-2 border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm font-bold"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Bersihkan"
                 >
-                  ✕
+                  <X size={12} />
                 </button>
               )}
             </div>
 
-            {/* Filter Status */}
+            {/* Filter Status — pakai Lucide */}
             {(["semua", "selesai"] as FilterMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setFilterMode(mode)}
-                className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold border transition-all inline-flex items-center gap-1.5 ${
                   filterMode === mode
                     ? "bg-dark-header text-white border-dark-header shadow"
                     : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
                 }`}
               >
-                {mode === "semua" ? "📋 Semua" : "✓ Selesai"}
+                {mode === "semua" ? (
+                  <>
+                    <FolderOpen size={12} /> Semua
+                  </>
+                ) : (
+                  <>
+                    <Check size={12} /> Selesai
+                  </>
+                )}
               </button>
             ))}
 
@@ -431,13 +393,12 @@ export default function RiwayatTable() {
             <div className="flex-1 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
             <div className="w-40 border-r-2 border-black p-2">Rencana Tindakan</div>
             <div className="flex-1 border-r-2 border-black p-2">Hasil Tindak Lanjut</div>
-            <div className="w-32 border-r-2 border-black p-2">Status</div>
-            <div className="w-24 p-2">PDF</div>
+            <div className="w-32 border-r-2 border-black p-2 align-top">Status</div>
+            <div className="w-24 p-2 align-top">PDF</div>
           </div>
           {filteredData.length === 0 ? (
             <div className="flex p-10 justify-center border-t-2 border-black">
               <p className="text-gray-400 italic text-sm">
-                {/* 🔄 UBAH PESAN INI: */}
                 {searchQuery
                   ? "Tidak ada laporan yang cocok dengan pencarian Anda."
                   : filterMode === "selesai"
@@ -449,49 +410,60 @@ export default function RiwayatTable() {
             paginatedData.map((item) => {
               const badge = statusBadge(item);
               return (
-              <div key={item.id_boxing} className="flex min-w-175 border-t-2 border-black text-[11px]">
-                <div className="w-24 border-r-2 border-black p-3 align-top">
-                  <p className="font-bold text-[10px]">{item.kode_laporan}</p>
-                  <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_laporan)}</p>
-                </div>
-                <div className="flex-1 border-r-2 border-black p-3">
-                  <div className="border border-gray-400 p-2 min-h-16">{item.isi_laporan}</div>
-                </div>
-                <div className="w-40 border-r-2 border-black p-3">
-                  <div className="min-h-16">
-                    <RencanaList rencana={item.rencana_tindakan} />
+                <div key={item.id_boxing} className="flex min-w-175 border-t-2 border-black text-[11px]">
+                  <div className="w-24 border-r-2 border-black p-3 align-top">
+                    <p className="font-bold text-[10px]">{item.kode_laporan}</p>
+                    <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                      <Calendar size={10} /> {fmtTglSingkat(item.tanggal_laporan)}
+                    </p>
+                  </div>
+                  {/* Uraian — rata kiri-kanan + jarak paragraf */}
+                  <div className="flex-1 border-r-2 border-black p-3">
+                    <div className="border border-gray-400 p-2 min-h-16 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                      {item.isi_laporan}
+                    </div>
+                  </div>
+                  <div className="w-40 border-r-2 border-black p-3">
+                    <div className="min-h-16">
+                      <RencanaList rencana={item.rencana_tindakan} />
+                    </div>
+                  </div>
+                  {/* Hasil Tindak Lanjut — rata kiri-kanan */}
+                  <div className="flex-1 border-r-2 border-black p-3">
+                    <div className="border border-gray-400 p-2 min-h-16 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                      {isHasilTerselesaikan(item) ? (
+                        <span className="italic text-gray-400">Sudah Terselesaikan</span>
+                      ) : (
+                        hasilTindakLanjutText(item)
+                      )}
+                    </div>
+                    <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                      <Calendar size={10} /> {fmtTglSingkat(item.tanggal_pelaksanaan)}
+                    </p>
+                    {item.lampiran_hasil && (
+                      <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
+                        className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
+                        <ImageIcon size={11} /> Lihat Gambar
+                      </button>
+                    )}
+                  </div>
+                  {/* Status — rata ATAS */}
+                  <div className="w-32 border-r-2 border-black p-3 flex items-start justify-center pt-6">
+                    <span className={`text-[9px] font-bold text-center px-2 py-1 rounded leading-tight inline-flex items-center gap-1 ${badge.cls}`}>
+                      <badge.Icon size={10} />
+                      {badge.label}
+                    </span>
+                  </div>
+                  {/* PDF — rata ATAS */}
+                  <div className="w-24 p-2 flex items-start justify-center pt-6">
+                    <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
+                      className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded w-full">
+                      {exportingId === item.id_boxing
+                        ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        : <><FileText size={12} /><span>PDF</span></>}
+                    </button>
                   </div>
                 </div>
-                <div className="flex-1 border-r-2 border-black p-3">
-                  <div className="border border-gray-400 p-2 min-h-16">
-                    {isHasilTerselesaikan(item) ? (
-                      <span className="italic text-gray-400"> Sudah Terselesaikan</span>
-                    ) : (
-                      hasilTindakLanjutText(item)
-                    )} </div>
-
-                  <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
-                  {item.lampiran_hasil && (
-                    <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
-                      className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
-                      🖼️ Lihat Gambar
-                    </button>
-                  )}
-                </div>
-                <div className="w-32 border-r-2 border-black p-3 flex items-center justify-center">
-                  <span className={`text-[9px] font-bold text-center px-2 py-1 rounded leading-tight ${badge.cls}`}>
-                    {badge.label}
-                  </span>
-                </div>
-                <div className="w-24 p-2 flex items-center justify-center">
-                  <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
-                    className="flex flex-col items-center gap-0.5 px-2 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded w-full">
-                    {exportingId === item.id_boxing
-                      ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
-                  </button>
-                </div>
-              </div>
               );
             })
           )}
@@ -504,7 +476,6 @@ export default function RiwayatTable() {
           </div>
           {filteredData.length === 0 ? (
             <div className="p-8 text-center text-gray-400 italic">
-              {/* 🔄 UBAH PESAN INI: */}
               {searchQuery
                 ? "Tidak ada laporan yang cocok dengan pencarian Anda."
                 : filterMode === "selesai"
@@ -515,74 +486,72 @@ export default function RiwayatTable() {
             paginatedData.map((item) => {
               const badge = statusBadge(item);
               return (
-              <div key={item.id_boxing} className="border-t-2 border-black p-4 space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-[10px] font-bold text-gray-600">{item.kode_laporan}</span>
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${badge.cls}`}>
-                    {badge.label}
-                  </span>
-                </div>
-                <div className="border border-gray-300 p-2 text-[11px] bg-gray-50 rounded max-h-20 overflow-auto">
-                  {item.isi_laporan}
-                </div>
-                <div>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana Tindakan</p>
-                  <div className="border border-gray-200 p-1.5 rounded">
-                    <RencanaList rencana={item.rencana_tindakan} />
+                <div key={item.id_boxing} className="border-t-2 border-black p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold text-gray-600">{item.kode_laporan}</span>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded inline-flex items-center gap-1 ${badge.cls}`}>
+                      <badge.Icon size={10} />
+                      {badge.label}
+                    </span>
                   </div>
-                </div>
-                <div>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
-                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16">
-                    {isHasilTerselesaikan(item) ? (
-                      <span className="italic text-gray-400">
-                        Sudah Terselesaikan
-                      </span>
-                    ) : (
-                      hasilTindakLanjutText(item)
+                  <div className="border border-gray-300 p-2 text-[11px] bg-gray-50 rounded max-h-20 overflow-auto leading-relaxed text-justify whitespace-pre-wrap break-words">
+                    {item.isi_laporan}
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana Tindakan</p>
+                    <div className="border border-gray-200 p-1.5 rounded">
+                      <RencanaList rencana={item.rencana_tindakan} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
+                    <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded max-h-16 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                      {isHasilTerselesaikan(item) ? (
+                        <span className="italic text-gray-400">Sudah Terselesaikan</span>
+                      ) : (
+                        hasilTindakLanjutText(item)
+                      )}
+                    </div>
+                    <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                      <Calendar size={10} /> {fmtTglSingkat(item.tanggal_pelaksanaan)}
+                    </p>
+                    {item.lampiran_hasil && (
+                      <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
+                        className="mt-1 flex items-center gap-1 text-[10px] text-blue-600 hover:underline">
+                        <ImageIcon size={11} /> Lihat Gambar
+                      </button>
                     )}
                   </div>
-
-                  <p className="text-[9px] text-gray-400 mt-1">📅 {fmtTglSingkat(item.tanggal_pelaksanaan)}</p>
-                  {item.lampiran_hasil && (
-                    <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
-                      className="mt-1 flex items-center gap-1 text-[10px] text-blue-600 hover:underline">
-                      🖼️ Lihat Gambar
-                    </button>
-                  )}
+                  <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[11px] font-bold rounded">
+                    {exportingId === item.id_boxing
+                      ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <><FileText size={12} /> Export PDF</>}
+                  </button>
                 </div>
-                <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[11px] font-bold rounded">
-                  {exportingId === item.id_boxing
-                    ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <>📄 Export PDF</>}
-                </button>
-              </div>
               );
             })
           )}
         </div>
+
         {/* PAGINATION */}
         {filteredData.length > ITEMS_PER_PAGE && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-3">
-
             <p className="text-[10px] text-gray-500">
               Menampilkan{" "}
-              <span className="font-semibold text-gray-700">{(currentPage - 1) * ITEMS_PER_PAGE + 1}
-              </span>
+              <span className="font-semibold text-gray-700">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>
               {" - "}
-              <span className="font-semibold text-gray-700">{Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)}
-              </span>
+              <span className="font-semibold text-gray-700">{Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)}</span>
               {" dari "}
-              <span className="font-semibold text-gray-700">{filteredData.length}
-              </span>
+              <span className="font-semibold text-gray-700">{filteredData.length}</span>
               {" laporan"}
             </p>
 
             <div className="flex items-center gap-1">
-
               <button onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                disabled={currentPage === 1}>‹ Prev
+                disabled={currentPage === 1}
+                className="px-2.5 py-1.5 text-[10px] font-semibold rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1">
+                <ChevronLeft size={12} /> Prev
               </button>
 
               {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -594,15 +563,11 @@ export default function RiwayatTable() {
                 .map((page, index, pages) => {
                   const previousPage = pages[index - 1];
                   return (
-                    <div
-                      key={page}
-                      className="flex items-center gap-1">
+                    <div key={page} className="flex items-center gap-1">
                       {previousPage && page - previousPage > 1 && (
                         <span className="px-1 text-gray-400 text-[10px]">...</span>
                       )}
-
-                      <button
-                        onClick={() => setCurrentPage(page)}
+                      <button onClick={() => setCurrentPage(page)}
                         className={`min-w-8 px-2.5 py-1.5 text-[10px] font-semibold rounded border transition-all ${
                           currentPage === page
                             ? "bg-dark-header text-white border-dark-header"
@@ -614,15 +579,10 @@ export default function RiwayatTable() {
                   );
                 })}
 
-              <button
-                onClick={() =>
-                  setCurrentPage((page) =>
-                    Math.min(totalPages, page + 1)
-                  )
-                }
+              <button onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                 disabled={currentPage === totalPages}
-                className="px-2.5 py-1.5 text-[10px] font-semibold rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                Next ›
+                className="px-2.5 py-1.5 text-[10px] font-semibold rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1">
+                Next <ChevronRight size={12} />
               </button>
             </div>
           </div>

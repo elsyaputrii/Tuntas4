@@ -10,6 +10,28 @@ import {
   getMonthWeeks, labelStatusLengkap,
 } from "@/lib/exportHelpers";
 import type { RekapItem, ProsesItem, ArsipItem } from "@/lib/exportTypes";
+import {
+  CheckCircle2,
+  Clock,
+  FileSpreadsheet,
+  FileText,
+  Calendar,
+  CalendarDays,
+  FolderArchive,
+  Search,
+  Upload,
+  Trash2,
+  X,
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+  Inbox,
+  Download,
+} from "lucide-react";
+
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
+  "http://localhost:5000";
 
 const BULAN_PANJANG = [
   "Januari","Februari","Maret","April","Mei","Juni",
@@ -18,7 +40,6 @@ const BULAN_PANJANG = [
 
 type FilterMode = "semua"|"harian"|"mingguan"|"bulanan"|"tahunan";
 
-/** Format tanggal yang sumbernya gak pasti ISO atau teks bebas */
 function formatTglAman(v: string | null): string {
   if (!v) return "—";
   const d = new Date(v);
@@ -30,9 +51,6 @@ const BULAN_ID_SINGKAT: Record<string, number> = {
   jul: 7, agu: 8, ags: 8, sep: 9, okt: 10, nov: 11, des: 12,
 };
 
-/** Ubah tanggal arsip (ISO / dd/mm/yyyy / "10 Mei 2023") jadi "YYYY-MM-DD"
- *  yang pasti bisa dibaca Date. Kalau gagal, atau tahunnya beda dengan tahun
- *  arsip yang dipilih saat upload, pakai tanggal cadangan `${tahun}-06-15`. */
 function tglMasukArsip(teks: string | null, tahun: number): string {
   const fallback = `${tahun}-06-15`;
   if (!teks) return fallback;
@@ -55,23 +73,42 @@ function tglMasukArsip(teks: string | null, tahun: number): string {
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
-// 1. Helper untuk memisahkan teks rencana berdasarkan kata "Rencana 1", "Rencana 2", dst.
-function parseRencana(rencana: string | null | undefined): string[] {
+interface RencanaItem {
+  nomor: string;
+  teks: string;
+  tanggal: string;
+}
+
+function parseRencana(rencana: string | null | undefined): RencanaItem[] {
   if (!rencana) return [];
-
-  // Hapus baris baru (enter liar) dan ubah jadi spasi
-  const cleanText = rencana.replace(/\r?\n|\r/g, " ").trim();
-
-  // Split (pisah) HANYA jika menemukan pola kata "Rencana 1", "Rencana 2", dst.
-  const items = cleanText
-    .split(/(?=Rencana\s*\d+:?)/i)
+  const cleanText = rencana.replace(/\r/g, "").trim();
+  const parts = cleanText
+    .split(/(?=Rencana\s*\d+\s*:)/i)
     .map((s) => s.trim())
     .filter(Boolean);
+
+  const items: RencanaItem[] = [];
+
+  for (const part of parts) {
+    const matchPrefix = /^Rencana\s*(\d+)\s*:\s*/i.exec(part);
+    if (!matchPrefix) continue;
+
+    const nomor = matchPrefix[1];
+    let body = part.slice(matchPrefix[0].length).trim();
+
+    let tanggal = "";
+    const matchTgl = /\(([^)]*)\)\s*$/.exec(body);
+    if (matchTgl) {
+      tanggal = matchTgl[1].trim();
+      body = body.slice(0, matchTgl.index).trim();
+    }
+
+    items.push({ nomor, teks: body, tanggal });
+  }
 
   return items;
 }
 
-// 2. Komponen UI untuk merender daftar poin rencana tindakan dengan margin bawah (mb-1)
 function RencanaList({
   rencana,
   emptyText = "—",
@@ -92,10 +129,16 @@ function RencanaList({
   }
 
   return (
-    <div className={`${textClass} text-gray-800`}>
-      {items.map((item, i) => (
-        <div key={i} className="whitespace-normal wrap-break-words leading-tight mb-1 last:mb-0">
-          {item}
+    <div className={`${textClass} text-gray-800 space-y-2`}>
+      {items.map((r, i) => (
+        <div key={i} className="leading-relaxed">
+          <p className="font-bold text-gray-800">Rencana {r.nomor}:</p>
+          <p className="text-gray-700 text-justify whitespace-pre-wrap break-words">
+            {r.teks}
+          </p>
+          {r.tanggal && (
+            <p className="text-[9px] text-gray-500 mt-0.5">{r.tanggal}</p>
+          )}
         </div>
       ))}
     </div>
@@ -127,12 +170,16 @@ function MiniCalendar({ selectedDate, onSelectDate, highlightedDates }: Calendar
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
       <div className="flex items-center justify-between mb-2">
         <button onClick={()=>setViewDate(new Date(year,month-1,1))}
-          className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 text-sm font-bold">‹</button>
+          className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600 font-bold">
+          <ChevronLeft size={14} />
+        </button>
         <span className="text-xs font-semibold text-gray-700">{BULAN_PANJANG[month]} {year}</span>
         <button onClick={()=>setViewDate(new Date(year,month+1,1))}
           disabled={isCurrentViewMonth}
           title={isCurrentViewMonth ? "Tidak bisa melihat bulan setelah hari ini" : undefined}
-          className="w-7 h-7 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed flex items-center justify-center text-gray-600 text-sm font-bold">›</button>
+          className="w-7 h-7 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed flex items-center justify-center text-gray-600 font-bold">
+          <ChevronRight size={14} />
+        </button>
       </div>
       <div className="grid grid-cols-7 mb-1">
         {["Sen","Sel","Rab","Kam","Jum","Sab","Min"].map(d=>(
@@ -197,7 +244,9 @@ function DailyPicker({ selectedDate, onChange }: DailyPickerProps) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">📅 Pilih Tanggal</p>
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2 inline-flex items-center gap-1">
+        <Calendar size={12} /> Pilih Tanggal
+      </p>
       <div className="grid grid-cols-3 gap-2">
         <select value={selDay} onChange={(e)=>set(Number(e.target.value), selMonth, selYear)}
           className="w-full text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
@@ -266,7 +315,9 @@ function WeeklyPicker({ selectedDate, onChange }: WeeklyPickerProps) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">🗓️ Pilih Minggu</p>
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2 inline-flex items-center gap-1">
+        <CalendarDays size={12} /> Pilih Minggu
+      </p>
       <div className="space-y-2">
         <div className="grid grid-cols-2 gap-2">
           <select value={selMonth} onChange={(e)=>goToMonth(selYear, Number(e.target.value))}
@@ -319,7 +370,9 @@ function MonthYearPicker({ selectedDate, onChange }: MonthYearPickerProps) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">📆 Pilih Bulan</p>
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2 inline-flex items-center gap-1">
+        <Calendar size={12} /> Pilih Bulan
+      </p>
       <div className="grid grid-cols-2 gap-2">
         <select value={selMonth} onChange={(e)=>{ onChange(new Date(selYear, Number(e.target.value), 1)); }}
           className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
@@ -356,7 +409,9 @@ function YearPicker({ selectedDate, onChange }: YearPickerProps) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm w-full">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2">🗃️ Pilih Tahun</p>
+      <p className="text-[10px] font-semibold text-gray-500 uppercase mb-2 inline-flex items-center gap-1">
+        <FolderArchive size={12} /> Pilih Tahun
+      </p>
       <select value={selYear}
         onChange={(e)=>onChange(new Date(Number(e.target.value), selectedDate.getMonth(), selectedDate.getDate()))}
         className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-dark-header/30">
@@ -433,25 +488,26 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
       <button
         onClick={()=>setShowUploadArsip(v=>!v)}
         disabled={uploadingArsip}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 text-white text-[10px] font-bold rounded transition-all">
-        {uploadingArsip?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📁"} Upload Data Lama
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 text-white text-[10px] font-bold rounded transition-all">
+        {uploadingArsip ? (
+          <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>
+        ) : (
+          <Upload size={12} />
+        )}
+        Upload Data Lama
       </button>
 
       {showUploadArsip && (
-        <div className="absolute bottom-full left-0 mb-2 z-999 w-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
+        <div className="absolute bottom-full left-0 mb-2 z-[9999] w-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
           {msg && (
-            <p className="text-green-700 text-[10px] font-bold px-2 py-1.5 bg-green-50 border border-green-200 rounded">
-              ✅ {msg}
-            </p>
+            <p className="text-green-700 text-[10px] font-bold px-2 py-1.5 bg-green-50 border border-green-200 rounded">✅ {msg}</p>
           )}
           {error && (
-            <p className="text-red-600 text-[10px] font-bold px-2 py-1.5 bg-red-50 border border-red-200 rounded">
-              ❌ {error}
-            </p>
+            <p className="text-red-600 text-[10px] font-bold px-2 py-1.5 bg-red-50 border border-red-200 rounded">❌ {error}</p>
           )}
 
           <p className="text-[10px] font-semibold text-black uppercase">🗃️ Upload Data Excel Tahun Lalu</p>
-          <p className="text-[9px] text-black leading-snug">
+          <p className="text-[9px] text-black leading-snug text-justify">
             Pilih tahun datanya, lalu pilih file Excel (.xlsx/.xls) yang kolomnya
             seperti hasil export ini (Kode Laporan, Uraian, Penyebab, dst).
             Bisa untuk 1 sampai 10 tahun ke belakang. Selain file Excel tidak
@@ -493,7 +549,7 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
 
           <div className="border-t border-gray-200 pt-2 mt-2 space-y-2">
             <p className="text-[10px] font-semibold text-red-700 uppercase">🗑️ Hapus Data Arsip</p>
-            <p className="text-[9px] text-black leading-snug">
+            <p className="text-[9px] text-black leading-snug text-justify">
               Pilih tahun datanya, lalu hapus data arsip tahun tsb yang
               sudah pernah diupload sebelumnya.
             </p>
@@ -536,6 +592,33 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
 }
 
 // ══════════════════════════════════════════════════════════
+// IMAGE MODAL
+// ══════════════════════════════════════════════════════════
+function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="relative" style={{ width: "85vw", maxWidth: "1100px" }} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute -top-10 right-0 text-white hover:text-gray-300 z-10" aria-label="Tutup">
+          <X size={32} strokeWidth={2.5} />
+        </button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt="Lampiran"
+          style={{
+            width: "100%",
+            maxHeight: "85vh",
+            objectFit: "contain",
+            background: "white",
+            borderRadius: "8px",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // TIPE DATA BARIS TABEL HASIL
 // ══════════════════════════════════════════════════════════
 
@@ -555,6 +638,8 @@ interface DisplayItem {
   approvalStaf: string | null;
   tglMasuk: string | null;
   isSelesai: boolean;
+  lampiranLaporan: string | null;
+  lampiranHasil: string | null;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -576,6 +661,7 @@ export default function RecapitulationTable() {
   const [searchQuery, setSearchQuery] = useState("");
   const [arsipData, setArsipData] = useState<ArsipItem[]>([]);
   const [loadingArsip, setLoadingArsip] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 15;
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -605,8 +691,6 @@ export default function RecapitulationTable() {
 
   useEffect(()=>{ fetchData(); },[fetchData]);
 
-  // ✅ Fetch arsip tahun — dipakai setelah hapus arsip (via onDeleteSuccess)
-  // dan dipanggil di useEffect filterMode tahunan.
   const fetchArsipTahun = useCallback((tahun: number) => {
     setLoadingArsip(true);
     return stafApi.getArsipRekap(tahun)
@@ -632,6 +716,13 @@ export default function RecapitulationTable() {
     }
   }
 
+  function getImageUrl(lampiran: string | null): string {
+    if (!lampiran) return "";
+    if (lampiran.startsWith("http")) return lampiran;
+    if (lampiran.startsWith("uploads/")) return `${BASE_URL}/${lampiran}`;
+    return `${BASE_URL}/uploads/${lampiran}`;
+  }
+
   const selesaiBoxingIds = new Set(rekapData.map(d=>d.id_boxing));
   const dipantauData     = prosesData.filter(p=>!selesaiBoxingIds.has(p.id_boxing));
 
@@ -645,6 +736,8 @@ export default function RecapitulationTable() {
       statusReview:d.status_review??"", statusBoxing:d.status_boxing??"selesai",
       approvalStaf: null as string | null,
       tglMasuk:d.created_at??null, isSelesai:d.status_boxing==="selesai",
+      lampiranLaporan: d.lampiran_laporan ?? null,
+      lampiranHasil: d.lampiran_hasil ?? null,
     })),
     ...dipantauData.map(p=>({
       id_boxing:p.id_boxing, kode:p.kode_laporan, jenis:p.jenis_laporan??"—",
@@ -655,9 +748,9 @@ export default function RecapitulationTable() {
       statusReview:p.status_review??"", statusBoxing:p.status_boxing??"",
       approvalStaf: p.approval_staf ?? null,
       tglMasuk:p.created_at??null,
-      // ✅ FIX: cek isSelesai juga untuk laporan dipantau, supaya kalau
-      // status_boxing = "selesai", tetap dianggap selesai.
       isSelesai: p.status_boxing === "selesai",
+      lampiranLaporan: p.lampiran_laporan ?? null,
+      lampiranHasil: p.lampiran_hasil ?? null,
     })),
     ...arsipData.map((a,i)=>{
       const statusRevLower = (a.status_review ?? "").toLowerCase();
@@ -683,18 +776,20 @@ export default function RecapitulationTable() {
         approvalStaf: null as string | null,
         tglMasuk: tglMasukArsip(a.tgl_masuk, a.tahun),
         isSelesai: isCloseOrSelesai,
+        lampiranLaporan: null,
+        lampiranHasil: null,
       };
     }),
   ];
 
   const highlightedDates = new Set<string>(
-  allItems
-    .filter(d => d.tglMasuk && !isNaN(Date.parse(d.tglMasuk)))
-    .map(d => {
-      const dt = toLocalDate(d.tglMasuk!);
-      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-    })
-);
+    allItems
+      .filter(d => d.tglMasuk && !isNaN(Date.parse(d.tglMasuk)))
+      .map(d => {
+        const dt = toLocalDate(d.tglMasuk!);
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+      })
+  );
 
   function isInFilter(tglMasuk:string|null):boolean{
     if(filterMode==="semua") return true;
@@ -749,13 +844,17 @@ export default function RecapitulationTable() {
   function statusFor(item: DisplayItem) {
     const { butuhAksiStaf } = labelStatusLengkap(item.statusBoxing, item.statusReview, item.approvalStaf);
 
-    let label: string, cls: string;
+    let label: string, cls: string, Icon: typeof CheckCircle2;
     if (item.isSelesai) {
-      label = "✅ Ditindaklanjuti";         cls = "bg-green-100 text-green-700";
+      label = "Ditindaklanjuti";
+      cls = "bg-green-100 text-green-700";
+      Icon = CheckCircle2;
     } else {
-      label = "⏳ Menunggu / Proses";       cls = "bg-yellow-100 text-yellow-700";
+      label = "Menunggu / Proses";
+      cls = "bg-yellow-100 text-yellow-700";
+      Icon = Clock;
     }
-    const statusInfo = { label, cls, butuhAksiStaf };
+    const statusInfo = { label, cls, Icon, butuhAksiStaf };
     return { statusInfo };
   }
 
@@ -767,16 +866,31 @@ export default function RecapitulationTable() {
 
   return(
     <div className="w-full space-y-4 px-3">
-      {error &&<p className="text-red-500 text-xs font-bold px-3 py-2 bg-red-50 border border-red-200 rounded">❌ {error}</p>}
+      {selectedImage && (
+        <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
+      )}
+
+      {error && (
+        <p className="text-red-500 text-xs font-bold px-3 py-2 bg-red-50 border border-red-200 rounded">❌ {error}</p>
+      )}
 
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {(["harian","mingguan","bulanan","tahunan","semua"] as FilterMode[]).map(mode=>(
-          <button key={mode} onClick={()=>{ setFilterMode(mode); setCalendarResetKey(k=>k+1); }}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
-              ${filterMode===mode?"bg-dark-header text-white border-dark-header shadow":"bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
-            {mode==="semua"?"📋 Semua":mode==="harian"?"📅 Harian":mode==="mingguan"?"🗓️ Mingguan":mode==="bulanan"?"📆 Bulanan":"🗃️ Tahunan"}
-          </button>
-        ))}
+        {(["harian","mingguan","bulanan","tahunan","semua"] as FilterMode[]).map(mode=>{
+          const emojiMap: Record<FilterMode, string> = {
+            semua: "📋", harian: "📅", mingguan: "🗓️", bulanan: "📆", tahunan: "🗃️",
+          };
+          const labelMap: Record<FilterMode, string> = {
+            semua: "Semua", harian: "Harian", mingguan: "Mingguan", bulanan: "Bulanan", tahunan: "Tahunan",
+          };
+          return (
+            <button key={mode} onClick={()=>{ setFilterMode(mode); setCalendarResetKey(k=>k+1); }}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all inline-flex items-center gap-1.5
+                ${filterMode===mode?"bg-dark-header text-white border-dark-header shadow":"bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
+              <span>{emojiMap[mode]}</span>
+              {labelMap[mode]}
+            </button>
+          );
+        })}
       </div>
 
       <button
@@ -802,7 +916,7 @@ export default function RecapitulationTable() {
             <div className="flex items-center gap-2">
               <YearPicker selectedDate={selectedDate} onChange={(d)=>setSelectedDate(d)} />
               {loadingArsip && (
-                <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                <span className="text-[10px] text-gray-400 inline-flex items-center gap-1">
                   <span className="w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
                   Memuat arsip...
                 </span>
@@ -848,8 +962,11 @@ export default function RecapitulationTable() {
         </div>
       </div>
 
+      {/* ✅ Toolbar Export — bagian ini saja yang Lucide */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
-        <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold w-full sm:w-auto">📥 Export:</span>
+        <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold w-full sm:w-auto inline-flex items-center gap-1">
+          <Download size={12} /> Export:
+        </span>
         
         <button
           onClick={async ()=>{
@@ -875,8 +992,13 @@ export default function RecapitulationTable() {
             }
           }}
           disabled={exportingExcelLoading||filteredItems.length===0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white text-[10px] font-bold rounded transition-all">
-          {exportingExcelLoading?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📊"} Excel
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white text-[10px] font-bold rounded transition-all">
+          {exportingExcelLoading ? (
+            <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>
+          ) : (
+            <FileSpreadsheet size={12} />
+          )}
+          Excel
         </button>
 
         <ArsipDataManager onDeleteSuccess={handleArsipDeleted} />
@@ -887,30 +1009,25 @@ export default function RecapitulationTable() {
             onClick={async ()=>{
               setExportingPDF(kat);
               try{
-                // ✅ FIX: ikut ambil data arsip (Upload Data Lama) sebelum export PDF,
-                // sama seperti yang sudah dilakukan tombol Export Excel.
                 let arsipForPdf: ArsipItem[] = [];
                 try{
-                  // ✅ FIX: `tahun` sekarang SELALU dikirim (kolom int, indexed
-                  // di backend) buat semua mode — sebelumnya cuma dikirim
-                  // pas "tahunan", jadi mode lain narik semua tahun arsip.
-                  // `bulan` ikut dikirim khusus utk harian/mingguan/bulanan,
-                  // karena ketiganya selalu dalam satu bulan kalender yang
-                  // sama (lihat sameWeekOfMonth di exportHelpers.ts — minggu
-                  // nggak pernah lintas bulan), jadi aman disortir di server.
                   const tahunFilter = selectedDate.getFullYear();
                   const bulanFilter = kat === "tahunan" ? undefined : selectedDate.getMonth() + 1;
                   const arsipRes = await stafApi.getArsipRekap(tahunFilter, bulanFilter);
                   arsipForPdf = arsipRes.data ?? [];
-                }catch{ /* nonfatal — PDF tetap jalan meski fetch arsip gagal */ }
+                }catch{ /* nonfatal */ }
                 await exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M,arsipForPdf);
               } finally {
                 setExportingPDF(null);
               }
             }}
             disabled={exportingPDF===kat}
-            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
-            {exportingPDF===kat?<span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>:"📄"}
+            className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[10px] font-bold rounded transition-all">
+            {exportingPDF===kat ? (
+              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>
+            ) : (
+              <FileText size={12} />
+            )}
             {kat.charAt(0).toUpperCase()+kat.slice(1)}
           </button>
         ))}
@@ -935,54 +1052,79 @@ export default function RecapitulationTable() {
       {/* Tabel — DESKTOP */}
       <div className="hidden md:block w-full border-2 border-black bg-white overflow-x-auto text-xs">
         <div className="flex min-w-175 font-bold uppercase bg-gray-50 border-b-2 border-black text-center text-[10px]">
-          <div className="w-10 border-r-2 border-black p-2">No</div>
-          <div className="w-78 border-r-2 border-black p-2">Uraian Ketidaksesuaian</div>
-          <div className="w-50 border-r-2 border-black p-2">Penyebab</div>
-          <div className="w-50 border-r-2 border-black p-2">Rencana</div>
-          <div className="w-28 border-r-2 border-black p-2">Status</div>
-          <div className="w-78 border-r-2 border-black p-2">Hasil Tindak Lanjut</div>
-          <div className="w-24 p-2">Status Proses</div>
+          <div className="w-10 border-r-2 border-black p-2 align-top">No</div>
+          <div className="w-78 border-r-2 border-black p-2 align-top">Uraian Ketidaksesuaian</div>
+          <div className="w-50 border-r-2 border-black p-2 align-top">Penyebab</div>
+          <div className="w-50 border-r-2 border-black p-2 align-top">Rencana</div>
+          <div className="w-28 border-r-2 border-black p-2 align-top">Status</div>
+          <div className="w-78 border-r-2 border-black p-2 align-top">Hasil Tindak Lanjut</div>
+          <div className="w-24 p-2 align-top">Status Proses</div>
         </div>
         {filteredItems.length===0?(
           <div className="flex p-8 justify-center border-t-2 border-black">
-            <p className="text-gray-400 italic text-sm">Tidak ada data untuk periode ini.</p>
+            <p className="text-gray-400 italic text-sm inline-flex items-center gap-2">
+              <Inbox size={16} /> Tidak ada data untuk periode ini.
+            </p>
           </div>
         ):(
           paginatedItems.map((item,index)=>{
             const { statusInfo } = statusFor(item);
             return (
               <div key={`d-${item.id_boxing}-${index}`} className="flex min-w-175 border-t-2 border-black text-[11px]">
-                <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center">
-                  <span className="font-bold text-sm"><span className="font-bold text-sm">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span></span>
+                <div className="w-10 border-r-2 border-black p-3 flex items-start justify-center pt-6">
+                  <span className="font-bold text-sm">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
                 </div>
-                <div className="w-78 border-r-2 border-black p-3">
+                <div className="w-78 border-r-2 border-black p-3 align-top">
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
-                  <div className="border border-gray-400 p-2 min-h-20 text-[10px]">{item.uraian}</div>
+                  <div className="border border-gray-400 p-2 min-h-20 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                    {item.uraian}
+                  </div>
+                  {item.lampiranLaporan && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage(getImageUrl(item.lampiranLaporan))}
+                      className="mt-1 inline-flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+                    >
+                      <ImageIcon size={11} /> Lihat Gambar Awal
+                    </button>
+                  )}
                 </div>
-                <div className="w-50 border-r-2 border-black p-2">
-                  <span className=" text-gray-600 text-center text-[10px]">{item.penyebab}</span>
+                <div className="w-50 border-r-2 border-black p-3 align-top">
+                  <div className="text-gray-600 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                    {item.penyebab}
+                  </div>
                 </div>
-                <div className="w-50 border-r-2 border-black p-2">
+                <div className="w-50 border-r-2 border-black p-3 align-top">
                   <div className="text-gray-600 text-[10px]">
                     <RencanaList rencana={item.rencana} textClass="text-[10px]" />
                     {item.tglRencana !== "—" && (
-                      <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 Direncanakan: {item.tglRencana}</span>
+                      <span className="not-italic font-semibold text-gray-400 text-[9px] mt-1 inline-flex items-center gap-1">
+                        <Calendar size={10} /> Direncanakan: {item.tglRencana}
+                      </span>
                     )}
                   </div>
                 </div>
-                <div className="w-28 border-r-2 border-black p-3 flex items-center justify-center">
-                  <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>{statusInfo.label}</span>
+                <div className="w-28 border-r-2 border-black p-3 flex items-start justify-center pt-6">
+                  <span className={`text-[8px] font-bold text-center px-1.5 py-1 rounded leading-tight ${statusInfo.cls}`}>
+                    {statusInfo.label}
+                  </span>
                 </div>
-                <div className="w-78 border-r-2 border-black p-3">
-                  <div className="border border-gray-400 p-2 min-h-20 text-gray-600">
+                <div className="w-78 border-r-2 border-black p-3 align-top">
+                  <div className="border border-gray-400 p-2 min-h-20 text-gray-600 leading-relaxed text-justify whitespace-pre-wrap break-words">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>
+                  {item.lampiranHasil && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage(getImageUrl(item.lampiranHasil))}
+                      className="mt-1 inline-flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+                    >
+                      <ImageIcon size={11} /> Lihat Gambar Hasil
+                    </button>
+                  )}
                 </div>
-                <div className="w-24 p-3 flex flex-col justify-center gap-1.5">
-                  {/* ✅ FIX: kalau laporan sudah selesai, tampilkan "Selesai".
-                      Kalau masih butuh aksi staf, tampilkan "Menunggu Keputusan Staff".
-                      Kalau belum, tampilkan "Menunggu proses". */}
+                <div className="w-24 p-3 flex flex-col items-center justify-start gap-1.5 pt-6">
                   {item.isSelesai ? (
                     <span className="text-[9px] text-green-600 italic text-center font-semibold">✓ Selesai</span>
                   ) : statusInfo.butuhAksiStaf ? (
@@ -1016,33 +1158,54 @@ export default function RecapitulationTable() {
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${statusInfo.cls}`}>{statusInfo.label}</span>
                 </div>
-                <div className="border border-gray-300 p-2 text-[11px] font-semibold uppercase bg-gray-50 rounded min-h-20">
+                <div className="border border-gray-300 p-2 text-[11px] font-semibold bg-gray-50 rounded min-h-20 leading-relaxed text-justify whitespace-pre-wrap break-words">
                   {item.uraian}
                 </div>
+                {item.lampiranLaporan && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedImage(getImageUrl(item.lampiranLaporan))}
+                    className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline"
+                  >
+                    <ImageIcon size={11} /> Lihat Gambar Awal
+                  </button>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Penyebab</p>
-                    <p className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">{item.penyebab}</p>
+                    <div className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                      {item.penyebab}
+                    </div>
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Rencana</p>
                     <div className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10">
                       <RencanaList rencana={item.rencana} textClass="text-[10px]" />
                       {item.tglRencana !== "—" && (
-                        <span className="block not-italic font-semibold text-gray-400 text-[9px] mt-1">📅 {item.tglRencana}</span>
+                        <span className="not-italic font-semibold text-gray-400 text-[9px] mt-1 inline-flex items-center gap-1">
+                          <Calendar size={10} /> {item.tglRencana}
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
-                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded min-h-16">
+                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded min-h-16 leading-relaxed text-justify whitespace-pre-wrap break-words">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>
+                  {item.lampiranHasil && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage(getImageUrl(item.lampiranHasil))}
+                      className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline"
+                    >
+                      <ImageIcon size={11} /> Lihat Gambar Hasil
+                    </button>
+                  )}
                 </div>
                 <div>
-                  {/* ✅ FIX sama seperti desktop */}
                   {item.isSelesai ? (
                     <span className="text-[10px] text-green-600 italic font-semibold">✓ Selesai</span>
                   ) : statusInfo.butuhAksiStaf ? (
@@ -1056,21 +1219,19 @@ export default function RecapitulationTable() {
           })
         )}
       </div>
+
       {/* PAGINATION */}
       {filteredItems.length > ITEMS_PER_PAGE && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-3">
-
-          <p className="text-[10px] text-gray-500"> Menampilkan{" "}
-            <span className="font-semibold text-gray-700"> {(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>
+          <p className="text-[10px] text-gray-500">
+            Menampilkan <span className="font-semibold text-gray-700">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>
             {" - "}
             <span className="font-semibold text-gray-700">{Math.min(currentPage * ITEMS_PER_PAGE, filteredItems.length)}</span>
             {" dari "}
-            <span className="font-semibold text-gray-700">{filteredItems.length}</span>
-            {" laporan"}
+            <span className="font-semibold text-gray-700">{filteredItems.length}</span> laporan
           </p>
 
           <div className="flex items-center gap-1">
-
             <button
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}
               className="px-2.5 py-1.5 text-[10px] font-semibold rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -1087,11 +1248,9 @@ export default function RecapitulationTable() {
                 const previousPage = pages[index - 1];
                 return (
                   <div key={page} className="flex items-center gap-1">
-
                     {previousPage && page - previousPage > 1 && (
                       <span className="px-1 text-gray-400 text-[10px]">...</span>
                     )}
-
                     <button
                       onClick={() => setCurrentPage(page)}
                       className={`min-w-8 px-2.5 py-1.5 text-[10px] font-semibold rounded border transition-all ${

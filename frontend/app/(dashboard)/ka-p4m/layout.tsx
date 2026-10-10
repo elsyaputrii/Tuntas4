@@ -284,7 +284,7 @@ export default function KaP4MLayout({
                   Pengelolaan Ketidaksesuaian Polibatam
                 </h1>
                 <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                  👤 Kepala Unit P4M (Ka P4M)
+                  Kepala Unit P4M 
                 </p>
               </div>
 
@@ -453,7 +453,7 @@ export default function KaP4MLayout({
                 Pengelolaan Ketidaksesuaian Polibatam
               </h1>
               <p className="mt-2 text-sm text-slate-200 flex items-center gap-2">
-                👩‍💻KA-P4M
+                KA-P4M
               </p>
             </div>
 

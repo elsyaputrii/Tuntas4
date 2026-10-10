@@ -29,7 +29,7 @@ export default function FlowGambarModal({ onDone }: FlowGambarModalProps) {
         {/* 🔥 AREA GAMBAR YANG BISA DI-SCROLL */}
         <div className="flex-1 overflow-y-auto p-6 pt-14 pb-16">
           <img
-            src="/Flow Tuntas.jpg"
+            src="/FLOW.jpg"
             alt="Panduan Flow"
             className="w-full h-auto rounded-lg object-contain"
           />

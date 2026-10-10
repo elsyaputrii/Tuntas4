@@ -45,7 +45,7 @@ export default function ProsesPengaduanPage() {
           📋 Proses Pengaduan
         </h2>
         {namaUser && (
-          <p className="text-sm text-gray-500">👤 {namaUser}</p>
+          <p className="text-sm text-gray-500"> {namaUser}</p>
         )}
       </div>
       

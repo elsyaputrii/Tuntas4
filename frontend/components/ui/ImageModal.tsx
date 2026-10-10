@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 
 interface ImageModalProps {
   src: string;
@@ -9,13 +8,12 @@ interface ImageModalProps {
 }
 
 export default function ImageModal({ src, onClose }: ImageModalProps) {
-  const [scale, setScale]       = useState(1);
-  const [pos, setPos]           = useState({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
-  const posRef    = useRef(pos);
+  const posRef = useRef(pos);
 
-  // Sync posRef setiap kali pos berubah — harus di useEffect, bukan di render
   useEffect(() => {
     posRef.current = pos;
   }, [pos]);
@@ -66,11 +64,11 @@ export default function ImageModal({ src, onClose }: ImageModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col items-center"
+        className="relative flex flex-col items-center max-w-[95vw] max-h-[95vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Toolbar */}
@@ -101,7 +99,6 @@ export default function ImageModal({ src, onClose }: ImageModalProps) {
 
           <div className="w-px h-5 bg-white/30" />
 
-          {/* ✅ FIX DI SINI */}
           <a
             href={src}
             target="_blank"
@@ -125,15 +122,15 @@ export default function ImageModal({ src, onClose }: ImageModalProps) {
         {isPdf ? (
           <iframe
             src={src}
-            className="rounded-lg shadow-2xl"
-            style={{ width: "min(720px, 90vw)", height: "min(1280px, 80vh)" }}
+            className="rounded-lg shadow-2xl bg-white"
+            style={{ width: "min(900px, 90vw)", height: "min(1200px, 80vh)" }}
           />
         ) : (
           <div
-            className="overflow-hidden rounded-lg shadow-2xl cursor-grab active:cursor-grabbing"
+            className="overflow-hidden rounded-lg shadow-2xl cursor-grab active:cursor-grabbing flex items-center justify-center"
             style={{
-              width:      "min(720px, 90vw)",
-              height:     "min(500px, 80vh)",
+              maxWidth: "90vw",
+              maxHeight: "80vh",
               background: "#1a1a1a",
             }}
             onWheel={handleWheel}
@@ -144,24 +141,28 @@ export default function ImageModal({ src, onClose }: ImageModalProps) {
           >
             <div
               style={{
-                transform:       `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
+                transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
                 transformOrigin: "center",
-                transition:      dragging ? "none" : "transform 0.1s ease",
-                width:           "100%",
-                height:          "100%",
-                display:         "flex",
-                alignItems:      "center",
-                justifyContent:  "center",
+                transition: dragging ? "none" : "transform 0.1s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={src}
                 alt="Lampiran"
-                width={720}
-                height={500}
-                className="object-contain select-none"
+                className="select-none"
                 draggable={false}
-                unoptimized
+                style={{
+                  maxWidth: "90vw",
+                  maxHeight: "80vh",
+                  width: "auto",
+                  height: "auto",
+                  objectFit: "contain",
+                  display: "block",
+                }}
               />
             </div>
           </div>

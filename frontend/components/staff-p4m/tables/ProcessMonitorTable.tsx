@@ -4,19 +4,63 @@
 import { useState, useEffect, useMemo } from "react";
 import { stafApi, authApi, userApi } from "@/lib/api";
 import { exportPDFProses } from "@/lib/exportPdf";
-import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
+import {
+  PeriodFilterBar,
+  isInPeriodFilter,
+  labelPeriodFilter,
+  type FilterMode,
+} from "@/components/shared/PeriodFilterBar";
 import { toLocalDate, fmtTgl } from "@/lib/exportHelpers";
+import {
+  Clock,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  Image as ImageIcon,
+  Calendar,
+  AlertTriangle,
+  X,
+  Search,
+  Inbox,
+} from "lucide-react";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
+  "http://localhost:5000";
 
+// ══════════════════════════════════════════════════════════════
+// IMAGE MODAL
+// ══════════════════════════════════════════════════════════════
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="relative" style={{ width: "85vw", maxWidth: "1100px" }} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300 z-10">✕</button>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      <div
+        className="relative"
+        style={{ width: "85vw", maxWidth: "1100px" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white hover:text-gray-300 z-10"
+          aria-label="Tutup"
+        >
+          <X size={32} strokeWidth={2.5} />
+        </button>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="Bukti lampiran"
-          style={{ width: "100%", maxHeight: "85vh", objectFit: "contain", background: "white", borderRadius: "8px" }}
+        <img
+          src={src}
+          alt="Bukti lampiran"
+          style={{
+            width: "100%",
+            maxHeight: "85vh",
+            objectFit: "contain",
+            background: "white",
+            borderRadius: "8px",
+          }}
           onError={(e) => {
             const el = e.target as HTMLImageElement;
             el.style.display = "none";
@@ -24,8 +68,9 @@ function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
             if (parent && !parent.querySelector(".err-msg")) {
               const msg = document.createElement("div");
               msg.className = "err-msg";
-              msg.style.cssText = "color:#ef4444;padding:32px;text-align:center;background:white;border-radius:8px;font-size:13px";
-              msg.innerText = "❌ Gambar tidak ditemukan.\nURL: " + src;
+              msg.style.cssText =
+                "color:#ef4444;padding:32px;text-align:center;background:white;border-radius:8px;font-size:13px";
+              msg.innerText = "Gambar tidak ditemukan.\nURL: " + src;
               parent.appendChild(msg);
             }
           }}
@@ -58,23 +103,32 @@ interface ProsesItem {
   created_at?: string | null;
 }
 
-// ✅ STATUS KEPUTUSAN KA — dipakai buat kolom "Keputusan Ka" di
-// Proses & Pantau. Ini murni soal keputusan Ka P4M atas RENCANA
-// (rancangan_tindakan.status_review), bukan soal keputusan akhir atas
-// HASIL (approval_staf, itu beda kolom/tahap).
-const reviewBadge: Record<string, { label: string; cls: string }> = {
-  menunggu_keputusan_ka: { label: "⏳ Menunggu Review", cls: "text-blue-600 bg-blue-50 border-blue-200" },
-  ditindaklanjuti:       { label: "🔄 Perbaikan Berkelanjutan", cls: "text-red-600 bg-red-50 border-red-200" },
-  tidak_ditindaklanjuti: { label: "✅ Sesuai", cls: "text-green-600 bg-green-50 border-green-200" },
+const reviewBadge: Record<
+  string,
+  { label: string; cls: string; Icon: typeof Clock }
+> = {
+  menunggu_keputusan_ka: {
+    label: "Menunggu Review",
+    cls: "text-blue-600 bg-blue-50 border-blue-200",
+    Icon: Clock,
+  },
+  ditindaklanjuti: {
+    label: "Tindak Lanjut",
+    cls: "text-red-600 bg-red-50 border-red-200",
+    Icon: RefreshCw,
+  },
+  tidak_ditindaklanjuti: {
+    label: "Sesuai",
+    cls: "text-green-600 bg-green-50 border-green-200",
+    Icon: CheckCircle2,
+  },
 };
 
-// ✅ FIX: sebelumnya kalau status_review masih NULL (laporan baru
-// terdistribusi, Kepala Unit belum isi rencana sama sekali), badge ini
-// gak muncul apa-apa alias kolom "Keputusan Ka" keliatan kosong —
-// padahal statusnya jelas: Ka P4M memang belum ada apa-apa buat
-// direview. Sekarang selalu fallback ke "⏳ Menunggu Review" biar
-// kolomnya gak pernah blank.
-function getKeputusanKaBadge(item: ProsesItem): { label: string; cls: string } {
+function getKeputusanKaBadge(item: ProsesItem): {
+  label: string;
+  cls: string;
+  Icon: typeof Clock;
+} {
   if (item.status_review && reviewBadge[item.status_review]) {
     return reviewBadge[item.status_review];
   }
@@ -96,15 +150,15 @@ export default function ProcessMonitorTable() {
   const [msgOk, setMsgOk] = useState("");
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [meSignature, setMeSignature] = useState<{ nama: string | null; tandaTangan: string | null } | null>(null);
+  const [meSignature, setMeSignature] = useState<{
+    nama: string | null;
+    tandaTangan: string | null;
+  } | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [filterApprovalStaf, setFilterApprovalStaf] = useState("semua");
 
-  // ✅ KEPUTUSAN STAFF: state modal konfirmasi ✅ Siap / ❌ Belum Siap.
-  // Keputusan ini dikembalikan jadi wewenang Staf P4M (bukan lagi Ka
-  // P4M / Kepala Unit) — lihat stafApi.setApprovalHasil di lib/api.ts.
   const [modal, setModal] = useState<{
     open: boolean;
     id_boxing: number | null;
@@ -113,23 +167,27 @@ export default function ProcessMonitorTable() {
   }>({ open: false, id_boxing: null, keputusan: null, catatan: "" });
   const [submittingId, setSubmittingId] = useState<number | null>(null);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   useEffect(() => {
-    // Ambil TTD digital Staf P4M yang sedang login, buat ditempel di PDF
-    // "Proses & Pantau" (bukan TTD Kepala P4M — beda dari PDF Rekapitulasi).
     (async () => {
       try {
         const me = await authApi.getMe();
         const users = await userApi.getUsers();
         const myAccount = users.find(
-          (u: { id: number; name: string; tandaTangan?: string | null }) => u.id === me.data?.id
+          (u: { id: number; name: string; tandaTangan?: string | null }) =>
+            u.id === me.data?.id
         );
         if (myAccount) {
-          setMeSignature({ nama: myAccount.name, tandaTangan: myAccount.tandaTangan ?? null });
+          setMeSignature({
+            nama: myAccount.name,
+            tandaTangan: myAccount.tandaTangan ?? null,
+          });
         }
       } catch {
-        /* nonfatal — PDF tetap bisa dicetak tanpa TTD */
+        /* nonfatal */
       }
     })();
   }, []);
@@ -155,33 +213,34 @@ export default function ProcessMonitorTable() {
 
   async function handleExportPDF(item: ProsesItem) {
     setExportingId(item.id_boxing);
-    await exportPDFProses({
-      kode_laporan: item.kode_laporan,
-      jenis_laporan: item.jenis_laporan,
-      isi_laporan: item.isi_laporan,
-      nama_unit: item.nama_unit,
-      status_boxing: item.status_boxing,
-      status_review: item.status_review,
-      approval_staf: item.approval_staf,
-      aksi_masukan: item.aksi_masukan,
-      penyebab: item.penyebab,
-      rencana_tindakan: item.rencana_tindakan,
-      hasil_tindakan: item.hasil_tindakan,
-      lampiran_hasil: item.lampiran_hasil,
-      tanggal_pelaksanaan: item.tanggal_pelaksanaan,
-      created_at: item.created_at,
-    }, meSignature);
+    await exportPDFProses(
+      {
+        kode_laporan: item.kode_laporan,
+        jenis_laporan: item.jenis_laporan,
+        isi_laporan: item.isi_laporan,
+        nama_unit: item.nama_unit,
+        status_boxing: item.status_boxing,
+        status_review: item.status_review,
+        approval_staf: item.approval_staf,
+        aksi_masukan: item.aksi_masukan,
+        penyebab: item.penyebab,
+        rencana_tindakan: item.rencana_tindakan,
+        hasil_tindakan: item.hasil_tindakan,
+        lampiran_hasil: item.lampiran_hasil,
+        tanggal_pelaksanaan: item.tanggal_pelaksanaan,
+        created_at: item.created_at,
+      },
+      meSignature
+    );
     setExportingId(null);
   }
 
-  // ✅ KEPUTUSAN STAFF: Staf P4M yang memutuskan ✅ Siap / ❌ Belum Siap
-  // atas hasil tindak lanjut unit (dulu wewenang ini dipindah ke Ka
-  // P4M, sekarang dikembalikan lagi ke sini). Kalau sudah diputuskan,
-  // tampilkan badge status; kalau belum, tampilkan tombol keputusan.
   function openModal(item: ProsesItem, keputusan: "diterima" | "ditolak") {
     if (item.status_boxing !== "di_staff") {
       setError(
-        `Laporan ini belum bisa diputuskan — status saat ini masih "${item.status_boxing || "tidak diketahui"}", belum sampai tahap Staf P4M (di_staff).`
+        `Laporan ini belum bisa diputuskan — status saat ini masih "${
+          item.status_boxing || "tidak diketahui"
+        }", belum sampai tahap Staf P4M (di_staff).`
       );
       return;
     }
@@ -199,32 +258,30 @@ export default function ProcessMonitorTable() {
     setSubmittingId(id_boxing);
     setError("");
     try {
-      const res = await stafApi.setApprovalHasil(id_boxing, keputusan, catatan.trim());
+      const res = await stafApi.setApprovalHasil(
+        id_boxing,
+        keputusan,
+        catatan.trim()
+      );
       setMsgOk(res.message);
       setTimeout(() => setMsgOk(""), 4000);
       setModal({ open: false, id_boxing: null, keputusan: null, catatan: "" });
       fetchData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Gagal menyimpan keputusan.");
+      setError(
+        err instanceof Error ? err.message : "Gagal menyimpan keputusan."
+      );
     } finally {
       setSubmittingId(null);
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // ✅ FIX UTAMA: renderKeputusanStaf
-  //
-  // Aturannya SIMPLE:
-  //   1. Belum sampai tahap staf → "Menunggu tahap sebelumnya"
-  //   2. Sudah diputuskan (approval_staf != "menunggu") → badge hasil
-  //   3. Sudah di staf, belum diputuskan → TOMBOL ✅❌ (selalu!)
-  //
-  // YANG DIHAPUS: cabang `if (!item.hasil_tindakan) return "Selesai"`
-  // — karena itu bikin tombol gak muncul untuk kasus "Sesuai / Tidak
-  // Ditindaklanjuti" (yang memang gak punya hasil_tindakan).
-  // ══════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════
+  // RENDER KEPUTUSAN STAF
+  // ✅ Tombol ✅❌ pakai SVG inline (bukan Lucide)
+  // ✅ Badge hasil tetap pakai Lucide (CheckCircle2 / XCircle)
+  // ══════════════════════════════════════════════════════════════
   function renderKeputusanStaf(item: ProsesItem) {
-    // 1. Belum sampai tahap staf
     if (item.status_boxing !== "di_staff" && item.status_boxing !== "selesai") {
       return (
         <span className="text-[9px] text-gray-400 italic text-center">
@@ -233,7 +290,6 @@ export default function ProcessMonitorTable() {
       );
     }
 
-    // 2. Sudah diputuskan — tampilkan badge hasil
     const apprVal =
       item.approval_staf && item.approval_staf !== "menunggu"
         ? item.approval_staf
@@ -243,16 +299,24 @@ export default function ProcessMonitorTable() {
       return (
         <div className="flex flex-col items-center gap-1">
           <span
-            className={`text-[10px] font-bold px-2 py-1 rounded border text-center ${
+            className={`text-[10px] font-bold px-2 py-1 rounded border text-center inline-flex items-center gap-1 ${
               apprVal === "diterima"
                 ? "text-green-700 bg-green-50 border-green-300"
                 : "text-red-700 bg-red-50 border-red-300"
             }`}
           >
-            {apprVal === "diterima" ? "✅ Siap — Selesai" : "❌ Belum Siap"}
+            {apprVal === "diterima" ? (
+              <>
+                <CheckCircle2 size={12} /> Siap — Selesai
+              </>
+            ) : (
+              <>
+                <XCircle size={12} /> Belum Siap
+              </>
+            )}
           </span>
           {item.catatan_approval && (
-            <p className="text-[9px] text-gray-500 italic text-center max-w-55">
+            <p className="text-[9px] text-gray-500 italic text-center max-w-55 leading-relaxed text-justify whitespace-pre-wrap break-words">
               {item.catatan_approval}
             </p>
           )}
@@ -260,32 +324,50 @@ export default function ProcessMonitorTable() {
       );
     }
 
-    // 3. Sudah di staf, belum diputuskan → TOMBOL ✅❌ SELALU MUNCUL
     return (
       <div className="flex flex-col items-center gap-2">
         {!item.hasil_tindakan && (
-          <p className="text-[9px] text-gray-400 italic text-center max-w-55">
+          <p className="text-[9px] text-gray-400 italic text-center max-w-55 leading-relaxed">
             Tidak ada hasil tindak lanjut (Sesuai)
           </p>
         )}
         <div className="flex gap-3 justify-center">
+          {/* ✅ Tombol Siap — SVG inline */}
           <button
             type="button"
             onClick={() => openModal(item, "diterima")}
             title="Siap — laporan otomatis Selesai"
             className="w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow transition-colors"
           >
-            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4"
+              stroke="currentColor"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M5 13l4 4L19 7" />
             </svg>
           </button>
+
+          {/* ✅ Tombol Belum Siap — SVG inline */}
           <button
             type="button"
             onClick={() => openModal(item, "ditolak")}
             title="Belum Siap — kembalikan ke unit untuk revisi hasil"
             className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow transition-colors"
           >
-            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-4 h-4"
+              stroke="currentColor"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
@@ -309,10 +391,13 @@ export default function ProcessMonitorTable() {
 
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      // 1. Filter Periode Tanggal (logika lama)
-      const matchPeriode = isInPeriodFilter(filterMode, selectedDate, toLocalDate, item.created_at ?? null);
+      const matchPeriode = isInPeriodFilter(
+        filterMode,
+        selectedDate,
+        toLocalDate,
+        item.created_at ?? null
+      );
 
-      // 2. Filter Pencarian Kata Kunci (Global Search)
       const query = searchQuery.toLowerCase().trim();
       const matchQuery =
         !query ||
@@ -321,14 +406,14 @@ export default function ProcessMonitorTable() {
         (item.isi_laporan?.toLowerCase().includes(query) ?? false) ||
         (item.hasil_tindakan?.toLowerCase().includes(query) ?? false);
 
-      // 3. Filter Keputusan Staff
       let matchApproval = true;
       if (filterApprovalStaf === "diterima") {
         matchApproval = item.approval_staf === "diterima";
       } else if (filterApprovalStaf === "ditolak") {
         matchApproval = item.approval_staf === "ditolak";
       } else if (filterApprovalStaf === "menunggu") {
-        matchApproval = !item.approval_staf || item.approval_staf === "menunggu";
+        matchApproval =
+          !item.approval_staf || item.approval_staf === "menunggu";
       }
 
       return matchPeriode && matchQuery && matchApproval;
@@ -341,7 +426,10 @@ export default function ProcessMonitorTable() {
         .filter((d) => d.created_at)
         .map((d) => {
           const dt = toLocalDate(d.created_at as string);
-          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}-${String(dt.getDate()).padStart(2, "0")}`;
         })
     );
   }, [data]);
@@ -355,30 +443,54 @@ export default function ProcessMonitorTable() {
     const isSelesai = item.status_boxing === "selesai";
 
     return (
-      <div key={`${item.id_laporan}-${item.id_boxing}`} className="border-t-2 border-black p-4 space-y-3">
+      <div
+        key={`${item.id_laporan}-${item.id_boxing}`}
+        className="border-t-2 border-black p-4 space-y-3"
+      >
         <div className="flex items-start justify-between gap-2">
           <div>
-            <span className="text-xs font-bold text-gray-700">{item.kode_laporan}</span>
-            <span className="text-[10px] text-gray-400 ml-2">{item.nama_unit}</span>
+            <span className="text-xs font-bold text-gray-700">
+              {item.kode_laporan}
+            </span>
+            <span className="text-[10px] text-gray-400 ml-2">
+              {item.nama_unit}
+            </span>
             <div className="text-[10px] text-gray-400 mt-0.5 italic">
               {boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {rev && <span className={`text-[9px] font-bold px-1.5 py-0.5 border rounded ${rev.cls}`}>{rev.label}</span>}
-            <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
-              className="flex items-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded">
-              {exportingId === item.id_boxing ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "📄 PDF"}
+            {rev && (
+              <span
+                className={`text-[9px] font-bold px-1.5 py-0.5 border rounded inline-flex items-center gap-1 ${rev.cls}`}
+              >
+                <rev.Icon size={11} />
+                {rev.label}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => handleExportPDF(item)}
+              disabled={exportingId === item.id_boxing}
+              className="inline-flex items-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[9px] font-bold rounded"
+            >
+              {exportingId === item.id_boxing ? (
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <FileText size={12} /> PDF
+                </>
+              )}
             </button>
           </div>
         </div>
 
         <div>
-          <div className="border border-gray-300 p-2 text-xs text-gray-700 min-h-16 bg-gray-50">
+          <div className="border border-gray-300 p-2 text-xs text-gray-700 min-h-16 bg-gray-50 leading-relaxed text-justify whitespace-pre-wrap break-words">
             {item.isi_laporan}
           </div>
-          <p className="text-[9px] text-gray-400 mt-1">
-            📅 Tanggal Masuk: {formatTanggal(item.created_at)}
+          <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+            <Calendar size={10} /> Tanggal Masuk: {formatTanggal(item.created_at)}
           </p>
           {item.lampiran_laporan && (
             <button
@@ -386,42 +498,59 @@ export default function ProcessMonitorTable() {
               onClick={() => setSelectedImage(getImageUrl(item.lampiran_laporan))}
               className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
             >
-              🖼️ Lihat Gambar Awal
+              <ImageIcon size={11} /> Lihat Gambar Awal
             </button>
           )}
         </div>
 
         {item.aksi_masukan && (
-          <p className="text-[10px] text-gray-500 italic border-l-2 border-blue-300 pl-2">{item.aksi_masukan}</p>
+          <p className="text-[10px] text-gray-500 italic border-l-2 border-blue-300 pl-2 leading-relaxed text-justify whitespace-pre-wrap break-words">
+            {item.aksi_masukan}
+          </p>
         )}
 
         {item.hasil_tindakan && (
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Hasil Unit:</p>
-            <div className="border border-gray-300 p-2 text-xs text-gray-700 min-h-14">{item.hasil_tindakan}</div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">
+              Hasil Unit:
+            </p>
+            <div className="border border-gray-300 p-2 text-xs text-gray-700 min-h-14 leading-relaxed text-justify whitespace-pre-wrap break-words">
+              {item.hasil_tindakan}
+            </div>
             {item.tanggal_pelaksanaan && (
-              <p className="text-[9px] text-gray-400 mt-1">
-                📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
+              <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                <Calendar size={10} />
+                {new Date(item.tanggal_pelaksanaan).toLocaleDateString(
+                  "id-ID",
+                  { day: "2-digit", month: "short", year: "numeric" }
+                )}
               </p>
             )}
             {item.lampiran_hasil && (
-              <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
-                className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
-                🖼️ Lihat Gambar
+              <button
+                type="button"
+                onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
+                className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+              >
+                <ImageIcon size={11} /> Lihat Gambar
               </button>
             )}
           </div>
         )}
 
         <div>
-          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Tindakan Staf:</p>
+          <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">
+            Tindakan Staf:
+          </p>
           <div className="flex flex-wrap gap-2">
             {diStaff || isSelesai ? (
               <div className="w-full flex justify-center">
                 {renderKeputusanStaf(item)}
               </div>
             ) : (
-              <span className="text-[10px] text-gray-400 italic">Menunggu tahap sebelumnya</span>
+              <span className="text-[10px] text-gray-400 italic">
+                Menunggu tahap sebelumnya
+              </span>
             )}
           </div>
         </div>
@@ -429,37 +558,62 @@ export default function ProcessMonitorTable() {
     );
   }
 
-  if (loading) return (
-    <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-gray-400 italic">Memuat data…</div>
-  );
+  if (loading)
+    return (
+      <div className="w-full border-2 border-black bg-white p-10 text-center text-sm text-gray-400 italic">
+        Memuat data…
+      </div>
+    );
 
   return (
     <>
-      {/* ── IMAGE MODAL ── */}
-      {selectedImage && <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />}
+      {selectedImage && (
+        <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />
+      )}
 
-      {/* ── MODAL KEPUTUSAN STAFF (✅ Siap / ❌ Belum Siap) ── */}
+      {/* ── MODAL KEPUTUSAN STAFF ── */}
       {modal.open && modal.id_boxing && modal.keputusan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white border-2 border-black w-full max-w-md p-6 shadow-2xl">
-            <h3 className="font-bold text-sm uppercase border-b-2 border-black pb-2 mb-3">
-              {modal.keputusan === "diterima" ? "✅ Selesai" : "❌ Tindak Lanjutin"} — Konfirmasi
+            <h3 className="font-bold text-sm uppercase border-b-2 border-black pb-2 mb-3 flex items-center gap-2">
+              {modal.keputusan === "diterima" ? (
+                <>
+                  <CheckCircle2 size={16} className="text-green-600" />
+                  Selesai — Konfirmasi
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={16} className="text-red-600" />
+                  Tindak Lanjut — Konfirmasi
+                </>
+              )}
             </h3>
             <p className="text-[11px] text-gray-500 mb-3">
               ID Boxing: <strong>{modal.id_boxing}</strong>
             </p>
             <div
-              className={`mb-4 p-3 border-2 text-[11px] font-bold leading-relaxed ${
+              className={`mb-4 p-3 border-2 text-[11px] font-bold leading-relaxed text-justify flex items-start gap-2 ${
                 modal.keputusan === "diterima"
                   ? "border-green-500 bg-green-50 text-green-800"
                   : "border-red-500 bg-red-50 text-red-800"
               }`}
             >
-              {modal.keputusan === "diterima" ? (
-                <>⚠️ Yakin mau tandai SIAP? Laporan ini akan langsung ditandai <u>SELESAI</u> dan masuk Rekapitulasi. Tindakan ini tidak bisa dibatalkan setelah dikirim.</>
-              ) : (
-                <>⚠️ Yakin mau tandai BELUM SIAP? Laporan ini akan dikembalikan ke Kepala Unit untuk direvisi (hasil pelaksanaan lama akan dihapus).</>
-              )}
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <span>
+                {modal.keputusan === "diterima" ? (
+                  <>
+                    Yakin mau tandai <u>SIAP</u>? Laporan ini akan langsung
+                    ditandai <u>SELESAI</u> dan masuk Rekapitulasi. Tindakan
+                    ini tidak bisa dibatalkan setelah dikirim.
+                  </>
+                ) : (
+                  <>
+                    Yakin mau tandai <u>BELUM SIAP</u>? Laporan ini akan
+                    dikembalikan ke Kepala Unit untuk direvisi (hasil
+                    pelaksanaan lama akan dihapus).
+                  </>
+                )}
+              </span>
             </div>
 
             <div className="mb-4">
@@ -467,22 +621,35 @@ export default function ProcessMonitorTable() {
                 Catatan / Alasan <span className="text-red-500">*</span>
               </label>
               <textarea
-                className="w-full border border-black p-2 text-xs h-24 outline-none resize-none"
+                className="w-full border border-black p-2 text-xs h-24 outline-none resize-none leading-relaxed"
                 placeholder={
                   modal.keputusan === "diterima"
                     ? "Tuliskan alasan menyatakan hasil ini siap..."
                     : "Tuliskan alasan menyatakan hasil ini belum siap (wajib untuk revisi)..."
                 }
                 value={modal.catatan}
-                onChange={(e) => setModal((prev) => ({ ...prev, catatan: e.target.value }))}
+                onChange={(e) =>
+                  setModal((prev) => ({ ...prev, catatan: e.target.value }))
+                }
               />
               <p className="text-[9px] text-gray-400 mt-1">* Wajib diisi</p>
-              {error && <p className="text-red-500 text-[10px] font-bold mt-2">❌ {error}</p>}
+              {error && (
+                <p className="text-red-500 text-[10px] font-bold mt-2 inline-flex items-center gap-1">
+                  <XCircle size={12} /> {error}
+                </p>
+              )}
             </div>
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
-                onClick={() => setModal({ open: false, id_boxing: null, keputusan: null, catatan: "" })}
+                onClick={() =>
+                  setModal({
+                    open: false,
+                    id_boxing: null,
+                    keputusan: null,
+                    catatan: "",
+                  })
+                }
                 className="px-4 py-2 border border-black text-[11px]"
               >
                 Batal
@@ -492,7 +659,9 @@ export default function ProcessMonitorTable() {
                 onClick={handleSubmitKeputusan}
                 disabled={submittingId === modal.id_boxing}
                 className={`px-6 py-2 text-white text-[11px] font-bold disabled:opacity-50 ${
-                  modal.keputusan === "diterima" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                  modal.keputusan === "diterima"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-red-600 hover:bg-red-700"
                 }`}
               >
                 {submittingId === modal.id_boxing
@@ -506,11 +675,9 @@ export default function ProcessMonitorTable() {
         </div>
       )}
 
-      {/* ── FILTER CONTAINER (PERIODE, SEARCH, & KEPUTUSAN SEJAJAR) ── */}
+      {/* ── FILTER CONTAINER ── */}
       <div className="mb-3 space-y-2 px-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          
-          {/* 1. Filter Periode (Sisi Kiri) */}
           <PeriodFilterBar
             filterMode={filterMode}
             onFilterModeChange={setFilterMode}
@@ -520,52 +687,60 @@ export default function ProcessMonitorTable() {
             showCalendar={false}
           />
 
-          {/* 2. Filter Tambahan: Search & Dropdown Keputusan (Sisi Kanan - Sejajar) */}
           <div className="flex flex-wrap items-center gap-2 flex-1 md:flex-initial justify-end min-w-[300px]">
-            
-            {/* Input Search Kata Kunci */}
             <div className="relative flex-1 sm:w-64 min-w-[180px]">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
               <input
                 type="text"
                 placeholder="Cari ID, Unit, atau Isi Laporan..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full border border-black px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-black rounded-md"
+                className="w-full border border-black pl-8 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-black rounded-md"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black text-xs font-bold"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+                  aria-label="Bersihkan pencarian"
                 >
-                  ✕
+                  <X size={14} />
                 </button>
               )}
             </div>
 
-            {/* Dropdown Keputusan Staff */}
             <select
               value={filterApprovalStaf}
               onChange={(e) => setFilterApprovalStaf(e.target.value)}
               className="border border-black px-2 py-1.5 text-xs bg-white outline-none cursor-pointer rounded-md"
             >
               <option value="semua">Status</option>
-              <option value="menunggu">⏳ Menunggu Tindakan</option>
-              <option value="diterima">✅ Siap / Diterima</option>
-              <option value="ditolak">❌ Belum Siap / Ditolak</option>
+              <option value="menunggu">Menunggu Tindakan</option>
+              <option value="diterima">Siap / Diterima</option>
+              <option value="ditolak">Belum Siap / Ditolak</option>
             </select>
           </div>
-
         </div>
 
-        {/* Label Info Jumlah Laporan & Periode */}
         <p className="mt-1 text-[10px] text-gray-400 font-bold uppercase">
-          {filteredData.length} laporan ditemukan · {labelPeriodFilter(filterMode, selectedDate, fmtTgl)}
+          {filteredData.length} laporan ditemukan ·{" "}
+          {labelPeriodFilter(filterMode, selectedDate, fmtTgl)}
         </p>
       </div>
 
       <div className="w-full border-2 border-black bg-white overflow-x-auto text-xs">
-        {msgOk && <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b">{msgOk}</p>}
-        {!modal.open && error && <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b">❌ {error}</p>}
+        {msgOk && (
+          <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b inline-flex items-center gap-1.5">
+            <CheckCircle2 size={14} /> {msgOk}
+          </p>
+        )}
+        {!modal.open && error && (
+          <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border-b inline-flex items-center gap-1.5">
+            <XCircle size={14} /> {error}
+          </p>
+        )}
 
         {/* ── DESKTOP ── */}
         <div className="hidden lg:block">
@@ -574,16 +749,43 @@ export default function ProcessMonitorTable() {
             style={{ display: "table", tableLayout: "fixed", width: "100%" }}
           >
             <div style={{ display: "table-row" }}>
-              <div style={{ display: "table-cell", width: "38%" }} className="border-r-2 border-black p-3 align-middle">Laporan</div>
-              <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-middle">Tinjauan Ka</div>
-              <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Hasil Unit</div>
-              <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-middle">Tindakan Staf</div>
-              <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">Dokumen</div>
+              <div
+                style={{ display: "table-cell", width: "42%" }}
+                className="border-r-2 border-black p-3 align-middle"
+              >
+                Laporan
+              </div>
+              <div
+                style={{ display: "table-cell", width: "10%" }}
+                className="border-r-2 border-black p-3 align-middle"
+              >
+                Tinjauan Ka
+              </div>
+              <div
+                style={{ display: "table-cell", width: "24%" }}
+                className="border-r-2 border-black p-3 align-middle"
+              >
+                Hasil Unit
+              </div>
+              <div
+                style={{ display: "table-cell", width: "12%" }}
+                className="border-r-2 border-black p-3 align-middle"
+              >
+                Tindakan Staf
+              </div>
+              <div
+                style={{ display: "table-cell", width: "8%" }}
+                className="p-2 align-middle"
+              >
+                Dokumen
+              </div>
             </div>
           </div>
 
           {aktif.length === 0 && selesai.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 italic min-w-215">Belum ada laporan diproses.</div>
+            <div className="p-8 text-center text-gray-400 italic min-w-215 inline-flex items-center justify-center gap-2 w-full">
+              <Inbox size={16} /> Belum ada laporan diproses.
+            </div>
           ) : (
             <>
               {aktif.map((item) => {
@@ -595,34 +797,64 @@ export default function ProcessMonitorTable() {
                     style={{ display: "table", tableLayout: "fixed", width: "100%" }}
                   >
                     <div style={{ display: "table-row" }}>
-                      {/* Kolom Laporan + Tanggal + Gambar */}
-                      <div style={{ display: "table-cell", width: "38%" }} className="border-r-2 border-black p-3 align-top">
+                      {/* Kolom Laporan */}
+                      <div
+                        style={{ display: "table-cell", width: "42%" }}
+                        className="border-r-2 border-black p-3 align-top"
+                      >
                         <p className="text-[9px] text-gray-400 mb-1 leading-tight">
-                          <span className="font-bold">{item.kode_laporan}</span><br />
-                          {item.nama_unit} · <span className="italic">{boxingLabel[item.status_boxing ?? ""] ?? item.status_boxing}</span>
+                          <span className="font-bold">{item.kode_laporan}</span>
+                          <br />
+                          {item.nama_unit} ·{" "}
+                          <span className="italic">
+                            {boxingLabel[item.status_boxing ?? ""] ??
+                              item.status_boxing}
+                          </span>
                         </p>
-                        <div className="border border-gray-400 p-2 min-h-16 text-[10px]">{item.isi_laporan}</div>
-                        <p className="text-[9px] text-gray-400 mt-1">
-                          📅 {formatTanggal(item.created_at)}
+                        <div className="border border-gray-400 p-2 min-h-16 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                          {item.isi_laporan}
+                        </div>
+                        <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                          <Calendar size={10} /> {formatTanggal(item.created_at)}
                         </p>
                         {item.lampiran_laporan && (
                           <button
                             type="button"
-                            onClick={() => setSelectedImage(getImageUrl(item.lampiran_laporan))}
+                            onClick={() =>
+                              setSelectedImage(getImageUrl(item.lampiran_laporan))
+                            }
                             className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
                           >
-                            🖼️ Lihat Gambar Awal
+                            <ImageIcon size={11} /> Lihat Gambar Awal
                           </button>
                         )}
                       </div>
 
-                      <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-top">
-                        {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                        {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 whitespace-pre-line break-words">{item.aksi_masukan}</p>}
+                      {/* Kolom Tinjauan Ka — dikecilkan */}
+                      <div
+                        style={{ display: "table-cell", width: "10%" }}
+                        className="border-r-2 border-black p-3 align-top"
+                      >
+                        {rev && (
+                          <span
+                            className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-flex items-center gap-1 ${rev.cls}`}
+                          >
+                            <rev.Icon size={10} /> {rev.label}
+                          </span>
+                        )}
+                        {item.aksi_masukan && (
+                          <p className="text-[9px] text-gray-700 mt-1 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                            {item.aksi_masukan}
+                          </p>
+                        )}
                       </div>
 
-                      <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
-                        <div className="border border-gray-300 p-2 min-h-16 text-[10px]">
+                      {/* Kolom Hasil Unit */}
+                      <div
+                        style={{ display: "table-cell", width: "24%" }}
+                        className="border-r-2 border-black p-3 align-top"
+                      >
+                        <div className="border border-gray-300 p-2 min-h-16 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
                           {item.hasil_tindakan ? (
                             item.hasil_tindakan
                           ) : item.status_review === "tidak_ditindaklanjuti" ? (
@@ -636,33 +868,57 @@ export default function ProcessMonitorTable() {
                           )}
                         </div>
                         {item.tanggal_pelaksanaan && (
-                          <p className="text-[9px] text-gray-400 mt-1">
-                            📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
+                          <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                            <Calendar size={10} />
+                            {new Date(item.tanggal_pelaksanaan).toLocaleDateString(
+                              "id-ID",
+                              { day: "2-digit", month: "short", year: "numeric" }
+                            )}
                           </p>
                         )}
                         {item.lampiran_hasil && (
-                          <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
-                            className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
-                            🖼️ Lihat Gambar
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedImage(getImageUrl(item.lampiran_hasil))
+                            }
+                            className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+                          >
+                            <ImageIcon size={11} /> Lihat Gambar
                           </button>
                         )}
                       </div>
 
-                      {/* ✅ KEPUTUSAN STAFF: ✅ Siap / ❌ Belum Siap — wewenang
-                          Staf P4M (bukan lagi Ka P4M / Kepala Unit). */}
-                      <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
-                        <div className="flex items-center justify-center h-full">
+                      {/* Kolom Tindakan Staf — dikecilkan */}
+                      <div
+                        style={{ display: "table-cell", width: "12%" }}
+                        className="border-r-2 border-black p-3 align-top"
+                      >
+                        <div className="flex items-start justify-center pt-2">
                           {renderKeputusanStaf(item)}
                         </div>
                       </div>
 
-                      <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">
-                        <div className="flex items-center justify-center">
-                          <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
-                            className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded">
-                            {exportingId === item.id_boxing
-                              ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
+                      {/* Kolom Dokumen — tombol rata atas */}
+                      <div
+                        style={{ display: "table-cell", width: "8%" }}
+                        className="p-2 align-top"
+                      >
+                        <div className="flex items-start justify-center pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleExportPDF(item)}
+                            disabled={exportingId === item.id_boxing}
+                            className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded"
+                          >
+                            {exportingId === item.id_boxing ? (
+                              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <>
+                                <FileText size={14} />
+                                <span>PDF</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>
@@ -682,39 +938,73 @@ export default function ProcessMonitorTable() {
                       <div
                         key={`${item.id_laporan}-${item.id_boxing}`}
                         className="min-w-215 border-t-2 border-black"
-                        style={{ display: "table", tableLayout: "fixed", width: "100%" }}
+                        style={{
+                          display: "table",
+                          tableLayout: "fixed",
+                          width: "100%",
+                        }}
                       >
                         <div style={{ display: "table-row" }}>
-                          <div style={{ display: "table-cell", width: "38%" }} className="border-r-2 border-black p-3 align-top">
+                          <div
+                            style={{ display: "table-cell", width: "42%" }}
+                            className="border-r-2 border-black p-3 align-top"
+                          >
                             <p className="text-[9px] text-gray-400 mb-1 leading-tight">
-                              <span className="font-bold">{item.kode_laporan}</span><br />
+                              <span className="font-bold">
+                                {item.kode_laporan}
+                              </span>
+                              <br />
                               {item.nama_unit} · <span className="italic">Selesai</span>
                             </p>
-                            <div className="border border-gray-400 p-2 min-h-16 text-[10px]">{item.isi_laporan}</div>
-                            <p className="text-[9px] text-gray-400 mt-1">
-                              📅 {formatTanggal(item.created_at)}
+                            <div className="border border-gray-400 p-2 min-h-16 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                              {item.isi_laporan}
+                            </div>
+                            <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                              <Calendar size={10} />{" "}
+                              {formatTanggal(item.created_at)}
                             </p>
                             {item.lampiran_laporan && (
                               <button
                                 type="button"
-                                onClick={() => setSelectedImage(getImageUrl(item.lampiran_laporan))}
+                                onClick={() =>
+                                  setSelectedImage(
+                                    getImageUrl(item.lampiran_laporan)
+                                  )
+                                }
                                 className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
                               >
-                                🖼️ Lihat Gambar Awal
+                                <ImageIcon size={11} /> Lihat Gambar Awal
                               </button>
                             )}
                           </div>
 
-                          <div style={{ display: "table-cell", width: "14%" }} className="border-r-2 border-black p-3 align-top">
-                            {rev && <span className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-block ${rev.cls}`}>{rev.label}</span>}
-                            {item.aksi_masukan && <p className="text-[9px] text-gray-700 mt-1 whitespace-pre-line break-words">{item.aksi_masukan}</p>}
+                          <div
+                            style={{ display: "table-cell", width: "10%" }}
+                            className="border-r-2 border-black p-3 align-top"
+                          >
+                            {rev && (
+                              <span
+                                className={`text-[8px] font-bold px-1 py-1 border rounded text-center inline-flex items-center gap-1 ${rev.cls}`}
+                              >
+                                <rev.Icon size={10} /> {rev.label}
+                              </span>
+                            )}
+                            {item.aksi_masukan && (
+                              <p className="text-[9px] text-gray-700 mt-1 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                                {item.aksi_masukan}
+                              </p>
+                            )}
                           </div>
 
-                          <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
-                            <div className="border border-gray-300 p-2 min-h-16 text-[10px]">
+                          <div
+                            style={{ display: "table-cell", width: "24%" }}
+                            className="border-r-2 border-black p-3 align-top"
+                          >
+                            <div className="border border-gray-300 p-2 min-h-16 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
                               {item.hasil_tindakan ? (
                                 item.hasil_tindakan
-                              ) : item.status_review === "tidak_ditindaklanjuti" ? (
+                              ) : item.status_review ===
+                                "tidak_ditindaklanjuti" ? (
                                 <span className="inline-block text-[9px] text-gray-400 italic bg-gray-50 px-1.5 py-0.5 rounded">
                                   Sudah sesuai, tidak ditindaklanjuti
                                 </span>
@@ -725,31 +1015,60 @@ export default function ProcessMonitorTable() {
                               )}
                             </div>
                             {item.tanggal_pelaksanaan && (
-                              <p className="text-[9px] text-gray-400 mt-1">
-                                📅 {new Date(item.tanggal_pelaksanaan).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
+                              <p className="text-[9px] text-gray-400 mt-1 inline-flex items-center gap-1">
+                                <Calendar size={10} />
+                                {new Date(
+                                  item.tanggal_pelaksanaan
+                                ).toLocaleDateString("id-ID", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
                               </p>
                             )}
                             {item.lampiran_hasil && (
-                              <button type="button" onClick={() => setSelectedImage(getImageUrl(item.lampiran_hasil))}
-                                className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline">
-                                🖼️ Lihat Gambar
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedImage(
+                                    getImageUrl(item.lampiran_hasil)
+                                  )
+                                }
+                                className="mt-1 flex items-center gap-1 text-[9px] text-blue-600 hover:underline"
+                              >
+                                <ImageIcon size={11} /> Lihat Gambar
                               </button>
                             )}
                           </div>
 
-                          <div style={{ display: "table-cell", width: "20%" }} className="border-r-2 border-black p-3 align-top">
-                            <div className="flex items-center justify-center h-full">
+                          <div
+                            style={{ display: "table-cell", width: "12%" }}
+                            className="border-r-2 border-black p-3 align-top"
+                          >
+                            <div className="flex items-start justify-center pt-2">
                               {renderKeputusanStaf(item)}
                             </div>
                           </div>
 
-                          <div style={{ display: "table-cell", width: "8%" }} className="p-2 align-middle">
-                            <div className="flex items-center justify-center">
-                              <button type="button" onClick={() => handleExportPDF(item)} disabled={exportingId === item.id_boxing}
-                                className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded">
-                                {exportingId === item.id_boxing
-                                  ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  : <><span className="text-sm leading-none">📄</span><span>PDF</span></>}
+                          <div
+                            style={{ display: "table-cell", width: "8%" }}
+                            className="p-2 align-top"
+                          >
+                            <div className="flex items-start justify-center pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleExportPDF(item)}
+                                disabled={exportingId === item.id_boxing}
+                                className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white text-[8px] font-bold rounded"
+                              >
+                                {exportingId === item.id_boxing ? (
+                                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <>
+                                    <FileText size={14} />
+                                    <span>PDF</span>
+                                  </>
+                                )}
                               </button>
                             </div>
                           </div>
@@ -766,13 +1085,17 @@ export default function ProcessMonitorTable() {
         {/* ── MOBILE ── */}
         <div className="lg:hidden">
           {aktif.length === 0 && selesai.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 italic">Belum ada laporan diproses.</div>
+            <div className="p-8 text-center text-gray-400 italic inline-flex items-center justify-center gap-2 w-full">
+              <Inbox size={16} /> Belum ada laporan diproses.
+            </div>
           ) : (
             <>
               {aktif.map(renderCard)}
               {selesai.length > 0 && (
                 <>
-                  <div className="bg-gray-100 px-3 py-2 text-[10px] font-bold uppercase border-t-2 border-black">Sudah selesai</div>
+                  <div className="bg-gray-100 px-3 py-2 text-[10px] font-bold uppercase border-t-2 border-black">
+                    Sudah selesai
+                  </div>
                   {selesai.map(renderCard)}
                 </>
               )}

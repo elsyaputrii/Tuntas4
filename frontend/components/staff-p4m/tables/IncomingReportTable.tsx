@@ -2,11 +2,17 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { stafApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
-import { ChevronDown, X, Search, Calendar } from "lucide-react";
+import {
+  ChevronDown,
+  X,
+  Search,
+  Calendar,
+  Image as ImageIcon,
+  CheckCircle2,
+} from "lucide-react";
 import { DAFTAR_UNIT_UMUM } from "@/lib/unitsUmum";
 import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
 import { toLocalDate, fmtTgl } from "@/lib/exportHelpers";
-import { div } from "framer-motion/m";
 import { createPortal } from "react-dom";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
@@ -27,9 +33,6 @@ interface LaporanMasuk {
 
 function formatTanggalKejadian(item: LaporanMasuk): string {
   if (!item.tanggal_kejadian) return "Tanggal kejadian tidak diketahui";
-  // tanggal_kejadian dari DB formatnya "YYYY-MM-DD" (DATE, bukan timestamp),
-  // jangan pakai `new Date(...)` langsung karena bisa ke-geser 1 hari akibat
-  // timezone parsing (UTC vs WIB) — parse manual per bagian saja.
   const [y, m, d] = item.tanggal_kejadian.split("-").map(Number);
   if (!y || !m || !d) return "Tanggal kejadian tidak diketahui";
   const dateObj = new Date(y, m - 1, d);
@@ -63,7 +66,7 @@ function formatTanggal(item: LaporanMasuk): string {
 }
 
 // ============================================
-// MULTI SELECT UNIT (SAME)
+// MULTI SELECT UNIT
 // ============================================
 function MultiSelectUnit({
   selected,
@@ -75,18 +78,15 @@ function MultiSelectUnit({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  // 1. TAMBAHKAN REF UNTUK TRIGGER DAN DROPDOWN
   const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 2. STATE UNTUK MENYIMPAN KOORDINAT
   const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({
     top: 0,
     left: 0,
     width: 0,
   });
 
-  // 3. FUNGSI MENGHITUNG POSISI (BoundingClientRect)
   const updateCoords = () => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
@@ -98,7 +98,6 @@ function MultiSelectUnit({
     }
   };
 
-  // 4. EFEK UNTUK UPDATE POSISI SAAT DI-SCROLL / RESIZE WINDOW
   useEffect(() => {
     if (open) {
       updateCoords();
@@ -111,7 +110,6 @@ function MultiSelectUnit({
     };
   }, [open]);
 
-  // 5. UPDATE EVENT LISTENER CLICK OUTSIDE (MENGGUNAKAN REF LENGKAP)
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (
@@ -241,7 +239,7 @@ function MultiSelectUnit({
               </div>
             )}
           </div>,
-          document.body // <-- Mengirimkan tampilan dropdown ini langsung ke paling luar (body)
+          document.body
         )}
     </div>
   );
@@ -272,7 +270,6 @@ export default function IncomingReportTable() {
 
       const res = await stafApi.getLaporanMasuk();
 
-      // Proses data
       const dataWithDate: LaporanMasuk[] = res.data.map((item: LaporanMasuk) => ({
         ...item,
         tanggal_lapor: item.tanggal_lapor || item.created_at || item.createdAt || undefined,
@@ -304,7 +301,7 @@ export default function IncomingReportTable() {
       await stafApi.distribusiLaporan({ id_laporan, unit_tujuan: units });
 
       const kode = `LAP-${String(id_laporan).padStart(5, "0")}`;
-      setSuccessMsg(`✅ ${kode} dikirim ke: ${units.join(", ")}`);
+      setSuccessMsg(`${kode} dikirim ke: ${units.join(", ")}`);
       setTimeout(() => setSuccessMsg(""), 5000);
 
       fetchData();
@@ -368,8 +365,8 @@ export default function IncomingReportTable() {
       <div className="px-3">
         <div className="w-full border-2 border-black bg-white overflow-x-auto">
           {successMsg && (
-            <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b border-green-200">
-              {successMsg}
+            <p className="text-green-700 text-xs font-bold p-2 bg-green-50 border-b border-green-200 inline-flex items-center gap-1.5">
+              <CheckCircle2 size={14} /> {successMsg}
             </p>
           )}
           {error && (
@@ -396,55 +393,53 @@ export default function IncomingReportTable() {
             ) : (
               laporanTampil.map((item) => (
                 <div key={item.id_laporan} className="flex min-h-45 border-t-2 border-black">
-                  <div className="flex-1 border-r-2 border-black p-5 flex flex-col justify-between">
-                    <div className="flex-1 flex flex-col mb-3">
-                      <p className="text-[9px] text-gray-400 italic mb-1 font-semibold">
-                        {item.kode_laporan} · {item.jenis_laporan}
-                      </p>
-                      {/* Tambahkan flex-1 dan min-h-[120px] agar melar penuh ke bawah */}
-                      <div className="border border-gray-400 p-4 text-xs bg-gray-50 overflow-auto flex-1 min-h-[140px]">
-                        {item.deskripsi}
-                      </div>
+                  {/* Kolom deskripsi */}
+                  <div className="flex-1 border-r-2 border-black p-5 flex flex-col">
+                    <p className="text-[9px] text-gray-400 italic mb-1 font-semibold">
+                      {item.kode_laporan} · {item.jenis_laporan}
+                    </p>
+                    {/* ✅ Teks rata kiri-kanan + jarak antar paragraf */}
+                    <div className="border border-gray-400 p-4 text-xs bg-gray-50 overflow-auto flex-1 min-h-[140px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                      {item.deskripsi}
                     </div>
-                    <p className="mt-3 text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                    <p className="mt-3 text-[9px] text-gray-500 font-bold inline-flex items-center gap-1">
                       <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}
                     </p>
-                    <p className="mt-1 text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                    <p className="mt-1 text-[9px] text-gray-500 font-bold inline-flex items-center gap-1">
                       <Calendar size={10} /> Tanggal kejadian: {formatTanggalKejadian(item)}
                     </p>
                     {item.lampiran && (
                       <button
                         onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran}`)}
-                        className="mt-2 border border-black px-2 py-1 flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase"
+                        className="mt-2 border border-black px-2 py-1 inline-flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase w-fit"
                       >
-                        🖼️ Lihat Gambar
+                        <ImageIcon size={12} /> Lihat Gambar
                       </button>
                     )}
                   </div>
-                  <div className="w-80 p-5 flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold uppercase block text-center mb-2">
-                        Pilih Unit :
-                      </label>
-                      <MultiSelectUnit
-                        selected={selectedUnit[item.id_laporan] || []}
-                        onChange={(units) =>
-                          setSelectedUnit((prev) => ({
-                            ...prev,
-                            [item.id_laporan]: units,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-center mt-6">
-                      <button
-                        onClick={() => handleSend(item.id_laporan)}
-                        disabled={loadingKirim === item.id_laporan}
-                        className="bg-blue-600 text-white px-10 py-2 font-bold shadow-md hover:bg-blue-700 transition-all uppercase text-xs tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
-                      </button>
-                    </div>
+
+                  {/* Kolom Unit — tombol Kirim nempel di bawah dropdown */}
+                  <div className="w-80 p-5 flex flex-col gap-3">
+                    <label className="text-[11px] font-bold uppercase block text-center">
+                      Pilih Unit :
+                    </label>
+                    <MultiSelectUnit
+                      selected={selectedUnit[item.id_laporan] || []}
+                      onChange={(units) =>
+                        setSelectedUnit((prev) => ({
+                          ...prev,
+                          [item.id_laporan]: units,
+                        }))
+                      }
+                    />
+                    {/* ✅ Tombol Kirim tepat di bawah dropdown, tidak ada flex-1 / mt-6 */}
+                    <button
+                      onClick={() => handleSend(item.id_laporan)}
+                      disabled={loadingKirim === item.id_laporan}
+                      className="w-full bg-blue-600 text-white py-2 font-bold shadow-md hover:bg-blue-700 transition-all uppercase text-xs tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingKirim === item.id_laporan ? "MENGIRIM..." : "KIRIM"}
+                    </button>
                   </div>
                 </div>
               ))
@@ -465,21 +460,22 @@ export default function IncomingReportTable() {
                   <p className="text-[10px] text-gray-400 italic">
                     {item.kode_laporan} · {item.jenis_laporan}
                   </p>
-                  <div className="border border-gray-400 p-4 text-xs bg-gray-50 max-h-32 overflow-auto">
+                  {/* ✅ Teks rata kiri-kanan + jarak antar paragraf */}
+                  <div className="border border-gray-400 p-4 text-xs bg-gray-50 max-h-32 overflow-auto leading-relaxed text-justify whitespace-pre-wrap break-words">
                     {item.deskripsi}
                   </div>
-                  <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                  <p className="text-[9px] text-gray-500 font-bold inline-flex items-center gap-1">
                     <Calendar size={10} /> Laporan masuk: {formatTanggal(item)}
                   </p>
-                  <p className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                  <p className="text-[9px] text-gray-500 font-bold inline-flex items-center gap-1">
                     <Calendar size={10} /> Tanggal kejadian: {formatTanggalKejadian(item)}
                   </p>
                   {item.lampiran && (
                     <button
                       onClick={() => setModalSrc(`${BASE_URL}/uploads/${item.lampiran}`)}
-                      className="border border-black px-2 py-1 flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase"
+                      className="border border-black px-2 py-1 inline-flex items-center gap-2 text-[10px] hover:bg-gray-100 font-bold uppercase"
                     >
-                      🖼️ Lihat Gambar
+                      <ImageIcon size={12} /> Lihat Gambar
                     </button>
                   )}
                   <div>
