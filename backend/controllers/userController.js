@@ -1,192 +1,590 @@
-// FILE: backend/utils/notifikasi.js
+// FILE: backend/controllers/userController.js
+// CRUD akun untuk halaman "Data Akun" (Staf P4M) — kelola Staff P4M,
+// Kepala Unit, dan KA-P4M.
 //
-// Helper terpusat untuk notifikasi in-app (tabel `notifikasi`, muncul di
-// lonceng 🔔 tiap dashboard) SEKALIGUS email (pakai Gmail).
+// CATATAN MAPPING ROLE:
+// Tabel `pengguna.role` pakai enum: 'staf_p4m' | 'ka_p4m' | 'kepala_unit' | 'civitas'
+// Frontend (data-akun) pakai key:   'staff_p4m' | 'ka_p4m' | 'kepala_unit'
+// (beda 1 huruf 'f' di staf/staff) → di-mapping di sini biar konsisten.
 //
-// PENTING: semua fungsi di sini sengaja TIDAK melempar error ke pemanggil.
-// Gagal kirim notifikasi/email tidak boleh bikin proses utama ikut gagal.
+// Data profil (nama, nip, unit) disimpan terpisah per role di
+// tabel staf_p4m / kepala_unit / ka_p4m, masing-masing terhubung lewat
+// pengguna.id_pengguna.
 
-const nodemailer = require("nodemailer");
+const bcrypt = require("bcryptjs");
+const fs = require("fs");
+const path = require("path");
 const { pool } = require("../config/db");
 
-// ✅ FIX email lambat masuk:
-// Sebelumnya transporter dibuat TANPA pooling, jadi SETIAP email membuka
-// koneksi TLS + login baru ke smtp.gmail.com (lambat, dan kalau ada beberapa
-// penerima sekaligus, puluhan koneksi baru dibuka bersamaan → Gmail sering
-// menahan/menolak sementara). Tanpa timeout & tanpa retry juga, email yang
-// tersangkut hilang begitu saja.
-//
-// Sekarang: koneksi dipakai ulang (pool), jumlah koneksi dibatasi, ada
-// timeout supaya tidak menggantung, dan kirim ulang otomatis kalau gagal.
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  pool: true,
-  maxConnections: 3,
-  maxMessages: 100,
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 30000,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// ✅ FIX: path absolut terpusat, sama dengan yang dipakai middleware
+// upload & server.js — lihat config/uploadDir.js untuk alasannya.
+const UPLOAD_DIR = require("../config/uploadDir");
 
-// Cek login SMTP sekali saat server start, supaya kalau EMAIL_USER/EMAIL_PASS
-// (App Password Gmail) salah atau port diblokir, langsung kelihatan di log —
-// bukan baru ketahuan saat ada yang protes email tidak masuk.
-transporter
-  .verify()
-  .then(() => console.log("✅ SMTP Gmail siap mengirim email."))
-  .catch((error) =>
-    console.error("❌ SMTP Gmail GAGAL terhubung:", error.message)
-  );
+const ROLE_FE_TO_DB = { staff_p4m: "staf_p4m", kepala_unit: "kepala_unit", ka_p4m: "ka_p4m" };
+const ROLE_DB_TO_FE = { staf_p4m: "staff_p4m", kepala_unit: "kepala_unit", ka_p4m: "ka_p4m" };
 
-const MAX_PERCOBAAN_EMAIL = 3;
-const JEDA_RETRY_MS = 5000; // 5 dtk, lalu 10 dtk
+function generateNip() {
+  // NIP sementara kalau user gak isi (biar gak bentrok UNIQUE constraint)
+  return `TMP-${Date.now()}`;
+}
 
-async function kirimDenganRetry(mail, percobaan = 1) {
-  const mulai = Date.now();
+// ── GET /api/users — list semua akun (gabungan 3 role) ──────────────
+async function getUsers(req, res) {
   try {
-    await transporter.sendMail(mail);
-    console.log(
-      `📧 Email ke ${mail.to} terkirim ke Gmail dalam ${Date.now() - mulai} ms` +
-        (percobaan > 1 ? ` (percobaan ke-${percobaan})` : "")
-    );
-  } catch (error) {
-    if (percobaan < MAX_PERCOBAAN_EMAIL) {
-      const jeda = JEDA_RETRY_MS * percobaan;
-      console.warn(
-        `⚠️ Email ke ${mail.to} gagal (${error.message}). Coba lagi ${jeda / 1000} dtk lagi (percobaan ${percobaan}/${MAX_PERCOBAAN_EMAIL}).`
-      );
-      setTimeout(() => kirimDenganRetry(mail, percobaan + 1), jeda);
-    } else {
-      console.error(
-        `❌ Gagal kirim email ke ${mail.to} setelah ${MAX_PERCOBAAN_EMAIL} percobaan:`,
-        error.message
-      );
-    }
-  }
-}
-
-// ============================================================
-// KONFIGURASI
-// ============================================================
-// Alamat aplikasi yang bisa dibuka penerima email (BUKAN localhost)
-const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, "");
-
-if (/localhost|127\.0\.0\.1/.test(FRONTEND_URL)) {
-  console.warn(
-    "⚠️  FRONTEND_URL masih localhost. Tombol di email tidak akan bisa dibuka orang lain."
-  );
-}
-
-// Mode uji coba: email HANYA dikirim ke alamat di EMAIL_ALLOWLIST.
-// Kalau EMAIL_TEST_MODE=false, email dikirim ke semua akun seperti biasa.
-const EMAIL_TEST_MODE = process.env.EMAIL_TEST_MODE === "true";
-const EMAIL_ALLOWLIST = (process.env.EMAIL_ALLOWLIST || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
-if (EMAIL_TEST_MODE) {
-  console.warn(
-    `⚠️  EMAIL_TEST_MODE aktif: email hanya dikirim ke: ${EMAIL_ALLOWLIST.join(", ") || "(kosong)"}`
-  );
-}
-
-// ============================================================
-// KIRIM EMAIL (dipanggil internal, tidak melempar error)
-// ============================================================
-async function kirimEmail(to, judul, pesan, link) {
-  if (!to) return;
-
-  let subject = judul;
-
-  if (EMAIL_TEST_MODE) {
-    if (!EMAIL_ALLOWLIST.includes(String(to).toLowerCase())) {
-      console.log(`[TEST MODE] Email ke ${to} dilewati (tidak ada di EMAIL_ALLOWLIST).`);
-      return;
-    }
-    subject = `[UJI COBA] ${judul}`;
-  }
-
-  const url = link ? `${FRONTEND_URL}${link.startsWith("/") ? link : "/" + link}` : null;
-
-  // kirimDenganRetry tidak pernah melempar error, jadi aman dipanggil tanpa await
-  await kirimDenganRetry({
-    from: `"TUNTAS4 - P4M Polibatam" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #18253d;">${judul}</h2>
-          <p style="font-size: 14px; color: #333;">${pesan}</p>
-          ${
-            url
-              ? `<p><a href="${url}" style="display:inline-block; margin-top:12px; padding:10px 18px; background:#18253d; color:#fff; text-decoration:none; border-radius:8px;">Buka di TUNTAS4</a></p>`
-              : ""
-          }
-          <p style="font-size: 12px; color: #888; margin-top: 24px;">
-            Email ini dikirim otomatis oleh sistem TUNTAS4, mohon tidak dibalas.
-          </p>
-        </div>
-      `,
-  });
-}
-
-// ============================================================
-// BUAT 1 NOTIFIKASI untuk 1 akun (id_pengguna sudah diketahui)
-// ============================================================
-async function notifikasiUntukPengguna(id_pengguna, { judul, pesan, jenis, link }) {
-  if (!id_pengguna) return;
-
-  try {
-    await pool.query(
-      `INSERT INTO notifikasi (id_pengguna, judul, pesan, jenis, link)
-       VALUES (?, ?, ?, ?, ?)`,
-      [id_pengguna, judul, pesan, jenis, link || null]
-    );
-
     const [rows] = await pool.query(
-      `SELECT email FROM pengguna WHERE id_pengguna = ?`,
-      [id_pengguna]
+      `SELECT
+        p.id_pengguna AS id,
+        p.nama        AS name,
+        p.email       AS email,
+        p.role        AS role,
+        p.status      AS status,
+        p.tanda_tangan AS tandaTangan,
+        p.created_at  AS createdAt,
+        COALESCE(s.nip, k.nip, kp.nip)         AS nip,
+        COALESCE(k.unit, '')                   AS unit
+      FROM pengguna p
+      LEFT JOIN staf_p4m    s  ON s.id_pengguna  = p.id_pengguna AND p.role = 'staf_p4m'
+      LEFT JOIN kepala_unit k  ON k.id_pengguna  = p.id_pengguna AND p.role = 'kepala_unit'
+      LEFT JOIN ka_p4m      kp ON kp.id_pengguna = p.id_pengguna AND p.role = 'ka_p4m'
+      WHERE p.role IN ('staf_p4m', 'kepala_unit', 'ka_p4m')
+      ORDER BY p.created_at DESC`
     );
-    if (rows.length > 0) {
-      kirimEmail(rows[0].email, judul, pesan, link);
-    }
+
+    const data = rows.map((row) => ({
+      ...row,
+      role: ROLE_DB_TO_FE[row.role] || row.role,
+      lastLogin: "-", // belum ada tracking last login di sistem
+    }));
+
+    return res.status(200).json(data);
   } catch (error) {
-    console.error("❌ Gagal buat notifikasi (per pengguna):", error.message);
+    console.error("Error getUsers:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengambil data akun." });
   }
 }
 
-// ============================================================
-// BUAT NOTIFIKASI untuk SEMUA akun dengan role tertentu
-// ============================================================
-async function notifikasiUntukRole(role, { judul, pesan, jenis, link }) {
+// ── POST /api/users — tambah akun baru ───────────────────────────────
+async function createUser(req, res) {
+  const { name, email, role, nip, unit, status, password } = req.body;
+
+  if (!name || !email || !role || !password) {
+    return res.status(400).json({ success: false, message: "Nama, email, role, dan password wajib diisi." });
+  }
+
+  const roleDb = ROLE_FE_TO_DB[role];
+  if (!roleDb) {
+    return res.status(400).json({ success: false, message: "Role tidak valid." });
+  }
+
+  const conn = await pool.getConnection();
   try {
-    const [users] = await pool.query(
-      `SELECT id_pengguna, email FROM pengguna WHERE role = ?`,
-      [role]
-    );
-
-    if (users.length === 0) return;
-
-    const values = users.map((u) => [u.id_pengguna, judul, pesan, jenis, link || null]);
-    await pool.query(
-      `INSERT INTO notifikasi (id_pengguna, judul, pesan, jenis, link) VALUES ?`,
-      [values]
-    );
-
-    for (const u of users) {
-      kirimEmail(u.email, judul, pesan, link);
+    const [existing] = await conn.query("SELECT id_pengguna FROM pengguna WHERE email = ?", [email]);
+    if (existing.length > 0) {
+      conn.release();
+      return res.status(409).json({ success: false, message: "Email sudah terdaftar." });
     }
+
+    await conn.beginTransaction();
+
+    const hashed = await bcrypt.hash(password, 10);
+    const finalNip = nip?.trim() || generateNip();
+
+    // ✅ wajib_ganti_password dipaksa = 1 di sini, jangan andalkan default
+    // kolom di database. Ini penting kalau aplikasinya di-deploy ulang ke
+    // instalasi baru (mis. server milik pembeli) — akun yang baru dibuat
+    // Staf P4M harus SELALU disuruh ganti password sekali di login
+    // pertama, apa pun default kolomnya di DB masing-masing instalasi.
+    const [result] = await conn.query(
+      `INSERT INTO pengguna (nama, email, password, role, status, nip, wajib_ganti_password)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [name, email, hashed, roleDb, status || "active", finalNip]
+    );
+    const idPengguna = result.insertId;
+
+    if (roleDb === "staf_p4m") {
+      await conn.query(
+        `INSERT INTO staf_p4m (id_pengguna, nama, nip, email) VALUES (?, ?, ?, ?)`,
+        [idPengguna, name, finalNip, email]
+      );
+    } else if (roleDb === "kepala_unit") {
+      await conn.query(
+        `INSERT INTO kepala_unit (id_pengguna, nama, nip, unit) VALUES (?, ?, ?, ?)`,
+        [idPengguna, name, finalNip, unit || ""]
+      );
+    } else if (roleDb === "ka_p4m") {
+      await conn.query(
+        `INSERT INTO ka_p4m (id_pengguna, nama, nip) VALUES (?, ?, ?)`,
+        [idPengguna, name, finalNip]
+      );
+    }
+
+    await conn.commit();
+    return res.status(201).json({ success: true, message: "Akun berhasil ditambahkan.", id: idPengguna });
   } catch (error) {
-    console.error("❌ Gagal buat notifikasi (per role):", error.message);
+    await conn.rollback();
+    console.error("Error createUser:", error);
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ success: false, message: "Email atau NIP sudah dipakai." });
+    }
+    return res.status(500).json({ success: false, message: "Gagal menambahkan akun." });
+  } finally {
+    conn.release();
+  }
+}
+
+// ── PUT /api/users/:id — edit akun ───────────────────────────────────
+async function updateUser(req, res) {
+  const { id } = req.params;
+  const { name, email, role, nip, unit, status, password } = req.body;
+
+  const roleDb = ROLE_FE_TO_DB[role];
+  if (!roleDb) {
+    return res.status(400).json({ success: false, message: "Role tidak valid." });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const [existing] = await conn.query("SELECT * FROM pengguna WHERE id_pengguna = ?", [id]);
+    if (existing.length === 0) {
+      conn.release();
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    await conn.beginTransaction();
+
+    if (password?.trim()) {
+      const hashed = await bcrypt.hash(password, 10);
+      // Staf P4M nyetel password baru buat akun ORANG LAIN (mis. reset
+      // password) → tandai wajib_ganti_password = 1 lagi, supaya pas
+      // login berikutnya pemilik akun diarahkan ganti password (atau
+      // boleh skip pakai password yang baru disiapkan ini).
+      await conn.query(
+        `UPDATE pengguna SET nama=?, email=?, role=?, status=?, nip=?, password=?, wajib_ganti_password=1 WHERE id_pengguna=?`,
+        [name, email, roleDb, status || "active", nip || existing[0].nip, hashed, id]
+      );
+    } else {
+      await conn.query(
+        `UPDATE pengguna SET nama=?, email=?, role=?, status=?, nip=? WHERE id_pengguna=?`,
+        [name, email, roleDb, status || "active", nip || existing[0].nip, id]
+      );
+    }
+
+    // Sinkronkan ke tabel profil sesuai role (insert kalau belum ada baris-nya)
+    if (roleDb === "staf_p4m") {
+      await conn.query(
+        `INSERT INTO staf_p4m (id_pengguna, nama, nip, email)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE nama=?, nip=?, email=?`,
+        [id, name, nip, email, name, nip, email]
+      );
+    } else if (roleDb === "kepala_unit") {
+      await conn.query(
+        `INSERT INTO kepala_unit (id_pengguna, nama, nip, unit)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE nama=?, nip=?, unit=?`,
+        [id, name, nip, unit || "", name, nip, unit || ""]
+      );
+    } else if (roleDb === "ka_p4m") {
+      await conn.query(
+        `INSERT INTO ka_p4m (id_pengguna, nama, nip)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE nama=?, nip=?`,
+        [id, name, nip, name, nip]
+      );
+    }
+
+    await conn.commit();
+    return res.status(200).json({ success: true, message: "Akun berhasil diperbarui." });
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error updateUser:", error);
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ success: false, message: "Email atau NIP sudah dipakai akun lain." });
+    }
+    return res.status(500).json({ success: false, message: "Gagal memperbarui akun." });
+  } finally {
+    conn.release();
+  }
+}
+
+// ── Helper: ambil data profil lengkap 1 akun (gabung tabel per-role) ──
+async function fetchProfileById(id) {
+  const [rows] = await pool.query(
+    `SELECT
+      p.id_pengguna AS id,
+      p.nama        AS nama_lengkap,
+      p.email       AS email,
+      p.role        AS role,
+      p.username    AS username,
+      p.created_at  AS created_at,
+      p.foto_profil AS foto_profil,
+      p.tanggal_bergabung AS tanggal_bergabung,
+      p.wajib_ganti_password AS wajib_ganti_password,
+      ku.unit       AS unit_kepala
+    FROM pengguna p
+    LEFT JOIN kepala_unit ku ON ku.id_pengguna = p.id_pengguna
+    WHERE p.id_pengguna = ?`,
+    [id]
+  );
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  const UNIT_DEFAULT = { staf_p4m: "P4M", ka_p4m: "P4M" };
+
+  return {
+    id: row.id,
+    nama_lengkap: row.nama_lengkap,
+    email: row.email,
+    role: row.role,
+    unit: row.unit_kepala || UNIT_DEFAULT[row.role] || "-",
+    username: row.username || row.email.split("@")[0],
+    created_at: row.created_at,
+    foto_profil: row.foto_profil || null,
+    // Fallback ke created_at kalau kolom baru ini belum keisi (akun lama
+    // sebelum migration, atau belum sempat di-UPDATE backfill-nya)
+    tanggal_bergabung: row.tanggal_bergabung || row.created_at,
+    wajibGantiPassword: !!row.wajib_ganti_password,
+  };
+}
+
+// ── GET /api/users/profile — profil akun yang sedang login ───────────
+// Dipakai halaman "Profil Saya" (Staf P4M, Kepala Unit, KA-P4M) untuk
+// menampilkan data akun milik user itu sendiri (bukan CRUD akun lain).
+async function getProfile(req, res) {
+  try {
+    const profile = await fetchProfileById(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+    return res.status(200).json(profile);
+  } catch (error) {
+    console.error("Error getProfile:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengambil data profil." });
+  }
+}
+
+// ── PUT /api/users/profile — update profil akun yang sedang login ────
+async function updateProfile(req, res) {
+  const userId = req.user.id;
+  const { nama_lengkap, email, tanggal_bergabung } = req.body;
+
+  if (!nama_lengkap?.trim() || !email?.trim()) {
+    return res.status(400).json({ success: false, message: "Nama dan email wajib diisi." });
+  }
+
+  // tanggal_bergabung sifatnya opsional — kalau dikirim, harus format
+  // YYYY-MM-DD (bawaan <input type="date"> di frontend) dan bukan tanggal
+  // masa depan.
+  if (tanggal_bergabung) {
+    const validFormat = /^\d{4}-\d{2}-\d{2}$/.test(tanggal_bergabung);
+    const notFuture = new Date(tanggal_bergabung) <= new Date();
+    if (!validFormat || !notFuture) {
+      return res.status(400).json({ success: false, message: "Tanggal bergabung tidak valid." });
+    }
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const [existing] = await conn.query("SELECT role FROM pengguna WHERE id_pengguna = ?", [userId]);
+    if (existing.length === 0) {
+      conn.release();
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+    const role = existing[0].role;
+
+    await conn.beginTransaction();
+
+    if (tanggal_bergabung) {
+      await conn.query(
+        "UPDATE pengguna SET nama = ?, email = ?, tanggal_bergabung = ? WHERE id_pengguna = ?",
+        [nama_lengkap, email, tanggal_bergabung, userId]
+      );
+    } else {
+      await conn.query("UPDATE pengguna SET nama = ?, email = ? WHERE id_pengguna = ?", [
+        nama_lengkap,
+        email,
+        userId,
+      ]);
+    }
+
+    // Sinkronkan juga ke tabel profil per-role biar data nama/email konsisten
+    if (role === "staf_p4m") {
+      await conn.query("UPDATE staf_p4m SET nama = ?, email = ? WHERE id_pengguna = ?", [
+        nama_lengkap,
+        email,
+        userId,
+      ]);
+    } else if (role === "kepala_unit") {
+      await conn.query("UPDATE kepala_unit SET nama = ? WHERE id_pengguna = ?", [nama_lengkap, userId]);
+    } else if (role === "ka_p4m") {
+      await conn.query("UPDATE ka_p4m SET nama = ? WHERE id_pengguna = ?", [nama_lengkap, userId]);
+    }
+
+    await conn.commit();
+
+    const updated = await fetchProfileById(userId);
+    return res.status(200).json(updated);
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error updateProfile:", error);
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ success: false, message: "Email sudah dipakai akun lain." });
+    }
+    return res.status(500).json({ success: false, message: "Gagal menyimpan perubahan." });
+  } finally {
+    conn.release();
+  }
+}
+
+// ── PUT /api/users/change-password — ganti password akun sendiri ─────
+// Dipakai halaman "Pengaturan". Beda dari updateUser/:id (itu buat Staf
+// P4M ganti password akun ORANG LAIN); ini user ganti password DIRI
+// SENDIRI, jadi wajib verifikasi password lama dulu.
+async function changePassword(req, res) {
+  const userId = req.user.id;
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: "Password lama dan baru wajib diisi." });
+  }
+  if (newPassword.length > 12) {
+    return res.status(400).json({ success: false, message: "Password boleh kurang dari 12 karakter, tapi tidak boleh lebih dari 12 karakter." });
+  }
+
+  try {
+    const [rows] = await pool.query("SELECT password FROM pengguna WHERE id_pengguna = ?", [userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    const cocok = await bcrypt.compare(oldPassword, rows[0].password);
+    if (!cocok) {
+      return res.status(400).json({ success: false, message: "Password lama tidak sesuai." });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    // User ganti password sendiri → matikan flag wajib_ganti_password,
+    // apapun nilainya sebelumnya (baik ini ganti password wajib pas
+    // login pertama, maupun ganti password biasa lewat halaman Pengaturan).
+    await pool.query(
+      "UPDATE pengguna SET password = ?, wajib_ganti_password = 0 WHERE id_pengguna = ?",
+      [hashed, userId]
+    );
+
+    return res.status(200).json({ success: true, message: "Password berhasil diubah." });
+  } catch (error) {
+    console.error("Error changePassword:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengubah password." });
+  }
+}
+
+// ── PUT /api/users/lewati-ganti-password — skip ganti password wajib ─
+// Dipakai halaman "Ubah Password" (muncul wajib pas login pertama /
+// pas password baru direset Staf P4M). User boleh pilih lewati dan
+// tetap pakai password yang sudah disiapkan — cukup matikan flag-nya,
+// TIDAK perlu verifikasi password lama karena tidak ada perubahan.
+async function lewatiGantiPassword(req, res) {
+  const userId = req.user.id;
+  try {
+    const [existing] = await pool.query(
+      "SELECT id_pengguna FROM pengguna WHERE id_pengguna = ?",
+      [userId]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    await pool.query("UPDATE pengguna SET wajib_ganti_password = 0 WHERE id_pengguna = ?", [userId]);
+
+    return res.status(200).json({ success: true, message: "Berhasil dilewati. Password lama tetap dipakai." });
+  } catch (error) {
+    console.error("Error lewatiGantiPassword:", error);
+    return res.status(500).json({ success: false, message: "Gagal melewati proses ganti password." });
+  }
+}
+
+// ── POST /api/users/profile/foto — upload foto profil akun sendiri ───
+// Beda dari uploadTandaTangan (itu tanda tangan akun ORANG LAIN, dikelola
+// Staf P4M lewat Data Akun); ini user upload foto profil DIRI SENDIRI,
+// dipakai halaman "Profil Saya" untuk semua role.
+async function uploadFotoProfil(req, res) {
+  const userId = req.user.id;
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "Tidak ada file foto yang diunggah." });
+  }
+
+  try {
+    const [existing] = await pool.query(
+      "SELECT foto_profil FROM pengguna WHERE id_pengguna = ?",
+      [userId]
+    );
+    if (existing.length === 0) {
+      fs.unlink(path.join(UPLOAD_DIR, req.file.filename), () => {});
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    // Hapus foto lama (kalau ada) supaya folder uploads tidak menumpuk
+    const fotoLama = existing[0].foto_profil;
+    if (fotoLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fotoLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET foto_profil = ? WHERE id_pengguna = ?", [
+      req.file.filename,
+      userId,
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Foto profil berhasil diunggah.",
+      foto_profil: req.file.filename,
+    });
+  } catch (error) {
+    fs.unlink(path.join(UPLOAD_DIR, req.file.filename), () => {});
+    console.error("Error uploadFotoProfil:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengunggah foto profil." });
+  }
+}
+
+// ── DELETE /api/users/profile/foto — hapus foto profil akun sendiri ──
+async function deleteFotoProfil(req, res) {
+  const userId = req.user.id;
+  try {
+    const [existing] = await pool.query(
+      "SELECT foto_profil FROM pengguna WHERE id_pengguna = ?",
+      [userId]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    const fotoLama = existing[0].foto_profil;
+    if (fotoLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fotoLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET foto_profil = NULL WHERE id_pengguna = ?", [userId]);
+    return res.status(200).json({ success: true, message: "Foto profil berhasil dihapus." });
+  } catch (error) {
+    console.error("Error deleteFotoProfil:", error);
+    return res.status(500).json({ success: false, message: "Gagal menghapus foto profil." });
+  }
+}
+
+// ── DELETE /api/users/:id — hapus akun ───────────────────────────────
+async function deleteUser(req, res) {
+  const { id } = req.params;
+  const conn = await pool.getConnection();
+  try {
+    const [existing] = await conn.query("SELECT role FROM pengguna WHERE id_pengguna = ?", [id]);
+    if (existing.length === 0) {
+      conn.release();
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    await conn.beginTransaction();
+
+    // Tidak ada ON DELETE CASCADE di database — hapus manual dulu row
+    // terkait di tabel profil per-role, biar NIP/email-nya nggak nyangkut
+    // (nyangkut = bikin "Email atau NIP sudah dipakai" pas bikin akun baru).
+    await conn.query("DELETE FROM staf_p4m WHERE id_pengguna = ?", [id]);
+    await conn.query("DELETE FROM kepala_unit WHERE id_pengguna = ?", [id]);
+    await conn.query("DELETE FROM ka_p4m WHERE id_pengguna = ?", [id]);
+
+    await conn.query("DELETE FROM pengguna WHERE id_pengguna = ?", [id]);
+
+    await conn.commit();
+    return res.status(200).json({ success: true, message: "Akun berhasil dihapus." });
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error deleteUser:", error);
+    return res.status(500).json({ success: false, message: "Gagal menghapus akun." });
+  } finally {
+    conn.release();
+  }
+}
+
+// ── POST /api/users/:id/tanda-tangan — upload gambar TTD akun ────────
+// Dipakai halaman Data Akun agar Staf P4M / Ka P4M / Kepala Unit punya
+// tanda tangan digital yang otomatis ditempel di dokumen PDF (mis.
+// PDF Rekapitulasi), mirip tanda tangan digital di dokumen bank.
+async function uploadTandaTangan(req, res) {
+  const { id } = req.params;
+
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "Tidak ada file tanda tangan yang diunggah." });
+  }
+
+  try {
+    const [existing] = await pool.query(
+      "SELECT id_pengguna, tanda_tangan FROM pengguna WHERE id_pengguna = ?",
+      [id]
+    );
+    if (existing.length === 0) {
+      // hapus file yang sudah kepalang di-upload multer karena akun tidak ada
+      fs.unlink(path.join(UPLOAD_DIR, req.file.filename), () => {});
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    // hapus file TTD lama (kalau ada) supaya folder uploads tidak menumpuk
+    const fileLama = existing[0].tanda_tangan;
+    if (fileLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fileLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET tanda_tangan = ? WHERE id_pengguna = ?", [
+      req.file.filename,
+      id,
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Tanda tangan berhasil diunggah.",
+      tandaTangan: req.file.filename,
+    });
+  } catch (error) {
+    console.error("Error uploadTandaTangan:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengunggah tanda tangan." });
+  }
+}
+
+// ── DELETE /api/users/:id/tanda-tangan — hapus gambar TTD akun ───────
+async function deleteTandaTangan(req, res) {
+  const { id } = req.params;
+  try {
+    const [existing] = await pool.query(
+      "SELECT tanda_tangan FROM pengguna WHERE id_pengguna = ?",
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: "Akun tidak ditemukan." });
+    }
+
+    const fileLama = existing[0].tanda_tangan;
+    if (fileLama) {
+      fs.unlink(path.join(UPLOAD_DIR, fileLama), () => {});
+    }
+
+    await pool.query("UPDATE pengguna SET tanda_tangan = NULL WHERE id_pengguna = ?", [id]);
+    return res.status(200).json({ success: true, message: "Tanda tangan berhasil dihapus." });
+  } catch (error) {
+    console.error("Error deleteTandaTangan:", error);
+    return res.status(500).json({ success: false, message: "Gagal menghapus tanda tangan." });
   }
 }
 
 module.exports = {
-  notifikasiUntukPengguna,
-  notifikasiUntukRole,
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  uploadTandaTangan,
+  deleteTandaTangan,
+  getProfile,
+  updateProfile,
+  changePassword,
+  lewatiGantiPassword,
+  uploadFotoProfil,
+  deleteFotoProfil,
 };
