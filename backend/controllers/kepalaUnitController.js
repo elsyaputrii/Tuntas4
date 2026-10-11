@@ -27,12 +27,27 @@
 const { pool } = require("../config/db");
 const { notifikasiUntukRole } = require("../utils/notifikasi");
 
+// ✅ FIX: akun Ka P4M otomatis dianggap Kepala Unit P4M TANPA butuh baris
+// `kepala_unit` khusus. Sebelumnya fungsi ini mencari
+//   kepala_unit WHERE unit = 'P4M'
+// lalu mengembalikan null kalau akun "Kepala Unit P4M" sudah dihapus →
+// semua halaman Kepala Unit di sisi Ka P4M error 403 "Data kepala unit tidak
+// ditemukan untuk akun ini."
+//
+// Sekarang semua query dibatasi lewat `unit` (kolom boxing.unit_tujuan),
+// bukan `id_kepala`. Skema memang mengizinkan boxing.id_kepala NULL
+// ("unit tidak harus punya akun", lihat database/add_unit_tujuan.sql), jadi
+// laporan unit P4M tetap ketemu walau akun/baris kepala unit-nya tidak ada
+// atau sudah dibuat ulang dengan id_kepala baru.
+//
+// `id_kepala` tetap dikembalikan kalau barisnya masih ada (dipakai untuk
+// mengisi pelaksanaan_tindakan.id_kepala), kalau tidak ada nilainya null.
 async function getKepalaInfo(req) {
   if (req.user.role === "ka_p4m") {
     const [rows] = await pool.query(
-      `SELECT id_kepala, unit FROM kepala_unit WHERE unit = 'P4M' LIMIT 1`,
+      `SELECT id_kepala FROM kepala_unit WHERE unit = 'P4M' LIMIT 1`,
     );
-    return rows[0] || null;
+    return { id_kepala: rows[0]?.id_kepala ?? null, unit: "P4M" };
   }
   const [rows] = await pool.query(
     `SELECT id_kepala, unit FROM kepala_unit WHERE id_pengguna = ?`,
@@ -71,7 +86,7 @@ async function getLaporanMasuk(req, res) {
       FROM boxing_ketidaksesuaian b
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
-      WHERE b.id_kepala = ?
+      WHERE b.unit_tujuan = ?
         AND b.status NOT IN ('selesai')
         AND (
           -- (a) Belum pernah kirim: status masih 'terdistribusi' dari Staf P4M
@@ -80,7 +95,7 @@ async function getLaporanMasuk(req, res) {
           OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
         )
       ORDER BY b.created_at DESC`,
-      [kepala.id_kepala],
+      [kepala.unit],
     );
     return res.status(200).json({ success: true, data: rows });
   } catch (error) {
@@ -117,8 +132,8 @@ async function submitRancangan(req, res) {
 
     const [boxingRows] = await pool.query(
       `SELECT id_boxing, id_laporan, status FROM boxing_ketidaksesuaian
-       WHERE id_boxing = ? AND id_kepala = ?`,
-      [id_boxing, kepala.id_kepala],
+       WHERE id_boxing = ? AND unit_tujuan = ?`,
+      [id_boxing, kepala.unit],
     );
     if (boxingRows.length === 0) {
       return res.status(403).json({
@@ -237,11 +252,11 @@ async function getLaporanHasil(req, res) {
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
       JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
-      WHERE b.id_kepala = ?
+      WHERE b.unit_tujuan = ?
         AND r.status_review IN ('ditindaklanjuti', 'tidak_ditindaklanjuti')
         AND b.status = 'menunggu_pelaksanaan'
       ORDER BY b.created_at DESC`,
-      [kepala.id_kepala],
+      [kepala.unit],
     );
     return res.status(200).json({ success: true, data: rows });
   } catch (error) {
@@ -286,10 +301,10 @@ async function submitPelaksanaan(req, res) {
        FROM boxing_ketidaksesuaian b
        JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
        JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
-       WHERE b.id_boxing = ? AND b.id_kepala = ?
+       WHERE b.id_boxing = ? AND b.unit_tujuan = ?
          AND r.status_review IN ('ditindaklanjuti', 'tidak_ditindaklanjuti')
          AND b.status = 'menunggu_pelaksanaan'`,
-      [id_boxing, kepala.id_kepala],
+      [id_boxing, kepala.unit],
     );
 
     if (boxingRows.length === 0) {
@@ -388,9 +403,9 @@ async function getRiwayat(req, res) {
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
-      WHERE b.id_kepala = ?
+      WHERE b.unit_tujuan = ?
       ORDER BY COALESCE(p.tanggal, b.created_at) DESC, b.id_boxing DESC`,
-      [kepala.id_kepala],
+      [kepala.unit],
     );
 
     const total = rows.length;
@@ -430,8 +445,8 @@ async function getRencana(req, res) {
 
     const [boxingRows] = await pool.query(
       `SELECT id_boxing FROM boxing_ketidaksesuaian 
-       WHERE id_boxing = ? AND id_kepala = ?`,
-      [id_boxing, kepala.id_kepala],
+       WHERE id_boxing = ? AND unit_tujuan = ?`,
+      [id_boxing, kepala.unit],
     );
     if (boxingRows.length === 0) {
       return res.status(403).json({
@@ -499,8 +514,8 @@ async function addRencana(req, res) {
 
     const [boxingRows] = await pool.query(
       `SELECT id_boxing FROM boxing_ketidaksesuaian 
-       WHERE id_boxing = ? AND id_kepala = ?`,
-      [id_boxing, kepala.id_kepala],
+       WHERE id_boxing = ? AND unit_tujuan = ?`,
+      [id_boxing, kepala.unit],
     );
     if (boxingRows.length === 0) {
       return res.status(403).json({
@@ -592,8 +607,8 @@ async function updateRencana(req, res) {
        FROM rencana_tindak_lanjut r
        JOIN boxing_ketidaksesuaian b ON b.id_boxing = r.id_boxing
        LEFT JOIN rancangan_tindakan ra ON ra.id_boxing = r.id_boxing
-       WHERE r.id = ? AND b.id_kepala = ?`,
-      [id, kepala.id_kepala],
+       WHERE r.id = ? AND b.unit_tujuan = ?`,
+      [id, kepala.unit],
     );
     if (rows.length === 0) {
       return res.status(404).json({
@@ -646,8 +661,8 @@ async function deleteRencana(req, res) {
        FROM rencana_tindak_lanjut r
        JOIN boxing_ketidaksesuaian b ON b.id_boxing = r.id_boxing
        LEFT JOIN rancangan_tindakan ra ON ra.id_boxing = r.id_boxing
-       WHERE r.id = ? AND b.id_kepala = ?`,
-      [id, kepala.id_kepala],
+       WHERE r.id = ? AND b.unit_tujuan = ?`,
+      [id, kepala.unit],
     );
     if (rows.length === 0) {
       return res.status(404).json({

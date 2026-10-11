@@ -9,13 +9,65 @@
 const nodemailer = require("nodemailer");
 const { pool } = require("../config/db");
 
+// ✅ FIX email lambat masuk:
+// Sebelumnya transporter dibuat TANPA pooling, jadi SETIAP email membuka
+// koneksi TLS + login baru ke smtp.gmail.com (lambat, dan kalau ada beberapa
+// penerima sekaligus, puluhan koneksi baru dibuka bersamaan → Gmail sering
+// menahan/menolak sementara). Tanpa timeout & tanpa retry juga, email yang
+// tersangkut hilang begitu saja.
+//
+// Sekarang: koneksi dipakai ulang (pool), jumlah koneksi dibatasi, ada
+// timeout supaya tidak menggantung, dan kirim ulang otomatis kalau gagal.
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 100,
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 30000,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
+
+// Cek login SMTP sekali saat server start, supaya kalau EMAIL_USER/EMAIL_PASS
+// (App Password Gmail) salah atau port diblokir, langsung kelihatan di log —
+// bukan baru ketahuan saat ada yang protes email tidak masuk.
+transporter
+  .verify()
+  .then(() => console.log("✅ SMTP Gmail siap mengirim email."))
+  .catch((error) =>
+    console.error("❌ SMTP Gmail GAGAL terhubung:", error.message)
+  );
+
+const MAX_PERCOBAAN_EMAIL = 3;
+const JEDA_RETRY_MS = 5000; // 5 dtk, lalu 10 dtk
+
+async function kirimDenganRetry(mail, percobaan = 1) {
+  const mulai = Date.now();
+  try {
+    await transporter.sendMail(mail);
+    console.log(
+      `📧 Email ke ${mail.to} terkirim ke Gmail dalam ${Date.now() - mulai} ms` +
+        (percobaan > 1 ? ` (percobaan ke-${percobaan})` : "")
+    );
+  } catch (error) {
+    if (percobaan < MAX_PERCOBAAN_EMAIL) {
+      const jeda = JEDA_RETRY_MS * percobaan;
+      console.warn(
+        `⚠️ Email ke ${mail.to} gagal (${error.message}). Coba lagi ${jeda / 1000} dtk lagi (percobaan ${percobaan}/${MAX_PERCOBAAN_EMAIL}).`
+      );
+      setTimeout(() => kirimDenganRetry(mail, percobaan + 1), jeda);
+    } else {
+      console.error(
+        `❌ Gagal kirim email ke ${mail.to} setelah ${MAX_PERCOBAAN_EMAIL} percobaan:`,
+        error.message
+      );
+    }
+  }
+}
 
 // ============================================================
 // KONFIGURASI
@@ -61,12 +113,12 @@ async function kirimEmail(to, judul, pesan, link) {
 
   const url = link ? `${FRONTEND_URL}${link.startsWith("/") ? link : "/" + link}` : null;
 
-  try {
-    await transporter.sendMail({
-      from: `"TUNTAS4 - P4M Polibatam" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html: `
+  // kirimDenganRetry tidak pernah melempar error, jadi aman dipanggil tanpa await
+  await kirimDenganRetry({
+    from: `"TUNTAS4 - P4M Polibatam" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #18253d;">${judul}</h2>
           <p style="font-size: 14px; color: #333;">${pesan}</p>
@@ -80,10 +132,7 @@ async function kirimEmail(to, judul, pesan, link) {
           </p>
         </div>
       `,
-    });
-  } catch (error) {
-    console.error("❌ Gagal kirim email notifikasi:", error.message);
-  }
+  });
 }
 
 // ============================================================

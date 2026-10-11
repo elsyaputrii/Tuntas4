@@ -14,7 +14,7 @@
 //                              hasil tindak lanjut unit.
 
 const { pool } = require("../config/db");
-const { notifikasiUntukPengguna } = require("../utils/notifikasi");
+const { notifikasiUntukPengguna, notifikasiUntukRole } = require("../utils/notifikasi");
 const { UNITS_UMUM } = require("../constants/unitsUmum");
 
 // ============================================================
@@ -142,7 +142,14 @@ async function distribusiLaporan(req, res) {
         [unit]
       );
 
-      if (kepalaRows.length === 0) {
+      // ✅ FIX: unit P4M ditangani langsung oleh akun Ka P4M (menu Kepala Unit
+      // sudah tergabung di sana), jadi akun "Kepala Unit P4M" terpisah tidak
+      // wajib ada. Tanpa ini, setelah akun itu dihapus, distribusi ke P4M
+      // selalu gagal dengan pesan "belum terdaftar".
+      // boxing.id_kepala boleh NULL (lihat database/add_unit_tujuan.sql).
+      const unitIniP4M = unit === "P4M";
+
+      if (kepalaRows.length === 0 && !unitIniP4M) {
         await conn.rollback();
         conn.release();
         return res.status(400).json({
@@ -151,8 +158,16 @@ async function distribusiLaporan(req, res) {
         });
       }
 
-      const { id_kepala, id_pengguna: id_pengguna_kepala } = kepalaRows[0];
-      kepalaUntukNotif.push({ id_pengguna: id_pengguna_kepala, unit });
+      const id_kepala = kepalaRows[0]?.id_kepala ?? null;
+      const id_pengguna_kepala = kepalaRows[0]?.id_pengguna ?? null;
+
+      if (unitIniP4M) {
+        // semua akun Ka P4M dikabari (id_pengguna null = pakai role)
+        kepalaUntukNotif.push({ role: "ka_p4m", unit });
+      }
+      if (id_pengguna_kepala) {
+        kepalaUntukNotif.push({ id_pengguna: id_pengguna_kepala, unit });
+      }
 
       const [result] = await conn.query(
         `INSERT INTO boxing_ketidaksesuaian
@@ -171,12 +186,21 @@ async function distribusiLaporan(req, res) {
     await conn.commit();
 
     for (const k of kepalaUntukNotif) {
-      notifikasiUntukPengguna(k.id_pengguna, {
+      const isi = {
         judul: "Laporan Baru untuk Unit Anda",
         pesan: `Ada laporan ketidaksesuaian baru yang didistribusikan ke unit ${k.unit}. Mohon segera ditindaklanjuti.`,
         jenis: "distribusi_unit",
-        link: "/kepala-unit/ketidaksesuaian-masuk",
-      });
+        // Ka P4M membuka menu Kepala Unit lewat prefix /ka-p4m/kepala-unit
+        link:
+          k.role === "ka_p4m"
+            ? "/ka-p4m/kepala-unit/ketidaksesuaian-masuk"
+            : "/kepala-unit/ketidaksesuaian-masuk",
+      };
+      if (k.role) {
+        notifikasiUntukRole(k.role, isi);
+      } else {
+        notifikasiUntukPengguna(k.id_pengguna, isi);
+      }
     }
 
     return res.status(201).json({
