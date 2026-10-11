@@ -11,7 +11,6 @@ import {
   CloudUpload,
   Info,
   Rocket,
-  Sparkles,
 } from "lucide-react";
 
 type Step = "form" | "success";

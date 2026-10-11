@@ -58,7 +58,7 @@ export default function DataAkunPage() {
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch('http://localhost:5000/api/users', {
+      const response = await fetch('/api/users', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -107,8 +107,8 @@ export default function DataAkunPage() {
 
     try {
       const url = selectedUser 
-        ? `http://localhost:5000/api/users/${selectedUser.id}`
-        : 'http://localhost:5000/api/users';
+        ? `/api/users/${selectedUser.id}`
+        : '/api/users';
       const method = selectedUser ? 'PUT' : 'POST';
 
       const token = localStorage.getItem("token");
@@ -138,7 +138,7 @@ export default function DataAkunPage() {
     if (selectedUser) {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch(`http://localhost:5000/api/users/${selectedUser.id}`, {
+        const response = await fetch(`/api/users/${selectedUser.id}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,

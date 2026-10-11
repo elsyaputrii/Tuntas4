@@ -7,6 +7,7 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),

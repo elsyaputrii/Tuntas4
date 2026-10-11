@@ -9,7 +9,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { User, Mail, ArrowLeft, MailCheck } from "lucide-react";
+import { User, ArrowLeft, MailCheck } from "lucide-react";
 import { authApi } from "@/lib/api";
 
 type Role = "staf_p4m" | "ka_p4m" | "kepala_unit";

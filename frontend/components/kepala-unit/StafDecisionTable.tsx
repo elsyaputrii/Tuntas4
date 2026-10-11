@@ -5,7 +5,7 @@ import { kepalaUnitApi } from "@/lib/api";
 import ImageModal from "@/components/ui/ImageModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import AutoResizeTextarea from "@/components/ui/AutoResizeTextarea";
-import RencanaPanel, { RencanaItem } from "@/components/kepala-unit/RencanaPanel";
+import RencanaPanel from "@/components/kepala-unit/RencanaPanel";
 import {
   Image as ImageIcon,
   XCircle,
