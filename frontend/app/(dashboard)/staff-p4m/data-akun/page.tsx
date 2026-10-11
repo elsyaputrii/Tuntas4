@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from "react";
+import { userApi } from "@/lib/api";
 import {
   Edit,
   Trash2,
@@ -57,20 +58,11 @@ export default function DataAkunPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch('/api/users', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await userApi.getUsers();
       setUsers(data);
     } catch (error) {
-      console.error('Gagal ambil data:', error);
-      setError('Gagal memuat data akun. Pastikan backend berjalan di http://localhost:5000');
+      console.error("Gagal ambil data:", error);
+      setError("Gagal memuat data akun. Pastikan backend berjalan.");
       setUsers([]);
     } finally {
       setLoading(false);
@@ -99,62 +91,56 @@ export default function DataAkunPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedUser && !formData.password) {
       alert("Password wajib diisi untuk akun baru!");
       return;
     }
 
     try {
-      const url = selectedUser 
-        ? `/api/users/${selectedUser.id}`
-        : '/api/users';
-      const method = selectedUser ? 'PUT' : 'POST';
-
-      const token = localStorage.getItem("token");
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        fetchUsers(); // Refresh data
-        closeModal();
+      if (selectedUser) {
+        await userApi.updateUser(selectedUser.id, {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          nip: formData.nip,
+          unit: formData.unit,
+          status: formData.status,
+          password: formData.password || undefined,
+        });
       } else {
-        const errorData = await response.json();
-        alert(`Gagal menyimpan data: ${errorData.message || 'Silakan coba lagi'}`);
+        await userApi.createUser({
+          name: formData.name || "",
+          email: formData.email || "",
+          password: formData.password || "",
+          role: formData.role || "staff_p4m",
+          nip: formData.nip,
+          unit: formData.unit,
+          status: formData.status,
+        });
       }
+      fetchUsers();
+      closeModal();
     } catch (error) {
       console.error("Error:", error);
-      alert("Terjadi kesalahan. Silakan coba lagi.");
+      alert(
+        `Gagal menyimpan data: ${
+          error instanceof Error ? error.message : "Silakan coba lagi"
+        }`
+      );
     }
   };
 
   const handleDelete = async () => {
-    if (selectedUser) {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(`/api/users/${selectedUser.id}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (response.ok) {
-          setUsers(users.filter((user) => user.id !== selectedUser.id));
-        } else {
-          alert("Gagal menghapus akun. Silakan coba lagi.");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        alert("Terjadi kesalahan. Silakan coba lagi.");
-      }
+    if (!selectedUser) return;
+    try {
+      await userApi.deleteUser(selectedUser.id);
+      setUsers(users.filter((user) => user.id !== selectedUser.id));
       setIsDeleteModalOpen(false);
       setSelectedUser(null);
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Gagal menghapus akun. Silakan coba lagi.");
     }
   };
 
@@ -233,7 +219,7 @@ export default function DataAkunPage() {
       <div className="flex items-center justify-center h-125">
         <div className="text-center p-6 bg-red-50 rounded-xl max-w-md">
           <p className="text-red-600 font-semibold mb-2">⚠️ {error}</p>
-          <button 
+          <button
             onClick={fetchUsers}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
           >
@@ -259,8 +245,10 @@ export default function DataAkunPage() {
 
         {/* Statistik Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-linear-to-r from-slate-400 to-slate-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
-               onClick={() => setSelectedRoleFilter("all")}>
+          <div
+            className="bg-linear-to-r from-slate-400 to-slate-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            onClick={() => setSelectedRoleFilter("all")}
+          >
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-slate-100 text-sm">Seluruh Akun</p>
@@ -269,8 +257,10 @@ export default function DataAkunPage() {
               <Users size={32} className="text-slate-200" />
             </div>
           </div>
-          <div className="bg-linear-to-r from-emerald-400 to-emerald-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
-               onClick={() => setSelectedRoleFilter("staff_p4m")}>
+          <div
+            className="bg-linear-to-r from-emerald-400 to-emerald-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            onClick={() => setSelectedRoleFilter("staff_p4m")}
+          >
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-emerald-100 text-sm">Staff P4M</p>
@@ -279,8 +269,10 @@ export default function DataAkunPage() {
               <Briefcase size={32} className="text-emerald-200" />
             </div>
           </div>
-          <div className="bg-linear-to-r from-violet-400 to-violet-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
-               onClick={() => setSelectedRoleFilter("kepala_unit")}>
+          <div
+            className="bg-linear-to-r from-violet-400 to-violet-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            onClick={() => setSelectedRoleFilter("kepala_unit")}
+          >
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-violet-100 text-sm">Kepala Unit</p>
@@ -289,8 +281,10 @@ export default function DataAkunPage() {
               <UserCog size={32} className="text-violet-200" />
             </div>
           </div>
-          <div className="bg-linear-to-r from-amber-400 to-amber-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
-               onClick={() => setSelectedRoleFilter("ka_p4m")}>
+          <div
+            className="bg-linear-to-r from-amber-400 to-amber-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            onClick={() => setSelectedRoleFilter("ka_p4m")}
+          >
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-amber-100 text-sm">KA-P4M</p>
@@ -314,7 +308,10 @@ export default function DataAkunPage() {
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex-1 min-w-50px">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-300" size={18} />
+              <Search
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-300"
+                size={18}
+              />
               <input
                 type="text"
                 placeholder="Cari nama, email, atau NIP..."
@@ -372,14 +369,19 @@ export default function DataAkunPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition duration-150">
+                <tr
+                  key={user.id}
+                  className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition duration-150"
+                >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-linear-to-r from-blue-300 to-blue-400 flex items-center justify-center text-white font-semibold shadow-sm">
                         {user.name.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-medium text-slate-700 dark:text-white">{user.name}</p>
+                        <p className="font-medium text-slate-700 dark:text-white">
+                          {user.name}
+                        </p>
                         <p className="text-sm text-slate-400 flex items-center gap-1">
                           <Mail size={12} className="text-slate-300" /> {user.email}
                         </p>
@@ -387,11 +389,15 @@ export default function DataAkunPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full font-medium ${
-                      user.role === "staff_p4m" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
-                      user.role === "kepala_unit" ? "bg-violet-50 text-violet-600 border border-violet-100" :
-                      "bg-amber-50 text-amber-600 border border-amber-100"
-                    }`}>
+                    <span
+                      className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full font-medium ${
+                        user.role === "staff_p4m"
+                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                          : user.role === "kepala_unit"
+                          ? "bg-violet-50 text-violet-600 border border-violet-100"
+                          : "bg-amber-50 text-amber-600 border border-amber-100"
+                      }`}
+                    >
                       {getRoleIcon(user.role)}
                       {getRoleLabel(user.role)}
                     </span>
@@ -399,22 +405,34 @@ export default function DataAkunPage() {
                   <td className="px-6 py-4 text-sm text-slate-500">{user.nip}</td>
                   <td className="px-6 py-4 text-sm text-slate-500">{user.unit}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 text-xs rounded-full font-medium ${
-                      user.status === "active" 
-                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
-                        : "bg-rose-50 text-rose-600 border border-rose-100"
-                    }`}>
+                    <span
+                      className={`px-3 py-1 text-xs rounded-full font-medium ${
+                        user.status === "active"
+                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                          : "bg-rose-50 text-rose-600 border border-rose-100"
+                      }`}
+                    >
                       {user.status === "active" ? "Aktif" : "Tidak Aktif"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-400">{user.lastLogin}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400">
+                    {user.lastLogin}
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">
-                      <button onClick={() => openEditModal(user)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200">
+                      <button
+                        onClick={() => openEditModal(user)}
+                        className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                      >
                         <Edit size={16} />
                       </button>
-                      <button onClick={() => { setSelectedUser(user); setIsDeleteModalOpen(true); }} 
-                              className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200">
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200"
+                      >
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -424,7 +442,9 @@ export default function DataAkunPage() {
             </tbody>
           </table>
           {filteredUsers.length === 0 && (
-            <div className="text-center py-12 text-slate-400">Tidak ada data akun yang ditemukan</div>
+            <div className="text-center py-12 text-slate-400">
+              Tidak ada data akun yang ditemukan
+            </div>
           )}
         </div>
       </div>
@@ -435,14 +455,23 @@ export default function DataAkunPage() {
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${selectedUser ? 'bg-blue-50 text-blue-400' : 'bg-emerald-50 text-emerald-400'}`}>
+                <div
+                  className={`p-2 rounded-lg ${
+                    selectedUser
+                      ? "bg-blue-50 text-blue-400"
+                      : "bg-emerald-50 text-emerald-400"
+                  }`}
+                >
                   {selectedUser ? <Edit size={20} /> : <UserPlus size={20} />}
                 </div>
                 <h3 className="text-xl font-semibold text-slate-700 dark:text-white">
-                  {selectedUser ? 'Edit Akun' : 'Tambah Akun Baru'}
+                  {selectedUser ? "Edit Akun" : "Tambah Akun Baru"}
                 </h3>
               </div>
-              <button onClick={closeModal} className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
                 <X size={20} className="text-slate-400" />
               </button>
             </div>
@@ -539,7 +568,11 @@ export default function DataAkunPage() {
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                     Password {!selectedUser && <span className="text-rose-400">*</span>}
-                    {selectedUser && <span className="text-sm text-slate-400 ml-2">(Kosongkan jika tidak diubah)</span>}
+                    {selectedUser && (
+                      <span className="text-sm text-slate-400 ml-2">
+                        (Kosongkan jika tidak diubah)
+                      </span>
+                    )}
                   </label>
                   <input
                     type="password"
@@ -547,7 +580,11 @@ export default function DataAkunPage() {
                     value={formData.password || ""}
                     onChange={handleInputChange}
                     required={!selectedUser}
-                    placeholder={selectedUser ? "Masukkan password baru (opsional)" : "Masukkan password"}
+                    placeholder={
+                      selectedUser
+                        ? "Masukkan password baru (opsional)"
+                        : "Masukkan password"
+                    }
                     className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
                   />
                 </div>
@@ -566,7 +603,7 @@ export default function DataAkunPage() {
                   className="px-6 py-2 bg-linear-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-colors shadow-sm flex items-center gap-2"
                 >
                   {selectedUser ? <Edit size={18} /> : <UserPlus size={18} />}
-                  {selectedUser ? 'Simpan Perubahan' : 'Tambah Akun'}
+                  {selectedUser ? "Simpan Perubahan" : "Tambah Akun"}
                 </button>
               </div>
             </form>
@@ -591,9 +628,12 @@ export default function DataAkunPage() {
                 Apakah Anda yakin ingin menghapus akun <br />
                 <span className="font-semibold text-slate-600 dark:text-slate-300">
                   {selectedUser.name}
-                </span>?
+                </span>
+                ?
                 <br />
-                <span className="text-sm text-rose-400">Tindakan ini tidak dapat dibatalkan!</span>
+                <span className="text-sm text-rose-400">
+                  Tindakan ini tidak dapat dibatalkan!
+                </span>
               </p>
               <div className="flex items-center justify-center gap-3">
                 <button
