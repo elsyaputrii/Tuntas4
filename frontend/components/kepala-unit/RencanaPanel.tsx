@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { kepalaUnitApi } from "@/lib/api";
 import { Plus, Pencil, Trash2, Calendar } from "lucide-react";
 
+const todayStr = () => new Date().toISOString().split("T")[0];
+
 export interface RencanaItem {
   id: number;
   teks: string;
@@ -86,6 +88,10 @@ export default function RencanaPanel({
     }
     if (!formTanggal) {
       setFormErr("Tanggal harus diisi.");
+      return false;
+    }
+    if (formTanggal < todayStr()) {
+      setFormErr("Tanggal tidak boleh lewat.");
       return false;
     }
     return true;
@@ -194,6 +200,7 @@ export default function RencanaPanel({
             type="date"
             className="w-full border border-black p-1.5 text-[10px] outline-none focus:border-blue-polibatam rounded"
             value={formTanggal}
+            min={todayStr()}
             onChange={(e) => setFormTanggal(e.target.value)}
           />
 

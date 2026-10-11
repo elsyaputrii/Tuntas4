@@ -101,7 +101,7 @@ export default function FAQSection() {
             </h3>
 
             <p className="mt-6 text-blue-100 leading-relaxed">
-              Sampaikan kritik, saran, dan ketidaksesuaian dengan mudah,
+              Sampaikan masukan, kritik, dan pengaduan dengan mudah,
               cepat, dan transparan tanpa perlu login.
             </p>
 

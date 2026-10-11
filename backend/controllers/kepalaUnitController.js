@@ -481,6 +481,13 @@ async function addRencana(req, res) {
     });
   }
 
+  if (tgl < today) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
+    });
+  }
+
   try {
     const kepala = await getKepalaInfo(req);
     if (!kepala) {
@@ -561,6 +568,13 @@ async function updateRencana(req, res) {
     return res.status(400).json({
       success: false,
       message: "Tanggal tidak valid.",
+    });
+  }
+
+  if (tgl < today) {
+    return res.status(400).json({
+      success: false,
+      message: "Tanggal rencana tidak boleh tanggal yang sudah lewat.",
     });
   }
 

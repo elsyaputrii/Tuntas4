@@ -109,7 +109,7 @@ export default function DiscrepancyTable() {
       return;
     }
     if ((rencanaCount[id_boxing] || 0) === 0) {
-      alert("Minimal 1 rancangan tindak lanjut harus ditambahkan.");
+      alert("Minimal 1 rencana tindak lanjut harus ditambahkan.");
       return;
     }
     setConfirmId(id_boxing);
@@ -176,7 +176,7 @@ export default function DiscrepancyTable() {
       <ConfirmDialog
         open={confirmId !== null}
         title="Konfirmasi Kirim"
-        message="Yakin ingin mengirim ini ke Ka P4M? Penyebab dan semua Rancangan Tindak Lanjut akan diteruskan."
+        message="Yakin ingin mengirim ini ke Ka P4M? Penyebab dan semua Rencana Tindak Lanjut akan diteruskan."
         confirmLabel="Kirim"
         cancelLabel="Batal"
         loading={confirmId !== null && !!sending[confirmId]}
@@ -190,7 +190,7 @@ export default function DiscrepancyTable() {
           <div className="w-[12%] border-r-2 border-black p-3 text-[11px]">Tanggal Masuk</div>
           <div className="w-[12%] border-r-2 border-black p-3 text-[11px]">Tanggal Kejadian</div>
           <div className="w-[18%] border-r-2 border-black p-3 text-[11px]">Penyebab</div>
-          <div className="w-[18%] border-r-2 border-black p-3 text-[11px]">Rancangan Tindak Lanjut</div>
+          <div className="w-[18%] border-r-2 border-black p-3 text-[11px]">Rencana Tindak Lanjut</div>
           <div className="flex-1 p-3 text-[11px]">Aksi</div>
         </div>
 
@@ -262,7 +262,7 @@ export default function DiscrepancyTable() {
                   />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rancangan Tindak Lanjut</p>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Rencana Tindak Lanjut</p>
                   <RencanaPanel
                     idBoxing={item.id_boxing}
                     onCountChange={handleCountChange}
@@ -356,7 +356,7 @@ export default function DiscrepancyTable() {
                   )}
                 </div>
 
-                {/* Kolom Rancangan */}
+                {/* Kolom Rencana */}
                 <div className="w-[18%] border-r-2 border-black p-3">
                   <RencanaPanel
                     idBoxing={item.id_boxing}

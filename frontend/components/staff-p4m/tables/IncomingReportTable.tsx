@@ -164,7 +164,7 @@ function MultiSelectUnit({
               </span>
             ))
           ) : (
-            <span className="text-gray-400 text-[11px]">pilih unit yang di tuju</span>
+            <span className="text-gray-400 text-[11px]">pilih unit yang dituju</span>
           )}
         </div>
         <ChevronDown size={13} className={`ml-1 transition-transform ${open ? "rotate-180" : ""}`} />

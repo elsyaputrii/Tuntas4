@@ -167,34 +167,25 @@ function buildTahapProgres(laporan, ringkasan, detailUnit = []) {
   const semuaUnitSudahDireview =
     semuaUnitSudahMengisi && unitSudahDireview.length === totalUnitSeharusnya;
 
-  // 3. Filter Unit Sesuai vs Perbaikan Berkelanjutan
-  const unitSesuai = detailUnit.filter(
-    (u) => u.status_review === "tidak_ditindaklanjuti"
-  );
-  
-  const unitPerbaikan = detailUnit.filter(
-    (u) => u.status_review === "ditindaklanjuti"
-  );
-
-  // ⬇️ VARIABEL INI HARUS DISEBUT DULU DI SINI SEBELUM DIPAKAI DI TAHAP 5!
-  const unitPerbaikanBelumHasil = unitPerbaikan
+  // 3. Cek laporan hasil pelaksanaan dari SELURUH unit
+  const unitBelumHasil = detailUnit
     .filter((u) => !Boolean(u.ada_pelaksanaan))
     .map((u) => u.unit_tujuan);
 
-  // Tahap 5 otomatis CENTANG HIJAU kalau semua unit perbaikan SUDAH KIRIM HASIL
+  // Tahap 5 selesai jika seluruh unit sudah ditinjau dan seluruh unit sudah mengirim laporan hasil pelaksanaan.
   const tahap5Selesai =
-    semuaUnitSudahDireview && unitPerbaikanBelumHasil.length === 0;
+    semuaUnitSudahDireview && unitBelumHasil.length === 0;
 
-  // Teks Deskripsi Tahap 5
   let deskripsiTahap5 = "";
+
   if (!semuaUnitSudahDireview) {
     deskripsiTahap5 = "Menunggu tinjauan Ka P4M untuk seluruh unit.";
-  } else if (unitSesuai.length === totalUnitSeharusnya) {
-    deskripsiTahap5 = "Tidak memerlukan tindakan lanjutan.";
-  } else if (unitPerbaikanBelumHasil.length > 0) {
-    deskripsiTahap5 = `Menunggu laporan hasil pelaksanaan dari: ${unitPerbaikanBelumHasil.join(", ")}.`;
+  } else if (unitBelumHasil.length > 0) {
+    deskripsiTahap5 =
+      `Menunggu laporan hasil pelaksanaan dari: ${unitBelumHasil.join(", ")}.`;
   } else {
-    deskripsiTahap5 = "Seluruh unit telah mengirimkan laporan hasil pelaksanaan.";
+    deskripsiTahap5 =
+      "Seluruh unit telah mengirimkan laporan hasil pelaksanaan.";
   }
 
   // Teks Deskripsi Tahap 6
@@ -202,7 +193,7 @@ function buildTahapProgres(laporan, ringkasan, detailUnit = []) {
   if (status === "selesai") {
     deskripsiTahap6 = "Laporan telah resmi diselesaikan dan ditutup oleh Staf P4M.";
   } else if (tahap5Selesai) {
-    deskripsiTahap6 = "Hasil pelaksanaan unit telah diterima. Menunggu verifikasi centang/silang akhir dari Staf P4M.";
+    deskripsiTahap6 = "Hasil pelaksanaan unit telah diterima. Menunggu verifikasi akhir dari Staf P4M.";
   } else {
     deskripsiTahap6 = "Menunggu penyelesaian seluruh tahapan unit.";
   }

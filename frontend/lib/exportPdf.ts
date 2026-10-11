@@ -132,7 +132,7 @@ const BASE_CSS = `
   .header-borang .logo { display:block; flex:0 0 80px; width:80px; height:80px; max-width:80px; object-fit:contain; }
   .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}
   .header-borang .doc-number { font-weight:700; white-space:nowrap; }
-  .header-borang .doc-title-text { text-decoration:underline; }
+  .header-borang .doc-title-text { text-decoration:underline; line-height: 1.5; }
   .header-borang .doc-date { font-size:9pt; font-weight:700; color:#000; margin-top:4px; }
   .header-borang .doc-subtitle { font-size:8.5pt; color:#555; margin-top:3px; line-height:1.4; }
 
@@ -165,9 +165,9 @@ const BASE_CSS = `
   .close-btn:hover { background:#3a4d5e; }
 
   @media print {
-    body { padding:32px; padding-top:20px; }
-    @page { size:A4 landscape; margin:18mm; }
-    tr { page-break-inside:avoid; break-inside:avoid; }
+    body { padding:0 15px; margin:0; }
+    @page { size:A4 landscape; margin:15mm 16mm; }
+    tr { page-break-inside:auto; break-inside:auto; }
     .header-borang { page-break-inside:avoid; break-inside:avoid; }
     .footer, .ttd { page-break-inside:avoid; break-inside:avoid; }
     .close-btn { display:none !important; }
@@ -206,7 +206,6 @@ function renderHeaderBorang(subtitleInfo?: string) {
         <br />
         Tindakan Koreksi/Pencegahan
       </div>
-      <div class="doc-date">23 September 2020</div>
       ${subtitleInfo ? `<div class="doc-subtitle">${subtitleInfo}</div>` : ""}
     </div>
   </div>`;
@@ -420,7 +419,7 @@ export async function exportPDFProses(
   const jabatanPenandatanganProses = "Staff P4M";
   const tglCetakProses = fmtTglWaktu(new Date().toISOString());
 
-  // ✅ TTE format baru
+  // TTE format baru
   const qrTextProses = await buildQrTteText({
     penandatangan: jabatanPenandatanganProses,
     perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
@@ -428,12 +427,9 @@ export async function exportPDFProses(
   });
   const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
-  const hasilTindakLanjutPdf =
-  item.hasil_tindakan
-    ? item.hasil_tindakan
-    : item.status_boxing === "selesai"
-      ? `<em style="color:#9ca3af">Sudah sesuai, tidak ditindaklanjuti</em>`
-      : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+  const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
+  ? item.hasil_tindakan
+  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
@@ -548,12 +544,9 @@ export async function exportPDFRiwayatKepalaUnit(
   const jabatanPenandatangan = `Kepala Unit — ${namaUnit}`;
   void penandatangan;
   const isSelesai = item.status_boxing === "selesai";
-  const hasilTindakLanjutPdf =
-  item.hasil_tindakan
-    ? item.hasil_tindakan
-    : isSelesai
-      ? `<em style="color:#9ca3af">Sudah sesuai, tidak ditindaklanjuti</em>`
-      : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+  const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
+  ? item.hasil_tindakan
+  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const statusLabel = isSelesai
     ? "Selesai — Disetujui Staf P4M"

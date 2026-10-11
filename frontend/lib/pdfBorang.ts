@@ -151,7 +151,6 @@ export function cetakBorangRegistrasi(data: BorangRegistrasiData): void {
       </td>
       <td style="padding:6px 8px; vertical-align:middle;">
         <p class="nomor-borang">No.BO.34.3.1-V6</p>
-        <p class="small" style="margin-top:4px;">23 September 2020</p>
         <p class="small" style="margin-top:8px; font-style:italic;">Dicetak via TUNTAS</p>
         <p class="small">${fmtTgl(new Date().toISOString())}</p>
       </td>

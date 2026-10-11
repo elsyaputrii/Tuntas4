@@ -855,12 +855,8 @@ export default function ProcessMonitorTable() {
                         className="border-r-2 border-black p-3 align-top"
                       >
                         <div className="border border-gray-300 p-2 min-h-16 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
-                          {item.hasil_tindakan ? (
+                          {item.hasil_tindakan?.trim() ? (
                             item.hasil_tindakan
-                          ) : item.status_review === "tidak_ditindaklanjuti" ? (
-                            <span className="inline-block text-[9px] text-gray-400 italic bg-gray-50 px-1.5 py-0.5 rounded">
-                              Sudah sesuai, tidak ditindaklanjuti
-                            </span>
                           ) : (
                             <span className="text-[9px] text-gray-400 italic">
                               Belum ada hasil
@@ -1001,13 +997,8 @@ export default function ProcessMonitorTable() {
                             className="border-r-2 border-black p-3 align-top"
                           >
                             <div className="border border-gray-300 p-2 min-h-16 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
-                              {item.hasil_tindakan ? (
+                              {item.hasil_tindakan?.trim() ? (
                                 item.hasil_tindakan
-                              ) : item.status_review ===
-                                "tidak_ditindaklanjuti" ? (
-                                <span className="inline-block text-[9px] text-gray-400 italic bg-gray-50 px-1.5 py-0.5 rounded">
-                                  Sudah sesuai, tidak ditindaklanjuti
-                                </span>
                               ) : (
                                 <span className="text-[9px] text-gray-400 italic">
                                   Belum ada hasil

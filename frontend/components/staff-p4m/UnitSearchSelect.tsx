@@ -57,7 +57,7 @@ export default function UnitSearchSelect() {
               </span>
             ))
           ) : (
-            <span className="text-gray-400 text-[11px]">pilih unit yang di tuju</span>
+            <span className="text-gray-400 text-[11px]">pilih unit yang dituju</span>
           )}
         </div>
         <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />

@@ -408,12 +408,12 @@ export default function KaP4MHasilTable() {
                           {/* Hasil Tindak Lanjut Unit — rata kiri-kanan */}
                           <td className={`border-r-2 border-black p-3 align-top ${isLastUnit ? "border-b-2" : "border-b"}`}>
                             <div className="border border-gray-400 min-h-16 p-2 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
-                              {item.hasil_tindakan ? (
+                              {item.hasil_tindakan?.trim() ? (
                                 item.hasil_tindakan
-                              ) : item.approval_staf === "diterima" ? (
-                                <span className="text-gray-400 italic">Sudah sesuai, tidak ditindaklanjuti</span>
                               ) : (
-                                <span className="text-gray-400 italic">Belum diisi Kepala Unit</span>
+                                <span className="text-gray-400 italic">
+                                  Belum diisi Kepala Unit
+                                </span>
                               )}
                             </div>
                             {item.tanggal_pelaksanaan && (
