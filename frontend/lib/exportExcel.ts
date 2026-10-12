@@ -32,7 +32,14 @@ const KOLOM: KolomTabel[] = [
   { header: "Tgl Pelaksanaan",       key: "tglPelaks",   width: 17 },
   { header: "Status Review",         key: "statusReview",width: 18 },
   { header: "Status Proses",         key: "statusBoxing",width: 17 },
+  { header: "Foto Laporan",          key: "fotoAwal",    width: 24 },
+  { header: "Foto Hasil",            key: "fotoHasil",   width: 24 },
 ];
+
+// Kolom terakhir (dipakai untuk merge judul / baris kosong)
+const KOLOM_AKHIR = String.fromCharCode(64 + KOLOM.length); // 14 kolom -> "N"
+const IDX_FOTO_AWAL  = KOLOM.findIndex((k) => k.key === "fotoAwal");  // 0-based
+const IDX_FOTO_HASIL = KOLOM.findIndex((k) => k.key === "fotoHasil"); // 0-based
 
 // ─── Baris data laporan ────────────────────────────────────
 interface BarisLaporan {
@@ -48,6 +55,48 @@ interface BarisLaporan {
   statusReview: string;
   statusBoxing: string;
   tglMasuk:     string;
+  lampiranAwal: string | null;   // foto dari pelapor
+  lampiranHasil: string | null;  // foto hasil perbaikan Kepala Unit
+}
+
+// ─── Helper gambar ─────────────────────────────────────────
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
+
+function getUploadUrl(file: string | null | undefined): string | null {
+  if (!file) return null;
+  if (file.startsWith("http://") || file.startsWith("https://")) return file;
+  if (file.startsWith("uploads/")) return `${BASE_URL}/${file}`;
+  return `${BASE_URL}/uploads/${file}`;
+}
+
+interface GambarSiap { buffer: ArrayBuffer; ext: "png" | "jpeg"; width: number; height: number }
+
+// Download gambar -> buffer yang siap dipakai ExcelJS.
+// ExcelJS hanya mendukung png/jpeg/gif, jadi format lain (webp, dll)
+// dikonversi dulu ke PNG lewat canvas. Kalau gagal -> null (sel dikosongkan).
+async function ambilGambar(url: string | null): Promise<GambarSiap | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const bmp  = await createImageBitmap(blob);
+    const { width, height } = bmp;
+
+    if (blob.type === "image/png" || blob.type === "image/jpeg") {
+      bmp.close();
+      return { buffer: await blob.arrayBuffer(), ext: blob.type === "image/png" ? "png" : "jpeg", width, height };
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0);
+    bmp.close();
+    const png: Blob | null = await new Promise((r) => canvas.toBlob(r, "image/png"));
+    if (!png) return null;
+    return { buffer: await png.arrayBuffer(), ext: "png", width, height };
+  } catch {
+    return null;
+  }
 }
 
 function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): BarisLaporan {
@@ -71,6 +120,8 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
       statusReview: "Ditindaklanjuti",
       statusBoxing: "Selesai",
       tglMasuk:     fmtTgl(d.created_at ?? null),
+      lampiranAwal: d.lampiran_laporan ?? null,
+      lampiranHasil: d.lampiran_hasil ?? null,
     };
   } else {
     const p = item as ProsesItem;
@@ -93,6 +144,8 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
       statusReview: "Menunggu / Proses",
       statusBoxing: labelStatusBoxing(p.status_boxing),
       tglMasuk:     fmtTgl(p.created_at ?? null),
+      lampiranAwal: p.lampiran_laporan ?? null,
+      lampiranHasil: p.lampiran_hasil ?? null,
     };
   }
 }
@@ -114,6 +167,8 @@ function buatBarisArsip(item: ArsipItem, no: number): BarisLaporan {
     statusReview: item.status_review ? labelStatusReview(item.status_review) : (item.status_review ?? "—"),
     statusBoxing: item.status_boxing ?? "—",
     tglMasuk:     item.tgl_masuk ?? "—",
+    lampiranAwal: null,
+    lampiranHasil: null,
   };
 }
 
@@ -277,7 +332,7 @@ export async function exportExcel(
   // ══════════════════════════════════════════════════════════
   // FUNGSI PEMBANTU — buat worksheet tabel laporan
   // ══════════════════════════════════════════════════════════
-  function buatWorksheetLaporan(
+  async function buatWorksheetLaporan(
     nama: string,
     baris: BarisLaporan[],
     warnaBaris?: string
@@ -285,13 +340,13 @@ export async function exportExcel(
     const ws = workbook.addWorksheet(nama);
 
     // Judul sheet
-    ws.mergeCells(`A1:L1`);
+    ws.mergeCells(`A1:${KOLOM_AKHIR}1`);
     const jCell = ws.getCell("A1");
     jCell.value     = `TUNTAS Polibatam — ${nama}`;
     jCell.font      = { bold: true, size: 12, name: "Arial", color: { argb: ABU_TUA } };
     jCell.alignment = { horizontal: "center" };
 
-    ws.mergeCells("A2:L2");
+    ws.mergeCells(`A2:${KOLOM_AKHIR}2`);
     const tCell = ws.getCell("A2");
     tCell.value     = `Tanggal Export: ${tglExport}  |  Total: ${baris.length} laporan`;
     tCell.font      = { size: 9, italic: true, name: "Arial" };
@@ -322,14 +377,43 @@ export async function exportExcel(
       ws.getColumn(i + 1).width = k.width;
     });
 
+    // Download semua gambar paralel di awal (dengan cache per URL)
+    const cache = new Map<string, Promise<GambarSiap | null>>();
+    const muat = (f: string | null) => {
+      const u = getUploadUrl(f);
+      if (!u) return Promise.resolve(null);
+      if (!cache.has(u)) cache.set(u, ambilGambar(u));
+      return cache.get(u)!;
+    };
+    const gambarBaris = await Promise.all(
+      baris.map(async (b) => ({ awal: await muat(b.lampiranAwal), hasil: await muat(b.lampiranHasil) }))
+    );
+
+    const BOX_W = 150, BOX_H = 105; // px, muat di kolom lebar 24 & tinggi baris 85pt
+    const tempelGambar = (g: GambarSiap | null, kolom: number, rowNumber: number) => {
+      if (!g) return;
+      const skala = Math.min(BOX_W / g.width, BOX_H / g.height, 1);
+      const id = workbook.addImage({ buffer: g.buffer, extension: g.ext });
+      ws.addImage(id, {
+        tl: { col: kolom + 0.05, row: rowNumber - 1 + 0.05 },
+        ext: { width: Math.round(g.width * skala), height: Math.round(g.height * skala) },
+        editAs: "oneCell",
+      });
+    };
+
     // Baris data
     baris.forEach((b, idx) => {
       const row = ws.addRow([
         b.no, b.kode, b.jenis, b.tglMasuk, b.uraian, b.unit,
         b.penyebab, b.rencana, b.hasil,
         b.tglPelaks, b.statusReview, b.statusBoxing,
+        gambarBaris[idx].awal ? "" : (b.lampiranAwal ? "(gambar gagal dimuat)" : "—"),
+        gambarBaris[idx].hasil ? "" : (b.lampiranHasil ? "(gambar gagal dimuat)" : "—"),
       ]);
-      row.height = 40;
+      const adaFoto = !!(gambarBaris[idx].awal || gambarBaris[idx].hasil);
+      row.height = adaFoto ? 85 : 40;
+      tempelGambar(gambarBaris[idx].awal,  IDX_FOTO_AWAL,  row.number);
+      tempelGambar(gambarBaris[idx].hasil, IDX_FOTO_HASIL, row.number);
       // Baris genap (idx 1, 3, 5, ...) dibuat lebih pudar supaya selang-seling,
       // baris ganjil (idx 0, 2, 4, ...) tetap pakai warna dasar tab ini.
       const warnaBarisIni =
@@ -347,12 +431,14 @@ export async function exportExcel(
       row.getCell(10).alignment = { horizontal: "center", vertical: "top" };
       row.getCell(11).alignment = { horizontal: "center", vertical: "top", wrapText: true };
       row.getCell(12).alignment = { horizontal: "center", vertical: "top" };
+      row.getCell(IDX_FOTO_AWAL + 1).alignment  = { horizontal: "center", vertical: "middle" };
+      row.getCell(IDX_FOTO_HASIL + 1).alignment = { horizontal: "center", vertical: "middle" };
     });
 
     // Baris kosong jika tidak ada data
     if (baris.length === 0) {
-      const emptyRow = ws.addRow(["Tidak ada data", "", "", "", "", "", "", "", "", "", "", ""]);
-      ws.mergeCells(`A${emptyRow.number}:L${emptyRow.number}`);
+      const emptyRow = ws.addRow(["Tidak ada data", ...Array(KOLOM.length - 1).fill("")]);
+      ws.mergeCells(`A${emptyRow.number}:${KOLOM_AKHIR}${emptyRow.number}`);
       emptyRow.getCell(1).alignment = { horizontal: "center" };
       emptyRow.getCell(1).font      = { italic: true, color: { argb: "FF9CA3AF" }, name: "Arial" };
       emptyRow.getCell(1).border    = semuaBorder();
@@ -377,7 +463,7 @@ export async function exportExcel(
       .map((b, i) => ({ ...b, no: i + 1 }));
 
     const warnaTahun = "FFD1FAE5"; // hijau muda, senada tema "Selesai"
-    buatWorksheetLaporan(`Laporan Tahun ${tahunFilter}`, barisGabungan, warnaTahun);
+    await buatWorksheetLaporan(`Laporan Tahun ${tahunFilter}`, barisGabungan, warnaTahun);
   } else {
     // ══════════════════════════════════════════════════════════
     // WORKSHEET 2 — LAPORAN MASIH DIPANTAU
@@ -385,7 +471,7 @@ export async function exportExcel(
     const barisDipantau = dipantauData.map((p, i) =>
       buatBaris(p, i + 1, false)
     );
-    buatWorksheetLaporan("Laporan Masih Dipantau", barisDipantau, KUNING_BG);
+    await buatWorksheetLaporan("Laporan Masih Dipantau", barisDipantau, KUNING_BG);
 
     // ══════════════════════════════════════════════════════════
     // WORKSHEET 3 — LAPORAN SELESAI
@@ -393,7 +479,7 @@ export async function exportExcel(
     const barisSelesai = rekapData.map((d, i) =>
       buatBaris(d, i + 1, true)
     );
-    buatWorksheetLaporan("Laporan Selesai", barisSelesai, HIJAU_BG);
+    await buatWorksheetLaporan("Laporan Selesai", barisSelesai, HIJAU_BG);
 
     // ══════════════════════════════════════════════════════════
     // WORKSHEET ARSIP — 1 sheet per tahun hasil "Upload Data Lama"
@@ -403,12 +489,12 @@ export async function exportExcel(
     const UNGU_BG = "FFE9D5FF";
     const tahunTersedia = [...new Set(arsipData.map((a) => a.tahun))].sort((a, b) => b - a);
 
-    tahunTersedia.forEach((tahun) => {
+    for (const tahun of tahunTersedia) {
       const barisTahunIni = arsipData
         .filter((a) => a.tahun === tahun)
         .map((a, i) => buatBarisArsip(a, i + 1));
-      buatWorksheetLaporan(`Arsip ${tahun}`, barisTahunIni, UNGU_BG);
-    });
+      await buatWorksheetLaporan(`Arsip ${tahun}`, barisTahunIni, UNGU_BG);
+    }
   }
 
   // ── Download ────────────────────────────────────────────
