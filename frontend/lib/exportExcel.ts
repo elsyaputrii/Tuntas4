@@ -167,8 +167,8 @@ function buatBarisArsip(item: ArsipItem, no: number): BarisLaporan {
     statusReview: item.status_review ? labelStatusReview(item.status_review) : (item.status_review ?? "—"),
     statusBoxing: item.status_boxing ?? "—",
     tglMasuk:     item.tgl_masuk ?? "—",
-    lampiranAwal: null,
-    lampiranHasil: null,
+    lampiranAwal: item.lampiran_laporan ?? null,
+    lampiranHasil: item.lampiran_hasil ?? null,
   };
 }
 

@@ -61,4 +61,7 @@ export interface ArsipItem {
   tgl_pelaksanaan: string | null;
   status_review: string | null;
   status_boxing: string | null;
+  /** path relatif di folder uploads (mis. "arsip/abc.png"), hasil import Excel yang berisi gambar */
+  lampiran_laporan?: string | null;
+  lampiran_hasil?: string | null;
 }
