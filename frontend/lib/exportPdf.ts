@@ -1,9 +1,9 @@
 // FILE: frontend/lib/exportPdf.ts
 // Semua fungsi export PDF untuk Staf P4M
 // Dipakai oleh:
-//   - RecapitulationTable.tsx  → exportPDFRekap (per harian/mingguan/bulanan/tahunan)
-//   - ProcessMonitorTable.tsx  → exportPDFProses (per laporan individual)
-//   - RiwayatTable.tsx         → exportPDFRiwayatKepalaUnit (per laporan individual Kepala Unit)
+//   - RecapitulationTable.tsx  → exportPDFRekap
+//   - ProcessMonitorTable.tsx  → exportPDFProses
+//   - RiwayatTable.tsx         → exportPDFRiwayatKepalaUnit
 
 import QRCode from "qrcode";
 import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
@@ -18,8 +18,6 @@ import {
 } from "./exportHelpers";
 
 // ─── QR Code TTE ─────────────────────────────────────────────
-// QR berisi info TTE (TTE oleh / Perihal / Hashing) — di-scan pakai
-// kamera/QR scanner apa pun untuk menampilkan info TTE-nya.
 async function generateQrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, {
@@ -29,12 +27,11 @@ async function generateQrDataUrl(text: string): Promise<string | null> {
       color: { dark: "#111111", light: "#ffffff" },
     });
   } catch {
-    return null; // nonfatal — PDF tetap bisa dicetak tanpa QR
+    return null;
   }
 }
 
 // ─── HELPER TTE ─────────────────────────────────────────────
-// Format tanggal Indonesia: "24 Juli 2026"
 function formatTanggalIndonesia(d: Date): string {
   const bulan = [
     "Januari","Februari","Maret","April","Mei","Juni",
@@ -43,7 +40,6 @@ function formatTanggalIndonesia(d: Date): string {
   return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-// Hash SHA-256 (hex) — pakai Web Crypto API (bawaan browser modern)
 async function sha256Hex(text: string): Promise<string> {
   try {
     const buf = new TextEncoder().encode(text);
@@ -52,8 +48,6 @@ async function sha256Hex(text: string): Promise<string> {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   } catch {
-    // Fallback super-sederhana kalau crypto.subtle tidak tersedia (harusnya
-    // tidak pernah terjadi di browser modern). Tetap deterministic.
     let h = 0;
     for (let i = 0; i < text.length; i++) {
       h = (h << 5) - h + text.charCodeAt(i);
@@ -63,20 +57,6 @@ async function sha256Hex(text: string): Promise<string> {
   }
 }
 
-/**
- * Bangun teks QR TTE dengan format:
- *
- *   TTE oleh:
- *   <nama penandatangan>
- *   <tanggal Indonesia>
- *
- *   Perihal:
- *   <jenis> — <kode/periode>
- *
- *   Hashing:
- *   <hash baris 1 (40 char)>
- *   <hash baris 2 (24 char)>
- */
 async function buildQrTteText(opts: {
   penandatangan: string;
   perihal: string;
@@ -102,7 +82,6 @@ async function buildQrTteText(opts: {
   ].join("\n");
 }
 
-// Menghapus gelar "Dr." di depan nama penandatangan
 function stripGelarDr(nama: string): string {
   return nama.replace(/^\s*dr\.?\s+/i, "").trim();
 }
@@ -125,12 +104,14 @@ const BULAN_PANJANG = [
 ];
 
 // ─── CSS bersama untuk semua PDF ────────────────────────────
+// ✅ FIX: tbody td & .box pakai text-align:justify + white-space:pre-wrap
+//         → teks rata kiri-kanan + jarak antar paragraf muncul
 const BASE_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:Arial,sans-serif; font-size:10pt; color:#111; padding:34px 30px; }
   .header-borang { display:flex; flex-direction:row; align-items:center; gap:14px; width:100%; margin-bottom:18px; border-bottom:3px double #111; padding-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
   .header-borang .logo { display:block; flex:0 0 80px; width:80px; height:80px; max-width:80px; object-fit:contain; }
-  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}
+  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700; }
   .header-borang .doc-number { font-weight:700; white-space:nowrap; }
   .header-borang .doc-title-text { text-decoration:underline; line-height: 1.5; }
   .header-borang .doc-date { font-size:9pt; font-weight:700; color:#000; margin-top:4px; }
@@ -144,7 +125,18 @@ const BASE_CSS = `
   thead tr { background:#4d5e71; color:#fff; }
   thead th { padding:6px 5px; text-align:center; font-weight:700; border:1px solid #3a4d5e; }
   tbody tr:nth-child(even) { background:#f8fafc; }
-  tbody td { padding:5px; border:1px solid #e2e8f0; vertical-align:top; line-height:1.4; overflow-wrap:break-word; }
+
+  /* ✅ FIX: sel tabel — rata kiri-kanan + jarak antar paragraf */
+  tbody td {
+    padding:5px;
+    border:1px solid #e2e8f0;
+    vertical-align:top;
+    line-height:1.6;
+    overflow-wrap:break-word;
+    word-wrap:break-word;
+    text-align:justify;
+    white-space:pre-wrap;
+  }
 
   .center { text-align:center; }
   .badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:8pt; font-weight:bold; }
@@ -160,6 +152,23 @@ const BASE_CSS = `
   .ttd .signature-placeholder { height:64px; }
   .ttd .qr-img { display:block; width:110px; height:110px; margin:8px auto 2px; }
   .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
+
+  /* ✅ FIX: kotak teks panjang — rata kiri-kanan + jarak antar paragraf */
+  .box {
+    border:1px solid #e2e8f0;
+    padding:8px 10px;
+    border-radius:4px;
+    background:#f8fafc;
+    font-size:9pt;
+    line-height:1.6;
+    min-height:40px;
+    text-align:justify;
+    white-space:pre-wrap;
+    word-wrap:break-word;
+  }
+
+  .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
+  .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
 
   .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px; padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
   .close-btn:hover { background:#3a4d5e; }
@@ -302,7 +311,6 @@ export async function exportPDFRekap(
   const jabatanPenandatanganRekap = stripGelarDr(penandatangan?.nama?.trim() || "Kepala P4M");
   const tglCetakRekap = fmtTglWaktu(new Date().toISOString());
 
-  // ✅ TTE format baru
   const qrTextRekap = await buildQrTteText({
     penandatangan: jabatanPenandatanganRekap,
     perihal: `Laporan Rekapitulasi TUNTAS — ${labelKat[kategori]}`,
@@ -321,10 +329,10 @@ export async function exportPDFRekap(
     return `
     <tr>
       <td class="center">${r.no}</td>
-      <td class="center" style="font-weight:bold;font-size:8pt">${r.kode}</td>
-      <td>${r.jenis}</td>
+      <td class="center" style="font-weight:bold;font-size:8pt;text-align:center;white-space:normal">${r.kode}</td>
+      <td class="center" style="text-align:center;white-space:normal">${r.jenis}</td>
       <td>${r.uraian}</td>
-      <td class="center">${r.unit}</td>
+      <td class="center" style="text-align:center;white-space:normal">${r.unit}</td>
       <td>${r.penyebab}</td>
       <td>${r.rencana}</td>
       <td>
@@ -334,9 +342,9 @@ export async function exportPDFRekap(
           <span class="hasil-img-cap">Foto hasil perbaikan Kepala Unit</span>
         ` : ""}
       </td>
-      <td class="center">${r.tgl}</td>
-      <td class="center">${badgeReview(r.isSelesai)}</td>
-      <td class="center">
+      <td class="center" style="text-align:center;white-space:normal">${r.tgl}</td>
+      <td class="center" style="text-align:center;white-space:normal">${badgeReview(r.isSelesai)}</td>
+      <td class="center" style="text-align:center;white-space:normal">
         <span class="badge ${r.isSelesai ? "badge-blue" : "badge-yellow"}">
           ${r.isSelesai ? "Selesai" : "Dipantau"}
         </span>
@@ -390,7 +398,7 @@ ${PRINT_SCRIPT}
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 2. PDF PROSES MONITOR — per laporan individual
+// 2. PDF PROSES MONITOR
 // ═══════════════════════════════════════════════════════════════
 export interface ProsesDetailItem {
   kode_laporan: string;
@@ -419,7 +427,6 @@ export async function exportPDFProses(
   const jabatanPenandatanganProses = "Staff P4M";
   const tglCetakProses = fmtTglWaktu(new Date().toISOString());
 
-  // TTE format baru
   const qrTextProses = await buildQrTteText({
     penandatangan: jabatanPenandatanganProses,
     perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
@@ -428,8 +435,8 @@ export async function exportPDFProses(
   const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
   const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
-  ? item.hasil_tindakan
-  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+    ? item.hasil_tindakan
+    : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
@@ -441,7 +448,6 @@ export async function exportPDFProses(
   .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
   .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
   .field .val { color:#111; flex:1; }
-  .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
   .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
   .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
   @media print { @page { size:A4 portrait; margin:15mm; } }
@@ -545,15 +551,14 @@ export async function exportPDFRiwayatKepalaUnit(
   void penandatangan;
   const isSelesai = item.status_boxing === "selesai";
   const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
-  ? item.hasil_tindakan
-  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+    ? item.hasil_tindakan
+    : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const statusLabel = isSelesai
     ? "Selesai — Disetujui Staf P4M"
     : "Dalam Proses";
   const tglCetak = fmtTglWaktu(new Date().toISOString());
 
-  // ✅ TTE format baru
   const qrText = await buildQrTteText({
     penandatangan: jabatanPenandatangan,
     perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
@@ -571,7 +576,6 @@ export async function exportPDFRiwayatKepalaUnit(
   .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
   .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
   .field .val { color:#111; flex:1; }
-  .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
   .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
   .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
   @media print { @page { size:A4 portrait; margin:15mm; } }
@@ -618,7 +622,7 @@ ${item.aksi_masukan ? `
     ? `<div class="field"><span class="lbl">Tanggal Pelaksanaan</span><span class="val">${fmtTgl(item.tanggal_pelaksanaan)}</span></div>`
     : ""}
   <div class="box">
-  ${hasilTindakLanjutPdf}
+    ${hasilTindakLanjutPdf}
     ${gambarHasilUrl ? `
       <img src="${gambarHasilUrl}" class="box-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
       <span class="box-img-cap">Foto bukti pelaksanaan dari Kepala Unit</span>

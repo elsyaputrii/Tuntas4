@@ -1,6 +1,4 @@
 "use client";
-// FILE: frontend/components/staff-p4m/tables/RecapitulationTable.tsx
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { stafApi, userApi } from "@/lib/api";
 import { exportExcel } from "@/lib/exportExcel";
@@ -44,30 +42,59 @@ function formatTglAman(v: string | null): string {
   return isNaN(d.getTime()) ? v : fmtTgl(v);
 }
 
-const BULAN_ID_SINGKAT: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, jun: 6,
-  jul: 7, agu: 8, ags: 8, sep: 9, okt: 10, nov: 11, des: 12,
-};
-
 function tglMasukArsip(teks: string | null, tahun: number): string {
-  const fallback = `${tahun}-06-15`;
+  const fallback = `${tahun}-01-15`;
   if (!teks) return fallback;
   const s = String(teks).trim();
   const pad = (n: number) => String(n).padStart(2, "0");
   let y = 0, m = 0, d = 0;
   let mt: RegExpExecArray | null;
 
+  const namaBulan: Record<string, number> = {
+    jan: 1, january: 1,
+    feb: 2, february: 2, peb: 2, februari: 2,
+    mar: 3, march: 3, maret: 3,
+    apr: 4, april: 4,
+    mei: 5, may: 5,
+    jun: 6, june: 6, juni: 6,
+    jul: 7, july: 7, juli: 7,
+    agu: 8, aug: 8, august: 8, agustus: 8, ags: 8,
+    sep: 9, sept: 9, september: 9,
+    okt: 10, oct: 10, october: 10, oktober: 10,
+    nov: 11, november: 11,
+    des: 12, dec: 12, december: 12, desember: 12,
+  };
+
+  // 1) ISO: 2026-10-11 atau 2026-10-11T...
   if ((mt = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) {
     y = +mt[1]; m = +mt[2]; d = +mt[3];
-  } else if ((mt = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(s))) {
+  }
+  // 2) dd/mm/yyyy atau dd-mm-yyyy atau dd.mm.yyyy
+  else if ((mt = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(s))) {
     d = +mt[1]; m = +mt[2]; y = +mt[3];
-  } else if ((mt = /^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})/.exec(s))) {
-    const bln = BULAN_ID_SINGKAT[mt[2].slice(0, 3).toLowerCase()];
+  }
+  // 3) dd BulanNama yyyy — misal "11 Oktober 2026" / "11 October 2026"
+  else if ((mt = /^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})/.exec(s))) {
+    const bln = namaBulan[mt[2].toLowerCase()];
     if (bln) { d = +mt[1]; m = bln; y = +mt[3]; }
+  }
+  // 4) BulanNama dd, yyyy (format US) — misal "October 11, 2026"
+  else if ((mt = /^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/.exec(s))) {
+    const bln = namaBulan[mt[1].toLowerCase()];
+    if (bln) { d = +mt[2]; m = bln; y = +mt[3]; }
+  }
+  // 5) Fallback: coba new Date(s)
+  else {
+    const parsed = new Date(s);
+    if (!isNaN(parsed.getTime())) {
+      y = parsed.getFullYear();
+      m = parsed.getMonth() + 1;
+      d = parsed.getDate();
+    }
   }
 
   if (!y || m < 1 || m > 12 || d < 1 || d > 31) return fallback;
-  if (y !== tahun) return fallback;
+  // ✅ Tidak lagi paksa y === tahun — kalau teksnya bilang 2026, pakai 2026
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
@@ -960,7 +987,7 @@ export default function RecapitulationTable() {
         </div>
       </div>
 
-      {/* ✅ Toolbar Export — bagian ini saja yang Lucide */}
+      {/* Toolbar Export */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
         <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold w-full sm:w-auto inline-flex items-center gap-1">
           <Download size={12} /> Export:
