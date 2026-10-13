@@ -5,7 +5,7 @@
 // Worksheet 3: Laporan Selesai
 
 import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
-import { fmtTgl, labelStatusReview, labelStatusBoxing } from "./exportHelpers";
+import { fmtTgl, labelStatusReview, labelStatusBoxing, parseTglArsip } from "./exportHelpers";
 
 // ─── Tipe kolom tabel ──────────────────────────────────────
 interface KolomTabel {
@@ -57,6 +57,7 @@ interface BarisLaporan {
   tglMasuk:     string;
   lampiranAwal: string | null;   // foto dari pelapor
   lampiranHasil: string | null;  // foto hasil perbaikan Kepala Unit
+  sortKey?: number;              // timestamp untuk pengurutan (BUKAN dari teks tanggal)
 }
 
 // ─── Helper gambar ─────────────────────────────────────────
@@ -83,7 +84,7 @@ async function ambilGambar(url: string | null): Promise<GambarSiap | null> {
     const bmp  = await createImageBitmap(blob);
     const { width, height } = bmp;
 
-    if (blob.type === "image/png" || blob.type === "image/jpeg") {
+    if (blob.type === "image/png" || blob.type === "image/jpeg" || blob.type === "image/jpg") {
       bmp.close();
       return { buffer: await blob.arrayBuffer(), ext: blob.type === "image/png" ? "png" : "jpeg", width, height };
     }
@@ -122,6 +123,7 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
       tglMasuk:     fmtTgl(d.created_at ?? null),
       lampiranAwal: d.lampiran_laporan ?? null,
       lampiranHasil: d.lampiran_hasil ?? null,
+      sortKey:      d.created_at ? new Date(d.created_at).getTime() : 0,
     };
   } else {
     const p = item as ProsesItem;
@@ -146,6 +148,7 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
       tglMasuk:     fmtTgl(p.created_at ?? null),
       lampiranAwal: p.lampiran_laporan ?? null,
       lampiranHasil: p.lampiran_hasil ?? null,
+      sortKey:      p.created_at ? new Date(p.created_at).getTime() : 0,
     };
   }
 }
@@ -164,11 +167,15 @@ function buatBarisArsip(item: ArsipItem, no: number): BarisLaporan {
     rencana:      item.rencana_tindakan ?? "—",
     hasil:        item.hasil_tindakan ?? "—",
     tglPelaks:    item.tgl_pelaksanaan ?? "—",
-    statusReview: item.status_review ? labelStatusReview(item.status_review) : (item.status_review ?? "—"),
+    // nilai mentah enum → label; teks bebas dari Excel (mis. "Ditindaklanjuti") ditampilkan apa adanya
+    statusReview: item.status_review
+      ? (labelStatusReview(item.status_review) !== "—" ? labelStatusReview(item.status_review) : item.status_review)
+      : "—",
     statusBoxing: item.status_boxing ?? "—",
     tglMasuk:     item.tgl_masuk ?? "—",
     lampiranAwal: item.lampiran_laporan ?? null,
     lampiranHasil: item.lampiran_hasil ?? null,
+    sortKey:      parseTglArsip(item.tgl_masuk)?.getTime() ?? 0,
   };
 }
 
@@ -189,7 +196,8 @@ export async function exportExcel(
   rekapData: RekapItem[],
   prosesData: ProsesItem[],
   arsipData: ArsipItem[] = [],
-  tahunFilter?: number
+  tahunFilter?: number,
+  labelPeriode?: string // mis. "Juni 2026" — dipakai untuk nama sheet & file kalau ada filter
 ): Promise<void> {
   // Import ExcelJS secara dinamis (browser bundle via CDN atau npm)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -411,7 +419,7 @@ export async function exportExcel(
         gambarBaris[idx].hasil ? "" : (b.lampiranHasil ? "(gambar gagal dimuat)" : "—"),
       ]);
       const adaFoto = !!(gambarBaris[idx].awal || gambarBaris[idx].hasil);
-      row.height = adaFoto ? 85 : 40;
+      row.height = adaFoto ? 85 : 40; // BOX_H 105px ≈ 79pt, muat di 85pt
       tempelGambar(gambarBaris[idx].awal,  IDX_FOTO_AWAL,  row.number);
       tempelGambar(gambarBaris[idx].hasil, IDX_FOTO_HASIL, row.number);
       // Baris genap (idx 1, 3, 5, ...) dibuat lebih pudar supaya selang-seling,
@@ -458,12 +466,14 @@ export async function exportExcel(
       ...dipantauData.map((p) => buatBaris(p, 0, false)),
       ...arsipData.filter((a) => a.tahun === tahunFilter).map((a) => buatBarisArsip(a, 0)),
     ]
-      // urutkan dari tanggal masuk terbaru ke terlama biar enak dibaca
-      .sort((a, b) => (a.tglMasuk < b.tglMasuk ? 1 : -1))
+      // ✅ FIX: urut berdasarkan timestamp, bukan membandingkan teks "15 Juni 2026"
+      .sort((a, b) => (b.sortKey ?? 0) - (a.sortKey ?? 0))
       .map((b, i) => ({ ...b, no: i + 1 }));
 
     const warnaTahun = "FFD1FAE5"; // hijau muda, senada tema "Selesai"
-    await buatWorksheetLaporan(`Laporan Tahun ${tahunFilter}`, barisGabungan, warnaTahun);
+    const namaSheet = (labelPeriode ? `Laporan ${labelPeriode}` : `Laporan Tahun ${tahunFilter}`)
+      .replace(/[\\/?*\[\]:]/g, "-").slice(0, 31);
+    await buatWorksheetLaporan(namaSheet, barisGabungan, warnaTahun);
   } else {
     // ══════════════════════════════════════════════════════════
     // WORKSHEET 2 — LAPORAN MASIH DIPANTAU
@@ -506,7 +516,7 @@ export async function exportExcel(
   const anchor   = document.createElement("a");
   anchor.href     = url;
   anchor.download = tahunFilter
-    ? `Rekapitulasi_TUNTAS_Tahun_${tahunFilter}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    ? `Rekapitulasi_TUNTAS_${(labelPeriode ?? `Tahun_${tahunFilter}`).replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`
     : `Rekapitulasi_TUNTAS_${new Date().toISOString().slice(0, 10)}.xlsx`;
   document.body.appendChild(anchor);
   anchor.click();

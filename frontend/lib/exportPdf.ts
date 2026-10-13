@@ -1,9 +1,9 @@
 // FILE: frontend/lib/exportPdf.ts
 // Semua fungsi export PDF untuk Staf P4M
 // Dipakai oleh:
-//   - RecapitulationTable.tsx  → exportPDFRekap
-//   - ProcessMonitorTable.tsx  → exportPDFProses
-//   - RiwayatTable.tsx         → exportPDFRiwayatKepalaUnit
+//   - RecapitulationTable.tsx  → exportPDFRekap (per harian/mingguan/bulanan/tahunan)
+//   - ProcessMonitorTable.tsx  → exportPDFProses (per laporan individual)
+//   - RiwayatTable.tsx         → exportPDFRiwayatKepalaUnit (per laporan individual Kepala Unit)
 
 import QRCode from "qrcode";
 import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
@@ -15,9 +15,14 @@ import {
   getWeekOfMonth,
   sameWeekOfMonth,
   sameDay,
+  parseTglArsip,
+  escHtml,
+  arsipSelesai,
 } from "./exportHelpers";
 
 // ─── QR Code TTE ─────────────────────────────────────────────
+// QR berisi info TTE (TTE oleh / Perihal / Hashing) — di-scan pakai
+// kamera/QR scanner apa pun untuk menampilkan info TTE-nya.
 async function generateQrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, {
@@ -27,11 +32,12 @@ async function generateQrDataUrl(text: string): Promise<string | null> {
       color: { dark: "#111111", light: "#ffffff" },
     });
   } catch {
-    return null;
+    return null; // nonfatal — PDF tetap bisa dicetak tanpa QR
   }
 }
 
 // ─── HELPER TTE ─────────────────────────────────────────────
+// Format tanggal Indonesia: "24 Juli 2026"
 function formatTanggalIndonesia(d: Date): string {
   const bulan = [
     "Januari","Februari","Maret","April","Mei","Juni",
@@ -40,6 +46,7 @@ function formatTanggalIndonesia(d: Date): string {
   return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// Hash SHA-256 (hex) — pakai Web Crypto API (bawaan browser modern)
 async function sha256Hex(text: string): Promise<string> {
   try {
     const buf = new TextEncoder().encode(text);
@@ -48,6 +55,8 @@ async function sha256Hex(text: string): Promise<string> {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   } catch {
+    // Fallback super-sederhana kalau crypto.subtle tidak tersedia (harusnya
+    // tidak pernah terjadi di browser modern). Tetap deterministic.
     let h = 0;
     for (let i = 0; i < text.length; i++) {
       h = (h << 5) - h + text.charCodeAt(i);
@@ -57,6 +66,20 @@ async function sha256Hex(text: string): Promise<string> {
   }
 }
 
+/**
+ * Bangun teks QR TTE dengan format:
+ *
+ *   TTE oleh:
+ *   <nama penandatangan>
+ *   <tanggal Indonesia>
+ *
+ *   Perihal:
+ *   <jenis> — <kode/periode>
+ *
+ *   Hashing:
+ *   <hash baris 1 (40 char)>
+ *   <hash baris 2 (24 char)>
+ */
 async function buildQrTteText(opts: {
   penandatangan: string;
   perihal: string;
@@ -82,6 +105,7 @@ async function buildQrTteText(opts: {
   ].join("\n");
 }
 
+// Menghapus gelar "Dr." di depan nama penandatangan
 function stripGelarDr(nama: string): string {
   return nama.replace(/^\s*dr\.?\s+/i, "").trim();
 }
@@ -104,14 +128,12 @@ const BULAN_PANJANG = [
 ];
 
 // ─── CSS bersama untuk semua PDF ────────────────────────────
-// ✅ FIX: tbody td & .box pakai text-align:justify + white-space:pre-wrap
-//         → teks rata kiri-kanan + jarak antar paragraf muncul
 const BASE_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:Arial,sans-serif; font-size:10pt; color:#111; padding:34px 30px; }
   .header-borang { display:flex; flex-direction:row; align-items:center; gap:14px; width:100%; margin-bottom:18px; border-bottom:3px double #111; padding-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
   .header-borang .logo { display:block; flex:0 0 80px; width:80px; height:80px; max-width:80px; object-fit:contain; }
-  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700; }
+  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}
   .header-borang .doc-number { font-weight:700; white-space:nowrap; }
   .header-borang .doc-title-text { text-decoration:underline; line-height: 1.5; }
   .header-borang .doc-date { font-size:9pt; font-weight:700; color:#000; margin-top:4px; }
@@ -125,18 +147,7 @@ const BASE_CSS = `
   thead tr { background:#4d5e71; color:#fff; }
   thead th { padding:6px 5px; text-align:center; font-weight:700; border:1px solid #3a4d5e; }
   tbody tr:nth-child(even) { background:#f8fafc; }
-
-  /* ✅ FIX: sel tabel — rata kiri-kanan + jarak antar paragraf */
-  tbody td {
-    padding:5px;
-    border:1px solid #e2e8f0;
-    vertical-align:top;
-    line-height:1.6;
-    overflow-wrap:break-word;
-    word-wrap:break-word;
-    text-align:justify;
-    white-space:pre-wrap;
-  }
+  tbody td { padding:5px; border:1px solid #e2e8f0; vertical-align:top; line-height:1.4; overflow-wrap:break-word; }
 
   .center { text-align:center; }
   .badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:8pt; font-weight:bold; }
@@ -153,23 +164,6 @@ const BASE_CSS = `
   .ttd .qr-img { display:block; width:110px; height:110px; margin:8px auto 2px; }
   .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
 
-  /* ✅ FIX: kotak teks panjang — rata kiri-kanan + jarak antar paragraf */
-  .box {
-    border:1px solid #e2e8f0;
-    padding:8px 10px;
-    border-radius:4px;
-    background:#f8fafc;
-    font-size:9pt;
-    line-height:1.6;
-    min-height:40px;
-    text-align:justify;
-    white-space:pre-wrap;
-    word-wrap:break-word;
-  }
-
-  .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
-  .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
-
   .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px; padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
   .close-btn:hover { background:#3a4d5e; }
 
@@ -183,14 +177,31 @@ const BASE_CSS = `
   }
 `;
 
-function printWindow(html: string) {
+/** ✅ BARU: panggil SINKRON di dalam onClick (sebelum await apa pun), lalu
+ *  oper hasilnya ke exportPDFRekap. Kalau window.open baru dipanggil setelah
+ *  await fetch, browser (terutama Safari/Chrome ketat) memblokirnya sebagai
+ *  popup → PDF "tidak keluar / kosong sama sekali". */
+export function bukaJendelaCetak(): Window | null {
   const w = window.screen.availWidth;
   const h = window.screen.availHeight;
   const win = window.open("", "_blank", `width=${w},height=${h},left=0,top=0`);
+  if (win) {
+    win.document.write("<p style='font-family:Arial;padding:24px'>Menyiapkan dokumen PDF…</p>");
+  }
+  return win;
+}
+
+function printWindow(html: string, preOpened?: Window | null) {
+  const w = window.screen.availWidth;
+  const h = window.screen.availHeight;
+  const win = preOpened && !preOpened.closed
+    ? preOpened
+    : window.open("", "_blank", `width=${w},height=${h},left=0,top=0`);
   if (!win) {
     alert("Popup diblokir browser. Izinkan popup untuk mencetak PDF.");
     return;
   }
+  win.document.open();
   win.document.write(html);
   win.document.close();
 }
@@ -198,7 +209,11 @@ function printWindow(html: string) {
 const PRINT_SCRIPT = `
 <script>
   window.onload = function() {
-    window.print();
+    var imgs = Array.prototype.slice.call(document.images);
+    var tunggu = imgs.filter(function(i){ return !i.complete; }).map(function(i){
+      return new Promise(function(r){ i.onload = i.onerror = r; });
+    });
+    Promise.all(tunggu).then(function(){ setTimeout(function(){ window.print(); }, 200); });
   };
 </script>
 `;
@@ -229,7 +244,8 @@ export async function exportPDFRekap(
   kategori: PdfKategori,
   selectedDate: Date,
   penandatangan?: { nama?: string | null; tandaTangan?: string | null } | null,
-  arsipData: ArsipItem[] = []
+  arsipData: ArsipItem[] = [],
+  preOpenedWindow?: Window | null
 ) {
   function isInRange(iso: string | null): boolean {
     if (!iso) return false;
@@ -248,7 +264,15 @@ export async function exportPDFRekap(
 
   const filteredSelesai  = rekapData.filter((d) => isInRange(d.created_at ?? null));
   const filteredDipantau = dipantauData.filter((p) => isInRange(p.created_at ?? null));
-  const filteredArsip = arsipData.filter((a) => isInRange(a.tgl_pelaksanaan ?? a.tgl_masuk ?? null));
+  // ✅ FIX: tanggal arsip berupa TEKS ("15 Juni 2025", "—") → new Date() menghasilkan
+  // Invalid Date, sehingga SEMUA arsip tersaring habis (data arsip tidak pernah masuk PDF).
+  // Backend sudah menyaring tahun/bulan; di sini hanya saring hari/minggu kalau tanggalnya terbaca.
+  const filteredArsip = arsipData.filter((a) => {
+    const dt = parseTglArsip(a.tgl_masuk) ?? parseTglArsip(a.tgl_pelaksanaan);
+    if (!dt) return true;
+    if (kategori === "harian" || kategori === "mingguan") return isInRange(dt.toISOString());
+    return true;
+  });
 
   const mingguIni = getWeekOfMonth(selectedDate);
   const labelKat: Record<PdfKategori, string> = {
@@ -267,6 +291,7 @@ export async function exportPDFRekap(
     penyebab: d.penyebab ?? "—",
     rencana: d.rencana_tindakan ?? "—",
     hasil: d.hasil_tindakan ?? "—",
+    lampiranAwal: d.lampiran_laporan ?? null,
     lampiranHasil: d.lampiran_hasil ?? null,
     tgl: fmtTgl(d.tanggal_pelaksanaan),
     statusReview: d.status_review ?? "",
@@ -282,28 +307,32 @@ export async function exportPDFRekap(
     penyebab: p.penyebab ?? "—",
     rencana: p.rencana_tindakan ?? "—",
     hasil: p.hasil_tindakan ?? "—",
+    lampiranAwal: p.lampiran_laporan ?? null,
     lampiranHasil: p.lampiran_hasil ?? null,
     tgl: fmtTgl(p.tanggal_pelaksanaan),
     statusReview: p.status_review ?? "",
     isSelesai: false,
   }));
 
-  const arsipRows = filteredArsip.map((a) => ({
-    no: 0,
-    kode: a.kode_laporan ?? "—",
-    jenis: a.jenis_laporan ?? "—",
-    uraian: a.uraian_ketidaksesuaian ?? "—",
-    unit: a.unit ?? "—",
-    penyebab: a.penyebab ?? "—",
-    rencana: a.rencana_tindakan ?? "—",
-    hasil: a.hasil_tindakan ?? "—",
-    lampiranHasil: null as string | null,
-    tgl: fmtTgl(a.tgl_pelaksanaan ?? a.tgl_masuk),
-    statusReview: a.status_review ?? "",
-    isSelesai:
-      a.status_boxing === "selesai" ||
-      a.status_boxing?.toLowerCase() === "closed",
-  }));
+  const arsipRows = filteredArsip.map((a) => {
+    const tglP = parseTglArsip(a.tgl_pelaksanaan);
+    return {
+      no: 0,
+      kode: a.kode_laporan ?? "—",
+      jenis: a.jenis_laporan ?? "—",
+      uraian: a.uraian_ketidaksesuaian ?? "—",
+      unit: a.unit ?? "—",
+      penyebab: a.penyebab ?? "—",
+      rencana: a.rencana_tindakan ?? "—",
+      hasil: a.hasil_tindakan ?? "—",
+      // ✅ FIX: gambar arsip (hasil import) ikut dicetak
+      lampiranAwal: a.lampiran_laporan ?? null,
+      lampiranHasil: a.lampiran_hasil ?? null,
+      tgl: tglP ? fmtTgl(tglP.toISOString()) : (a.tgl_pelaksanaan ?? "—"),
+      statusReview: a.status_review ?? "",
+      isSelesai: arsipSelesai(a.status_boxing, a.status_review),
+    };
+  });
 
   const allRows = [...selesaiRows, ...dipantauRows, ...arsipRows]
     .map((r, i) => ({ ...r, no: i + 1 }));
@@ -311,6 +340,7 @@ export async function exportPDFRekap(
   const jabatanPenandatanganRekap = stripGelarDr(penandatangan?.nama?.trim() || "Kepala P4M");
   const tglCetakRekap = fmtTglWaktu(new Date().toISOString());
 
+  // ✅ TTE format baru
   const qrTextRekap = await buildQrTteText({
     penandatangan: jabatanPenandatanganRekap,
     perihal: `Laporan Rekapitulasi TUNTAS — ${labelKat[kategori]}`,
@@ -324,33 +354,30 @@ export async function exportPDFRekap(
       : `<span class="badge badge-yellow">⏳ Menunggu / Proses</span>`;
   }
 
-  const tableRows = allRows.map((r) => {
-    const gambarUrl = getUploadUrl(r.lampiranHasil);
-    return `
+  const imgTag = (file: string | null, cap: string) => {
+    const url = getUploadUrl(file);
+    if (!url) return "";
+    return `<img src="${escHtml(url)}" class="hasil-img" alt="${escHtml(cap)}" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/><span class="hasil-img-cap">${escHtml(cap)}</span>`;
+  };
+
+  const tableRows = allRows.map((r) => `
     <tr>
       <td class="center">${r.no}</td>
-      <td class="center" style="font-weight:bold;font-size:8pt;text-align:center;white-space:normal">${r.kode}</td>
-      <td class="center" style="text-align:center;white-space:normal">${r.jenis}</td>
-      <td>${r.uraian}</td>
-      <td class="center" style="text-align:center;white-space:normal">${r.unit}</td>
-      <td>${r.penyebab}</td>
-      <td>${r.rencana}</td>
-      <td>
-        ${r.hasil}
-        ${gambarUrl ? `
-          <img src="${gambarUrl}" class="hasil-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
-          <span class="hasil-img-cap">Foto hasil perbaikan Kepala Unit</span>
-        ` : ""}
-      </td>
-      <td class="center" style="text-align:center;white-space:normal">${r.tgl}</td>
-      <td class="center" style="text-align:center;white-space:normal">${badgeReview(r.isSelesai)}</td>
-      <td class="center" style="text-align:center;white-space:normal">
+      <td class="center" style="font-weight:bold;font-size:8pt">${escHtml(r.kode)}</td>
+      <td>${escHtml(r.jenis)}</td>
+      <td>${escHtml(r.uraian)}${imgTag(r.lampiranAwal, "Foto laporan")}</td>
+      <td class="center">${escHtml(r.unit)}</td>
+      <td>${escHtml(r.penyebab)}</td>
+      <td>${escHtml(r.rencana)}</td>
+      <td>${escHtml(r.hasil)}${imgTag(r.lampiranHasil, "Foto hasil perbaikan")}</td>
+      <td class="center">${escHtml(r.tgl)}</td>
+      <td class="center">${badgeReview(r.isSelesai)}</td>
+      <td class="center">
         <span class="badge ${r.isSelesai ? "badge-blue" : "badge-yellow"}">
           ${r.isSelesai ? "Selesai" : "Dipantau"}
         </span>
       </td>
-    </tr>`;
-  }).join("");
+    </tr>`).join("");
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
@@ -394,11 +421,11 @@ ${renderHeaderBorang(`Periode: <strong>${labelKat[kategori]}</strong> | Dicetak:
 ${PRINT_SCRIPT}
 </body></html>`;
 
-  printWindow(html);
+  printWindow(html, preOpenedWindow);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 2. PDF PROSES MONITOR
+// 2. PDF PROSES MONITOR — per laporan individual
 // ═══════════════════════════════════════════════════════════════
 export interface ProsesDetailItem {
   kode_laporan: string;
@@ -427,6 +454,7 @@ export async function exportPDFProses(
   const jabatanPenandatanganProses = "Staff P4M";
   const tglCetakProses = fmtTglWaktu(new Date().toISOString());
 
+  // TTE format baru
   const qrTextProses = await buildQrTteText({
     penandatangan: jabatanPenandatanganProses,
     perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
@@ -435,8 +463,8 @@ export async function exportPDFProses(
   const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
   const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
-    ? item.hasil_tindakan
-    : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+  ? item.hasil_tindakan
+  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
@@ -448,6 +476,7 @@ export async function exportPDFProses(
   .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
   .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
   .field .val { color:#111; flex:1; }
+  .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
   .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
   .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
   @media print { @page { size:A4 portrait; margin:15mm; } }
@@ -551,14 +580,15 @@ export async function exportPDFRiwayatKepalaUnit(
   void penandatangan;
   const isSelesai = item.status_boxing === "selesai";
   const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
-    ? item.hasil_tindakan
-    : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+  ? item.hasil_tindakan
+  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const statusLabel = isSelesai
     ? "Selesai — Disetujui Staf P4M"
     : "Dalam Proses";
   const tglCetak = fmtTglWaktu(new Date().toISOString());
 
+  // ✅ TTE format baru
   const qrText = await buildQrTteText({
     penandatangan: jabatanPenandatangan,
     perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
@@ -576,6 +606,7 @@ export async function exportPDFRiwayatKepalaUnit(
   .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
   .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
   .field .val { color:#111; flex:1; }
+  .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
   .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
   .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
   @media print { @page { size:A4 portrait; margin:15mm; } }
@@ -622,7 +653,7 @@ ${item.aksi_masukan ? `
     ? `<div class="field"><span class="lbl">Tanggal Pelaksanaan</span><span class="val">${fmtTgl(item.tanggal_pelaksanaan)}</span></div>`
     : ""}
   <div class="box">
-    ${hasilTindakLanjutPdf}
+  ${hasilTindakLanjutPdf}
     ${gambarHasilUrl ? `
       <img src="${gambarHasilUrl}" class="box-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
       <span class="box-img-cap">Foto bukti pelaksanaan dari Kepala Unit</span>

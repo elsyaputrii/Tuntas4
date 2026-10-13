@@ -1,11 +1,13 @@
 "use client";
+// FILE: frontend/components/staff-p4m/tables/RecapitulationTable.tsx
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { stafApi, userApi } from "@/lib/api";
 import { exportExcel } from "@/lib/exportExcel";
-import { exportPDFRekap, type PdfKategori } from "@/lib/exportPdf";
+import { exportPDFRekap, bukaJendelaCetak, type PdfKategori } from "@/lib/exportPdf";
 import {
   fmtTgl, toLocalDate, sameDay, sameWeekOfMonth, getWeekOfMonth,
-  getMonthWeeks, labelStatusLengkap,
+  getMonthWeeks, labelStatusLengkap, parseTglArsip,
 } from "@/lib/exportHelpers";
 import type { RekapItem, ProsesItem, ArsipItem } from "@/lib/exportTypes";
 import {
@@ -42,59 +44,30 @@ function formatTglAman(v: string | null): string {
   return isNaN(d.getTime()) ? v : fmtTgl(v);
 }
 
+const BULAN_ID_SINGKAT: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, jun: 6,
+  jul: 7, agu: 8, ags: 8, sep: 9, okt: 10, nov: 11, des: 12,
+};
+
 function tglMasukArsip(teks: string | null, tahun: number): string {
-  const fallback = `${tahun}-01-15`;
+  const fallback = `${tahun}-06-15`;
   if (!teks) return fallback;
   const s = String(teks).trim();
   const pad = (n: number) => String(n).padStart(2, "0");
   let y = 0, m = 0, d = 0;
   let mt: RegExpExecArray | null;
 
-  const namaBulan: Record<string, number> = {
-    jan: 1, january: 1,
-    feb: 2, february: 2, peb: 2, februari: 2,
-    mar: 3, march: 3, maret: 3,
-    apr: 4, april: 4,
-    mei: 5, may: 5,
-    jun: 6, june: 6, juni: 6,
-    jul: 7, july: 7, juli: 7,
-    agu: 8, aug: 8, august: 8, agustus: 8, ags: 8,
-    sep: 9, sept: 9, september: 9,
-    okt: 10, oct: 10, october: 10, oktober: 10,
-    nov: 11, november: 11,
-    des: 12, dec: 12, december: 12, desember: 12,
-  };
-
-  // 1) ISO: 2026-10-11 atau 2026-10-11T...
   if ((mt = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) {
     y = +mt[1]; m = +mt[2]; d = +mt[3];
-  }
-  // 2) dd/mm/yyyy atau dd-mm-yyyy atau dd.mm.yyyy
-  else if ((mt = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(s))) {
+  } else if ((mt = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(s))) {
     d = +mt[1]; m = +mt[2]; y = +mt[3];
-  }
-  // 3) dd BulanNama yyyy — misal "11 Oktober 2026" / "11 October 2026"
-  else if ((mt = /^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})/.exec(s))) {
-    const bln = namaBulan[mt[2].toLowerCase()];
+  } else if ((mt = /^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})/.exec(s))) {
+    const bln = BULAN_ID_SINGKAT[mt[2].slice(0, 3).toLowerCase()];
     if (bln) { d = +mt[1]; m = bln; y = +mt[3]; }
-  }
-  // 4) BulanNama dd, yyyy (format US) — misal "October 11, 2026"
-  else if ((mt = /^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/.exec(s))) {
-    const bln = namaBulan[mt[1].toLowerCase()];
-    if (bln) { d = +mt[2]; m = bln; y = +mt[3]; }
-  }
-  // 5) Fallback: coba new Date(s)
-  else {
-    const parsed = new Date(s);
-    if (!isNaN(parsed.getTime())) {
-      y = parsed.getFullYear();
-      m = parsed.getMonth() + 1;
-      d = parsed.getDate();
-    }
   }
 
   if (!y || m < 1 || m > 12 || d < 1 || d > 31) return fallback;
-  // ✅ Tidak lagi paksa y === tahun — kalau teksnya bilang 2026, pakai 2026
+  if (y !== tahun) return fallback;
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
@@ -158,7 +131,7 @@ function RencanaList({
       {items.map((r, i) => (
         <div key={i} className="leading-relaxed">
           <p className="font-bold text-gray-800">Rencana {r.nomor}:</p>
-          <p className="text-gray-700 text-justify whitespace-pre-wrap break-words">
+          <p className="text-gray-700 text-justify whitespace-pre-wrap wrap-break-words">
             {r.teks}
           </p>
           {r.tanggal && (
@@ -523,7 +496,7 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
       </button>
 
       {showUploadArsip && (
-        <div className="absolute bottom-full left-0 mb-2 z-[9999] w-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
+        <div className="absolute bottom-full left-0 mb-2 z-9999 w-80 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
           {msg && (
             <p className="text-green-700 text-[10px] font-bold px-2 py-1.5 bg-green-50 border border-green-200 rounded">✅ {msg}</p>
           )}
@@ -621,7 +594,7 @@ function ArsipDataManager({ onDeleteSuccess }: ArsipDataManagerProps) {
 // ══════════════════════════════════════════════════════════
 function ImageModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
       <div className="relative" style={{ width: "85vw", maxWidth: "1100px" }} onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute -top-10 right-0 text-white hover:text-gray-300 z-10" aria-label="Tutup">
           <X size={32} strokeWidth={2.5} />
@@ -801,8 +774,9 @@ export default function RecapitulationTable() {
         approvalStaf: null as string | null,
         tglMasuk: tglMasukArsip(a.tgl_masuk, a.tahun),
         isSelesai: isCloseOrSelesai,
-        lampiranLaporan: null,
-        lampiranHasil: null,
+        // ✅ FIX: gambar hasil import Excel sebelumnya dibuang (null) → sekarang ditampilkan
+        lampiranLaporan: a.lampiran_laporan ?? null,
+        lampiranHasil: a.lampiran_hasil ?? null,
       };
     }),
   ];
@@ -987,7 +961,7 @@ export default function RecapitulationTable() {
         </div>
       </div>
 
-      {/* Toolbar Export */}
+      {/* ✅ Toolbar Export — bagian ini saja yang Lucide */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center">
         <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold w-full sm:w-auto inline-flex items-center gap-1">
           <Download size={12} /> Export:
@@ -998,20 +972,32 @@ export default function RecapitulationTable() {
             setExportingExcelLoading(true);
             try{
               const filteredRekap = rekapData.filter(d=>isInFilter(d.created_at??null));
-              const filteredDipantau = prosesData.filter(p=>{
-                const ids=new Set(rekapData.map(d=>d.id_boxing));
-                return !ids.has(p.id_boxing)&&isInFilter(p.created_at??null);
-              });
-              let arsipExport: ArsipItem[] = [];
-              const tahunFilter = selectedDate.getFullYear();
-              const bulanFilter = filterMode === "tahunan" || filterMode === "semua" ? undefined : selectedDate.getMonth() + 1;
+              const idsSelesai = new Set(rekapData.map(d=>d.id_boxing));
+              const filteredDipantau = prosesData.filter(p=>!idsSelesai.has(p.id_boxing)&&isInFilter(p.created_at??null));
 
+              // ✅ FIX: mode "Semua" → ambil SEMUA arsip (semua tahun) & jangan paksa 1 tahun.
+              // Sebelumnya tahunFilter selalu diisi → export selalu tergabung 1 sheet & arsip tahun lain hilang.
+              const semua = filterMode === "semua";
+              const tahunFilter = semua ? undefined : selectedDate.getFullYear();
+              const bulanFilter = (filterMode === "bulanan" || filterMode === "mingguan" || filterMode === "harian")
+                ? selectedDate.getMonth() + 1 : undefined;
+
+              let arsipExport: ArsipItem[] = [];
               try {
                 const arsipRes = await stafApi.getArsipRekap(tahunFilter, bulanFilter);
                 arsipExport = arsipRes.data ?? [];
               } catch { /* nonfatal */ }
 
-              await exportExcel(filteredRekap, filteredDipantau, arsipExport, tahunFilter);
+              // harian/mingguan: backend hanya menyaring per bulan → saring lagi per hari/minggu di sini
+              if (filterMode === "harian" || filterMode === "mingguan") {
+                arsipExport = arsipExport.filter((a) => {
+                  const dt = parseTglArsip(a.tgl_masuk);
+                  return !dt || isInFilter(dt.toISOString());
+                });
+              }
+
+              const labelPeriode = semua ? undefined : labelFilter[filterMode];
+              await exportExcel(filteredRekap, filteredDipantau, arsipExport, tahunFilter, labelPeriode);
             } finally {
               setTimeout(()=>setExportingExcelLoading(false),1200);
             }
@@ -1032,6 +1018,8 @@ export default function RecapitulationTable() {
         {(["harian","mingguan","bulanan","tahunan"] as PdfKategori[]).map(kat=>(
           <button key={kat}
             onClick={async ()=>{
+              // ✅ FIX: buka jendela cetak SEKARANG (sinkron, sebelum await) supaya tidak diblokir popup-blocker
+              const jendela = bukaJendelaCetak();
               setExportingPDF(kat);
               try{
                 let arsipForPdf: ArsipItem[] = [];
@@ -1041,7 +1029,7 @@ export default function RecapitulationTable() {
                   const arsipRes = await stafApi.getArsipRekap(tahunFilter, bulanFilter);
                   arsipForPdf = arsipRes.data ?? [];
                 }catch{ /* nonfatal */ }
-                await exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M,arsipForPdf);
+                await exportPDFRekap(rekapData,prosesData,kat,selectedDate,kaP4M,arsipForPdf,jendela);
               } finally {
                 setExportingPDF(null);
               }
@@ -1101,7 +1089,7 @@ export default function RecapitulationTable() {
                 </div>
                 <div className="w-78 border-r-2 border-black p-3 align-top">
                   <p className="text-[9px] text-gray-400 italic mb-1">{item.kode}{item.unit!=="—"&&` · ${item.unit}`}</p>
-                  <div className="border border-gray-400 p-2 min-h-20 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                  <div className="border border-gray-400 p-2 min-h-20 text-[10px] leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                     {item.uraian}
                   </div>
                   {item.lampiranLaporan && (
@@ -1115,7 +1103,7 @@ export default function RecapitulationTable() {
                   )}
                 </div>
                 <div className="w-50 border-r-2 border-black p-3 align-top">
-                  <div className="text-gray-600 text-[10px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                  <div className="text-gray-600 text-[10px] leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                     {item.penyebab}
                   </div>
                 </div>
@@ -1135,7 +1123,7 @@ export default function RecapitulationTable() {
                   </span>
                 </div>
                 <div className="w-78 border-r-2 border-black p-3 align-top">
-                  <div className="border border-gray-400 p-2 min-h-20 text-gray-600 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                  <div className="border border-gray-400 p-2 min-h-20 text-gray-600 leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1 text-[9px]">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>
@@ -1183,7 +1171,7 @@ export default function RecapitulationTable() {
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${statusInfo.cls}`}>{statusInfo.label}</span>
                 </div>
-                <div className="border border-gray-300 p-2 text-[11px] font-semibold bg-gray-50 rounded min-h-20 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                <div className="border border-gray-300 p-2 text-[11px] font-semibold bg-gray-50 rounded min-h-20 leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                   {item.uraian}
                 </div>
                 {item.lampiranLaporan && (
@@ -1198,7 +1186,7 @@ export default function RecapitulationTable() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Penyebab</p>
-                    <div className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                    <div className="text-[10px] text-gray-600 border border-gray-200 p-1.5 rounded min-h-10 leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                       {item.penyebab}
                     </div>
                   </div>
@@ -1216,7 +1204,7 @@ export default function RecapitulationTable() {
                 </div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Hasil Tindak Lanjut</p>
-                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded min-h-16 leading-relaxed text-justify whitespace-pre-wrap break-words">
+                  <div className="border border-gray-200 p-2 text-[10px] text-gray-600 rounded min-h-16 leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                     {item.tglPelaksanaan!=="—"&&<span className="block font-bold not-italic text-gray-700 mb-1">{item.tglPelaksanaan}</span>}
                     {item.hasil}
                   </div>

@@ -237,3 +237,41 @@ export function labelStatusLengkap(
 
   return { label: "⏳ Dipantau", cls: "bg-amber-100 text-amber-700", butuhAksiStaf: false };
 }
+
+// ─────────────────────────────────────────────────────────────
+// ✅ BARU: helper untuk data arsip (hasil import Excel) & PDF
+// ─────────────────────────────────────────────────────────────
+const BULAN_SINGKAT: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, jun: 6,
+  jul: 7, agu: 8, ags: 8, sep: 9, okt: 10, nov: 11, des: 12,
+};
+
+/** Parse tanggal TEKS arsip ("2025-06-15", "15/06/2025", "15 Juni 2025", ISO) → Date lokal.
+ *  null kalau tidak bisa dibaca (mis. "—"). */
+export function parseTglArsip(teks: string | null | undefined): Date | null {
+  if (!teks) return null;
+  const s = String(teks).trim();
+  let mt: RegExpExecArray | null;
+  if ((mt = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) return new Date(+mt[1], +mt[2] - 1, +mt[3]);
+  if ((mt = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(s))) return new Date(+mt[3], +mt[2] - 1, +mt[1]);
+  if ((mt = /^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})/.exec(s))) {
+    const m = BULAN_SINGKAT[mt[2].slice(0, 3).toLowerCase()];
+    if (m) return new Date(+mt[3], m - 1, +mt[1]);
+  }
+  return null;
+}
+
+/** Escape teks sebelum dimasukkan ke HTML (PDF). Newline → <br>. */
+export function escHtml(v: string | number | null | undefined): string {
+  if (v == null) return "";
+  return String(v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/\r?\n/g, "<br/>");
+}
+
+/** Status arsip dianggap selesai kalau mengandung selesai/close/ditindaklanjuti/sesuai (case-insensitive). */
+export function arsipSelesai(statusBoxing?: string | null, statusReview?: string | null): boolean {
+  const t = `${statusBoxing ?? ""} ${statusReview ?? ""}`.toLowerCase();
+  if (/menunggu|proses|dipantau|open/.test(t) && !/selesai|close/.test(t)) return false;
+  return /selesai|close|ditindaklanjuti|sesuai/.test(t);
+}

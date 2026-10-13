@@ -472,23 +472,23 @@ async function getRekapitulasi(req, res) {
 // 7b. UPLOAD ARSIP REKAP
 // ============================================================
 const KOLOM_ALIAS = {
-  // URUTAN = PRIORITAS. "kode laporan" harus menang atas "no", karena di
-  // file hasil export aplikasi kolom "No" (nomor urut) ada di KIRI
-  // "Kode Laporan". "no" hanya dipakai kalau tidak ada kolom kode sama sekali
-  // (format Excel lama dari staf).
-  kode: ["kode laporan","kode","nomor laporan","no.","nomor","no"],
-  jenis: ["jenis laporan","jenis","jenis ketidaksesuaian"],
-  tglMasuk: ["tgl masuk","tanggal masuk","tanggal","tgl","tanggal laporan"],
-  uraian: ["uraian ketidaksesuaian","uraian","deskripsi","uraian masalah"],
-  unit: ["unit","bagian","unit/bagian","unit pelaksana"],
-  penyebab: ["penyebab","penyebab ketidaksesuaian"],
-  rencana: ["rencana tindakan","rencana","tindakan pencegahan"],
-  hasil: ["hasil tindak lanjut","hasil","hasil tindakan","tindakan koreksi"],
-  tglPelaks: ["tgl pelaksanaan","tanggal pelaksanaan","tanggal selesai","tgl selesai"],
+  // "no" (nomor urut) DIPISAH dari "kode". Di file hasil export aplikasi kolom
+  // "No" ada di kiri "Kode Laporan"; kalau kode kosong ("—"), baris tetap
+  // dikenali sebagai laporan BARU lewat nomor urut (bukan digabung ke baris atas).
+  no: ["no", "no.", "nomor", "nomor urut"],
+  kode: ["kode laporan", "kode", "nomor laporan"],
+  jenis: ["jenis laporan", "jenis", "jenis ketidaksesuaian"],
+  tglMasuk: ["tgl masuk", "tanggal masuk", "tanggal", "tgl", "tanggal laporan"],
+  uraian: ["uraian ketidaksesuaian", "uraian", "deskripsi", "uraian masalah"],
+  unit: ["unit", "bagian", "unit/bagian", "unit pelaksana"],
+  penyebab: ["penyebab", "penyebab ketidaksesuaian"],
+  rencana: ["rencana tindakan", "rencana", "tindakan pencegahan"],
+  hasil: ["hasil tindak lanjut", "hasil", "hasil tindakan", "tindakan koreksi"],
+  tglPelaks: ["tgl pelaksanaan", "tanggal pelaksanaan", "tanggal selesai", "tgl selesai"],
   statusReview: ["status review"],
-  statusBoxing: ["status proses","status boxing","status (open/close)","status"],
-  fotoAwal: ["foto laporan","lampiran laporan","gambar laporan"],
-  fotoHasil: ["foto hasil","lampiran hasil","gambar hasil"],
+  statusBoxing: ["status proses", "status boxing", "status (open/close)", "status"],
+  fotoAwal: ["foto laporan", "lampiran laporan", "gambar laporan"],
+  fotoHasil: ["foto hasil", "lampiran hasil", "gambar hasil"],
 };
 
 function normalisasiHeader(value) {
@@ -505,14 +505,17 @@ function cariBarisHeader(sheet) {
     row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
       let teks = cell.value;
       if (teks == null) return;
-      if (typeof teks === "object") teks = teks.text ?? teks.result ?? "";
+      if (typeof teks === "object") {
+        teks = Array.isArray(teks.richText)
+          ? teks.richText.map((x) => x?.text ?? "").join("")
+          : teks.text ?? teks.result ?? "";
+      }
       teks = normalisasiHeader(teks);
       if (!teks) return;
 
       for (const [key, aliases] of Object.entries(KOLOM_ALIAS)) {
         const prio = aliases.findIndex((a) => normalisasiHeader(a) === teks);
         if (prio === -1) continue;
-        // pilih alias berprioritas tertinggi (index terkecil), BUKAN kolom paling kiri
         if (!terbaik[key] || prio < terbaik[key].prio) {
           terbaik[key] = { prio, colNumber };
         }
@@ -522,48 +525,61 @@ function cariBarisHeader(sheet) {
     const petaKolom = {};
     for (const [key, v] of Object.entries(terbaik)) petaKolom[key] = v.colNumber;
 
-    // foto tidak dihitung sebagai syarat deteksi header
-    const jumlahCocok = Object.keys(petaKolom).filter((k) => k !== "fotoAwal" && k !== "fotoHasil").length;
-    if (jumlahCocok >= 4) return { headerRowNum: r, petaKolom };
+    const jumlahCocok = Object.keys(petaKolom).filter(
+      (k) => k !== "fotoAwal" && k !== "fotoHasil" && k !== "no"
+    ).length;
+    if (jumlahCocok >= 3) return { headerRowNum: r, petaKolom };
   }
   return null;
 }
 
-// Ambil gambar yang tertanam (embedded) di sheet, dikelompokkan per baris & kolom foto.
-// Hasil: Map<nomorBaris, { awal?: {buffer, ext}, hasil?: {buffer, ext} }>
-function kumpulkanGambar(workbook, sheet, petaKolom) {
+// Ambil gambar tertanam di sheet -> Map<nomorBaris, { awal?, hasil? }>
+// ✅ FIX: kalau file TIDAK punya kolom "Foto Laporan"/"Foto Hasil" (mis. Excel
+// lama buatan staf), gambar tetap diambil: gambar pertama di baris = foto
+// laporan, gambar kedua (paling kanan) = foto hasil.
+function kumpulkanGambar(workbook, sheet, petaKolom, headerRowNum) {
   const hasil = new Map();
-  if (!petaKolom.fotoAwal && !petaKolom.fotoHasil) return hasil;
-
   let daftar = [];
   try { daftar = sheet.getImages(); } catch { return hasil; }
+
+  const adaKolomFoto = !!(petaKolom.fotoAwal || petaKolom.fotoHasil);
+  const perBaris = new Map(); // baris -> [{ kolom, buffer, ext }]
 
   for (const img of daftar) {
     const tl = img.range?.tl;
     if (!tl) continue;
-    const kolom = (tl.nativeCol ?? Math.floor(tl.col)) + 1; // 0-based -> 1-based
+    const kolom = (tl.nativeCol ?? Math.floor(tl.col)) + 1;
     const baris = (tl.nativeRow ?? Math.floor(tl.row)) + 1;
-
-    let jenis = null;
-    if (kolom === petaKolom.fotoAwal) jenis = "awal";
-    else if (kolom === petaKolom.fotoHasil) jenis = "hasil";
-    if (!jenis) continue;
+    if (baris <= headerRowNum) continue;
 
     const media = workbook.getImage(img.imageId);
     if (!media || !media.buffer) continue;
     const ext = String(media.extension || "").toLowerCase().replace("jpeg", "jpg");
-    if (!["png", "jpg", "gif"].includes(ext)) continue; // whitelist
+    if (!["png", "jpg", "gif"].includes(ext)) continue;
 
-    if (!hasil.has(baris)) hasil.set(baris, {});
-    const entry = hasil.get(baris);
-    if (!entry[jenis]) entry[jenis] = { buffer: media.buffer, ext }; // 1 foto per kolom
+    if (!perBaris.has(baris)) perBaris.set(baris, []);
+    perBaris.get(baris).push({ kolom, buffer: media.buffer, ext });
+  }
+
+  for (const [baris, list] of perBaris) {
+    list.sort((a, b) => a.kolom - b.kolom);
+    const entry = {};
+    if (adaKolomFoto) {
+      for (const g of list) {
+        if (g.kolom === petaKolom.fotoAwal && !entry.awal) entry.awal = g;
+        else if (g.kolom === petaKolom.fotoHasil && !entry.hasil) entry.hasil = g;
+      }
+    } else {
+      if (list[0]) entry.awal = list[0];
+      if (list[1]) entry.hasil = list[list.length - 1];
+    }
+    if (entry.awal || entry.hasil) hasil.set(baris, entry);
   }
   return hasil;
 }
 
 const ARSIP_IMG_SUBDIR = "arsip";
 
-// Simpan 1 gambar ke uploads/arsip/<random>.<ext>; return path relatif ("arsip/xxx.png")
 function simpanGambarArsip(media) {
   const dir = path.join(UPLOAD_DIR, ARSIP_IMG_SUBDIR);
   fs.mkdirSync(dir, { recursive: true });
@@ -573,13 +589,12 @@ function simpanGambarArsip(media) {
 }
 
 function hapusFileArsip(relPath) {
-  if (!relPath || !relPath.startsWith(`${ARSIP_IMG_SUBDIR}/`)) return; // hanya folder arsip
+  if (!relPath || !relPath.startsWith(`${ARSIP_IMG_SUBDIR}/`)) return;
   const full = path.join(UPLOAD_DIR, relPath);
-  if (!full.startsWith(path.join(UPLOAD_DIR, ARSIP_IMG_SUBDIR))) return; // anti path traversal
+  if (!full.startsWith(path.join(UPLOAD_DIR, ARSIP_IMG_SUBDIR))) return;
   fs.promises.unlink(full).catch(() => {});
 }
 
-// "—", "–", "-" (placeholder kosong dari export aplikasi) dianggap tidak ada isi
 function bersihkanPlaceholder(v) {
   if (v == null) return null;
   const t = String(v).trim();
@@ -592,10 +607,8 @@ function ambilNilaiSel(row, colNumber) {
 
 function ambilNilaiSelMentah(row, colNumber) {
   if (!colNumber) return null;
-
   const cell = row.getCell(colNumber);
   if (!cell) return null;
-
   const nilai = cell.value;
   if (nilai == null) return null;
 
@@ -612,33 +625,138 @@ function ambilNilaiSelMentah(row, colNumber) {
       const teks = String(nilai.result).trim();
       return teks === "" ? null : teks;
     }
-
     if (Array.isArray(nilai.richText)) {
-      const teks = nilai.richText.map(item => item?.text ?? "").join("").trim();
+      const teks = nilai.richText.map((item) => item?.text ?? "").join("").trim();
       return teks === "" ? null : teks;
     }
-
     if (typeof nilai.text === "string") {
       const teks = nilai.text.trim();
       return teks === "" ? null : teks;
     }
-
     if (nilai.hyperlink) {
       const teks = nilai.text ?? nilai.hyperlink;
       return String(teks).trim() || null;
     }
-
     return null;
   }
   return String(nilai).trim() || null;
 }
 
+// Potong teks supaya tidak melebihi panjang kolom VARCHAR (kalau lebih,
+// MySQL strict mode menolak INSERT dan SELURUH import gagal).
+function potong(v, maks) {
+  if (v == null) return null;
+  const s = String(v);
+  return s.length > maks ? s.slice(0, maks) : s;
+}
+
+// Pastikan kolom lampiran ada di tabel arsip (migrasi otomatis, aman diulang)
+let kolomArsipSiap = false;
+async function pastikanKolomLampiranArsip(conn) {
+  if (kolomArsipSiap) return;
+  const [cols] = await conn.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'arsip_rekapitulasi'
+       AND COLUMN_NAME IN ('lampiran_laporan','lampiran_hasil')`
+  );
+  const ada = new Set(cols.map((c) => c.COLUMN_NAME));
+  for (const kol of ["lampiran_laporan", "lampiran_hasil"]) {
+    if (!ada.has(kol)) {
+      await conn.query(`ALTER TABLE arsip_rekapitulasi ADD COLUMN ${kol} VARCHAR(255) NULL`);
+    }
+  }
+  kolomArsipSiap = true;
+}
+
+// Baca SATU sheet -> array laporan. null kalau header tidak dikenali.
+function bacaSheetArsip(workbook, sheet, meta) {
+  const hasilHeader = cariBarisHeader(sheet);
+  if (!hasilHeader) return null;
+  const { headerRowNum, petaKolom } = hasilHeader;
+  const gambarPerBaris = kumpulkanGambar(workbook, sheet, petaKolom, headerRowNum);
+
+  const daftar = [];
+  let laporanSaatIni = null;
+
+  for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+
+    const noVal = ambilNilaiSel(row, petaKolom.no);
+    const kode = ambilNilaiSel(row, petaKolom.kode);
+    const jenis = ambilNilaiSel(row, petaKolom.jenis);
+    const tglMasuk = ambilNilaiSel(row, petaKolom.tglMasuk);
+    const uraian = ambilNilaiSel(row, petaKolom.uraian);
+    const unit = ambilNilaiSel(row, petaKolom.unit);
+    const penyebab = ambilNilaiSel(row, petaKolom.penyebab);
+    const rencana = ambilNilaiSel(row, petaKolom.rencana);
+    const hasil = ambilNilaiSel(row, petaKolom.hasil);
+    const tglPelaks = ambilNilaiSel(row, petaKolom.tglPelaks);
+    const statusReview = ambilNilaiSel(row, petaKolom.statusReview);
+    const statusBoxing = ambilNilaiSel(row, petaKolom.statusBoxing);
+
+    const semuaNilai = [
+      kode, jenis, tglMasuk, uraian, unit, penyebab, rencana, hasil,
+      tglPelaks, statusReview, statusBoxing,
+    ].filter(Boolean).join(" ").trim();
+
+    // STOP FOOTER (tanda tangan)
+    if (
+      /^Batam,\s*\d{1,2}\s+\w+\s+\d{4}$/i.test(semuaNilai) ||
+      /^Kepala P4M$/i.test(semuaNilai) ||
+      /^\(.+\)$/.test(semuaNilai) && !uraian
+    ) {
+      break;
+    }
+
+    const kodeText = kode == null ? null : String(kode).trim() || null;
+    const noText = noVal == null ? null : String(noVal).trim() || null;
+
+    // Baris "Tidak ada data" -> lewati
+    if (/^tidak ada data$/i.test(kodeText ?? noText ?? "")) continue;
+
+    // Identitas laporan: kode kalau ada, kalau tidak pakai nomor urut.
+    const idKey = kodeText || (noText ? `NO:${noText}` : null);
+    const kodeBaru = !!idKey && (!laporanSaatIni || laporanSaatIni.idKey !== idKey);
+
+    if (kodeBaru) {
+      laporanSaatIni = {
+        idKey,
+        // kalau file tidak punya kolom kode sama sekali, nomor urut dipakai sebagai kode (perilaku lama)
+        kode: kodeText || (!petaKolom.kode ? noText : null),
+        jenis, tglMasuk, uraian, unit, penyebab, rencana, hasil,
+        tglPelaks, statusReview, statusBoxing,
+        mediaAwal: null, mediaHasil: null,
+      };
+      daftar.push(laporanSaatIni);
+    } else if (laporanSaatIni) {
+      if (jenis) laporanSaatIni.jenis = jenis;
+      if (tglMasuk) laporanSaatIni.tglMasuk = tglMasuk;
+      if (unit) laporanSaatIni.unit = unit;
+      if (tglPelaks) laporanSaatIni.tglPelaks = tglPelaks;
+      if (statusReview) laporanSaatIni.statusReview = statusReview;
+      if (statusBoxing) laporanSaatIni.statusBoxing = statusBoxing;
+      if (uraian) laporanSaatIni.uraian = laporanSaatIni.uraian ? `${laporanSaatIni.uraian}\n${uraian}` : uraian;
+      if (penyebab) laporanSaatIni.penyebab = laporanSaatIni.penyebab ? `${laporanSaatIni.penyebab}\n${penyebab}` : penyebab;
+      if (rencana) laporanSaatIni.rencana = laporanSaatIni.rencana ? `${laporanSaatIni.rencana}\n${rencana}` : rencana;
+      if (hasil) laporanSaatIni.hasil = laporanSaatIni.hasil ? `${laporanSaatIni.hasil}\n${hasil}` : hasil;
+    }
+
+    // Gambar di baris ini -> laporan yang sedang diproses
+    const g = gambarPerBaris.get(r);
+    if (g && laporanSaatIni) {
+      if (g.awal && !laporanSaatIni.mediaAwal) laporanSaatIni.mediaAwal = g.awal;
+      if (g.hasil && !laporanSaatIni.mediaHasil) laporanSaatIni.mediaHasil = g.hasil;
+    }
+  }
+
+  daftar.forEach((l) => Object.assign(l, meta));
+  return daftar;
+}
+
 async function uploadArsipRekap(req, res) {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false, message: "File Excel wajib diunggah.",
-      });
+      return res.status(400).json({ success: false, message: "File Excel wajib diunggah." });
     }
 
     const tahun = parseInt(req.body.tahun, 10);
@@ -654,125 +772,57 @@ async function uploadArsipRekap(req, res) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
 
-    const sheet =
-      workbook.worksheets.find((ws) => /selesai/i.test(ws.name)) ||
-      workbook.worksheets.find(
-        (ws) => !/ringkasan/i.test(ws.name) && !/masih.?dipantau/i.test(ws.name)
-      ) ||
-      workbook.worksheets.find((ws) => !/ringkasan/i.test(ws.name)) ||
-      workbook.worksheets[0];
-
-    if (!sheet) {
-      return res.status(400).json({
-        success: false,
-        message: "File Excel tidak berisi sheet data apa pun.",
-      });
+    // ✅ FIX: baca SEMUA sheet data (Laporan Masih Dipantau + Laporan Selesai +
+    // Arsip/Tahun ...), bukan hanya 1 sheet. Sheet "Ringkasan" dilewati.
+    const sheetData = workbook.worksheets.filter((ws) => !/ringkasan/i.test(ws.name));
+    if (sheetData.length === 0) {
+      return res.status(400).json({ success: false, message: "File Excel tidak berisi sheet data apa pun." });
     }
 
-    const hasilHeader = cariBarisHeader(sheet);
-    if (!hasilHeader) {
+    const meta = { tahun, namaFileAsal: req.file.originalname, diuploadOleh: req.user?.id ?? null };
+    const barisSiapInsert = [];
+    const sudahAda = new Set(); // cegah dobel kalau 1 laporan muncul di >1 sheet
+    let adaSheetValid = false;
+
+    for (const sheet of sheetData) {
+      const daftar = bacaSheetArsip(workbook, sheet, meta);
+      if (!daftar) continue;
+      adaSheetValid = true;
+      for (const l of daftar) {
+        const kunci = l.kode ? `K:${l.kode}` : null;
+        if (kunci && sudahAda.has(kunci)) continue;
+        if (kunci) sudahAda.add(kunci);
+        barisSiapInsert.push(l);
+      }
+    }
+
+    if (!adaSheetValid) {
       return res.status(400).json({
         success: false,
         message:
           "Format file tidak dikenali. Pastikan file memiliki kolom seperti hasil export TUNTAS (Kode Laporan, Uraian Ketidaksesuaian, Penyebab, dst).",
       });
     }
-    const { headerRowNum, petaKolom } = hasilHeader;
-    const barisSiapInsert = [];
-    let laporanSaatIni = null;
-    const gambarPerBaris = kumpulkanGambar(workbook, sheet, petaKolom);
-
-    for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
-      const row = sheet.getRow(r);
-
-      const kode = ambilNilaiSel(row, petaKolom.kode);
-      const jenis = ambilNilaiSel(row, petaKolom.jenis);
-      const tglMasuk = ambilNilaiSel(row, petaKolom.tglMasuk);
-      const uraian = ambilNilaiSel(row, petaKolom.uraian);
-      const unit = ambilNilaiSel(row, petaKolom.unit);
-      const penyebab = ambilNilaiSel(row, petaKolom.penyebab);
-      const rencana = ambilNilaiSel(row, petaKolom.rencana);
-      const hasil = ambilNilaiSel(row, petaKolom.hasil);
-      const tglPelaks = ambilNilaiSel(row, petaKolom.tglPelaks);
-      const statusReview = ambilNilaiSel(row, petaKolom.statusReview);
-      const statusBoxing = ambilNilaiSel(row, petaKolom.statusBoxing);
-
-      const semuaNilai = [
-        kode, jenis, tglMasuk, uraian, unit,
-        penyebab, rencana, hasil, tglPelaks,
-        statusReview, statusBoxing,
-      ].filter(Boolean).join(" ").trim();
-
-      // STOP FOOTER (tanda tangan)
-      if (
-        /^Batam,\s*\d{1,2}\s+\w+\s+\d{4}$/i.test(semuaNilai) ||
-        /^Kepala P4M$/i.test(semuaNilai) ||
-        /^\(Evaliata Br\. Sembiring\)$/i.test(semuaNilai)
-      ) {
-        break;
-      }
-
-      const kodeText = kode == null ? null : String(kode).trim() || null;
-
-      // Baris "Tidak ada data" dari export aplikasi -> lewati
-      if (kodeText && /^tidak ada data$/i.test(kodeText)) continue;
-
-      // KODE BARU: kode terisi (angka ATAU teks seperti LAP-1A2B3C4D) dan beda
-      // dari laporan sebelumnya. Baris tanpa kode = lanjutan laporan sebelumnya
-      // (format Excel lama yang uraiannya terpecah beberapa baris).
-      const kodeBaru = !!kodeText && (!laporanSaatIni || laporanSaatIni.kode !== kodeText);
-
-      if (kodeBaru) {
-        laporanSaatIni = {
-          tahun, kode: kodeText, jenis, tglMasuk, uraian, unit, penyebab, rencana, hasil,
-          tglPelaks, statusReview, statusBoxing, namaFileAsal: req.file.originalname,
-          diuploadOleh: req.user?.id ?? null,
-          mediaAwal: null, mediaHasil: null,
-        };
-        barisSiapInsert.push(laporanSaatIni);
-      } else if (laporanSaatIni) {
-        if (jenis) laporanSaatIni.jenis = jenis;
-        if (tglMasuk) laporanSaatIni.tglMasuk = tglMasuk;
-        if (unit) laporanSaatIni.unit = unit;
-        if (tglPelaks) laporanSaatIni.tglPelaks = tglPelaks;
-        if (statusReview) laporanSaatIni.statusReview = statusReview;
-        if (statusBoxing) laporanSaatIni.statusBoxing = statusBoxing;
-
-        if (uraian) laporanSaatIni.uraian = laporanSaatIni.uraian ? `${laporanSaatIni.uraian}\n${uraian}` : uraian;
-        if (penyebab) laporanSaatIni.penyebab = laporanSaatIni.penyebab ? `${laporanSaatIni.penyebab}\n${penyebab}` : penyebab;
-        if (rencana) laporanSaatIni.rencana = laporanSaatIni.rencana ? `${laporanSaatIni.rencana}\n${rencana}` : rencana;
-        if (hasil) laporanSaatIni.hasil = laporanSaatIni.hasil ? `${laporanSaatIni.hasil}\n${hasil}` : hasil;
-      } else {
-        continue;
-      }
-
-      // Tempelkan gambar yang tertanam di baris ini ke laporan yang sedang diproses
-      const g = gambarPerBaris.get(r);
-      if (g) {
-        if (g.awal && !laporanSaatIni.mediaAwal) laporanSaatIni.mediaAwal = g.awal;
-        if (g.hasil && !laporanSaatIni.mediaHasil) laporanSaatIni.mediaHasil = g.hasil;
-      }
-    }
-
-  if (barisSiapInsert.length === 0) {
-    return res.status(400).json({
+    if (barisSiapInsert.length === 0) {
+      return res.status(400).json({
         success: false,
         message: "Tidak ditemukan baris data yang bisa dibaca dari file ini.",
       });
     }
 
     const connection = await pool.getConnection();
-    const fileBaru = [];   // untuk rollback kalau DB gagal
-    let fileLama = [];     // dihapus setelah commit
+    const fileBaru = [];
+    let fileLama = [];
 
     try {
-      // simpan gambar ke disk dulu (path-nya masuk ke kolom DB)
+      await pastikanKolomLampiranArsip(connection); // ALTER = implicit commit, jadi sebelum transaksi
+
       for (const laporan of barisSiapInsert) {
         laporan.lampiranLaporan = laporan.mediaAwal ? simpanGambarArsip(laporan.mediaAwal) : null;
         laporan.lampiranHasil   = laporan.mediaHasil ? simpanGambarArsip(laporan.mediaHasil) : null;
         if (laporan.lampiranLaporan) fileBaru.push(laporan.lampiranLaporan);
         if (laporan.lampiranHasil) fileBaru.push(laporan.lampiranHasil);
-        delete laporan.mediaAwal; delete laporan.mediaHasil; // lepas buffer dari memori
+        delete laporan.mediaAwal; delete laporan.mediaHasil;
       }
 
       await connection.beginTransaction();
@@ -791,31 +841,31 @@ async function uploadArsipRekap(req, res) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
-      for (const laporan of barisSiapInsert) {
+      for (const l of barisSiapInsert) {
         await connection.query(sqlInsert, [
-          laporan.tahun, laporan.kode, laporan.jenis, laporan.tglMasuk, laporan.uraian,
-          laporan.unit, laporan.penyebab, laporan.rencana, laporan.hasil, laporan.tglPelaks,
-          laporan.statusReview, laporan.statusBoxing,
-          laporan.lampiranLaporan, laporan.lampiranHasil,
-          laporan.namaFileAsal, laporan.diuploadOleh,
+          l.tahun, potong(l.kode, 50), potong(l.jenis, 50), potong(l.tglMasuk, 50), l.uraian,
+          potong(l.unit, 150), l.penyebab, l.rencana, l.hasil, potong(l.tglPelaks, 50),
+          potong(l.statusReview, 50), potong(l.statusBoxing, 50),
+          l.lampiranLaporan, l.lampiranHasil,
+          potong(l.namaFileAsal, 255), l.diuploadOleh,
         ]);
       }
       await connection.commit();
-      fileLama.forEach(hapusFileArsip); // bersihkan gambar data lama yang sudah diganti
+      fileLama.forEach(hapusFileArsip);
     } catch (error) {
       try { await connection.rollback(); } catch {}
-      fileBaru.forEach(hapusFileArsip); // batalkan gambar yang sudah terlanjur disimpan
+      fileBaru.forEach(hapusFileArsip);
       throw error;
     } finally {
       connection.release();
     }
 
+    const jumlahGambar = barisSiapInsert.filter((x) => x.lampiranLaporan).length +
+                         barisSiapInsert.filter((x) => x.lampiranHasil).length;
     return res.status(200).json({
       success: true,
       message: `Berhasil mengimpor ${barisSiapInsert.length} baris data arsip tahun ${tahun}` +
-        (barisSiapInsert.some((x) => x.lampiranLaporan || x.lampiranHasil)
-          ? ` (termasuk ${barisSiapInsert.filter((x) => x.lampiranLaporan).length + barisSiapInsert.filter((x) => x.lampiranHasil).length} gambar).`
-          : "."),
+        (jumlahGambar > 0 ? ` (termasuk ${jumlahGambar} gambar).` : "."),
       jumlah: barisSiapInsert.length,
       tahun,
     });
@@ -843,6 +893,7 @@ function bulanDariTeksTanggal(teks) {
 
 async function getArsipRekap(req, res) {
   try {
+    await pastikanKolomLampiranArsip(pool);
     const { tahun, bulan } = req.query;
     let query = `
       SELECT tahun, kode_laporan, jenis_laporan, tgl_masuk, uraian_ketidaksesuaian,
