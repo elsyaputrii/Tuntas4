@@ -668,6 +668,19 @@ async function pastikanKolomLampiranArsip(conn) {
   kolomArsipSiap = true;
 }
 
+// Gabungkan teks lanjutan TANPA menduplikasi (mis. sel merge yang nilainya
+// terbaca sama di tiap baris, atau baris yang isinya persis sama).
+function gabungTeks(lama, baru) {
+  if (!baru) return lama;
+  if (!lama) return baru;
+  const bagian = String(lama).split("\n").map((x) => x.trim());
+  if (bagian.includes(String(baru).trim())) return lama;
+  return `${lama}\n${baru}`;
+}
+
+const samaTeks = (a, b) =>
+  String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+
 // Baca SATU sheet -> array laporan. null kalau header tidak dikenali.
 function bacaSheetArsip(workbook, sheet, meta) {
   const hasilHeader = cariBarisHeader(sheet);
@@ -716,11 +729,26 @@ function bacaSheetArsip(workbook, sheet, meta) {
 
     // Identitas laporan: kode kalau ada, kalau tidak pakai nomor urut.
     const idKey = kodeText || (noText ? `NO:${noText}` : null);
-    const kodeBaru = !!idKey && (!laporanSaatIni || laporanSaatIni.idKey !== idKey);
+
+    // ✅ FIX: baris dianggap laporan BARU (dipisah) kalau:
+    //   - kode/nomor berbeda dari baris sebelumnya, ATAU
+    //   - kode sama tapi UNIT berbeda (1 laporan didistribusikan ke beberapa unit
+    //     → tiap unit punya Penyebab, Rencana & Hasil sendiri), ATAU
+    //   - nomor urut (kolom No) berbeda dari baris sebelumnya (file hasil export
+    //     aplikasi: 1 baris = 1 unit).
+    // Baris tanpa kode/nomor = lanjutan teks laporan sebelumnya (format Excel lama).
+    const beda = (a, b) => a != null && b != null && !samaTeks(a, b);
+    const kodeBaru =
+      !!idKey &&
+      (!laporanSaatIni ||
+        laporanSaatIni.idKey !== idKey ||
+        beda(laporanSaatIni.unit, unit) ||
+        beda(laporanSaatIni.noText, noText));
 
     if (kodeBaru) {
       laporanSaatIni = {
         idKey,
+        noText,
         // kalau file tidak punya kolom kode sama sekali, nomor urut dipakai sebagai kode (perilaku lama)
         kode: kodeText || (!petaKolom.kode ? noText : null),
         jenis, tglMasuk, uraian, unit, penyebab, rencana, hasil,
@@ -735,10 +763,10 @@ function bacaSheetArsip(workbook, sheet, meta) {
       if (tglPelaks) laporanSaatIni.tglPelaks = tglPelaks;
       if (statusReview) laporanSaatIni.statusReview = statusReview;
       if (statusBoxing) laporanSaatIni.statusBoxing = statusBoxing;
-      if (uraian) laporanSaatIni.uraian = laporanSaatIni.uraian ? `${laporanSaatIni.uraian}\n${uraian}` : uraian;
-      if (penyebab) laporanSaatIni.penyebab = laporanSaatIni.penyebab ? `${laporanSaatIni.penyebab}\n${penyebab}` : penyebab;
-      if (rencana) laporanSaatIni.rencana = laporanSaatIni.rencana ? `${laporanSaatIni.rencana}\n${rencana}` : rencana;
-      if (hasil) laporanSaatIni.hasil = laporanSaatIni.hasil ? `${laporanSaatIni.hasil}\n${hasil}` : hasil;
+      if (uraian) laporanSaatIni.uraian = gabungTeks(laporanSaatIni.uraian, uraian);
+      if (penyebab) laporanSaatIni.penyebab = gabungTeks(laporanSaatIni.penyebab, penyebab);
+      if (rencana) laporanSaatIni.rencana = gabungTeks(laporanSaatIni.rencana, rencana);
+      if (hasil) laporanSaatIni.hasil = gabungTeks(laporanSaatIni.hasil, hasil);
     }
 
     // Gambar di baris ini -> laporan yang sedang diproses
@@ -789,7 +817,7 @@ async function uploadArsipRekap(req, res) {
       if (!daftar) continue;
       adaSheetValid = true;
       for (const l of daftar) {
-        const kunci = l.kode ? `K:${l.kode}` : null;
+        const kunci = l.kode ? `K:${l.kode}|${String(l.unit ?? "").trim().toLowerCase()}|${String(l.uraian ?? "").trim().slice(0, 80)}` : null;
         if (kunci && sudahAda.has(kunci)) continue;
         if (kunci) sudahAda.add(kunci);
         barisSiapInsert.push(l);
