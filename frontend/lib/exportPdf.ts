@@ -21,8 +21,6 @@ import {
 } from "./exportHelpers";
 
 // ─── QR Code TTE ─────────────────────────────────────────────
-// QR berisi info TTE (TTE oleh / Perihal / Hashing) — di-scan pakai
-// kamera/QR scanner apa pun untuk menampilkan info TTE-nya.
 async function generateQrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, {
@@ -32,12 +30,11 @@ async function generateQrDataUrl(text: string): Promise<string | null> {
       color: { dark: "#111111", light: "#ffffff" },
     });
   } catch {
-    return null; // nonfatal — PDF tetap bisa dicetak tanpa QR
+    return null;
   }
 }
 
 // ─── HELPER TTE ─────────────────────────────────────────────
-// Format tanggal Indonesia: "24 Juli 2026"
 function formatTanggalIndonesia(d: Date): string {
   const bulan = [
     "Januari","Februari","Maret","April","Mei","Juni",
@@ -46,7 +43,6 @@ function formatTanggalIndonesia(d: Date): string {
   return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-// Hash SHA-256 (hex) — pakai Web Crypto API (bawaan browser modern)
 async function sha256Hex(text: string): Promise<string> {
   try {
     const buf = new TextEncoder().encode(text);
@@ -55,8 +51,6 @@ async function sha256Hex(text: string): Promise<string> {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   } catch {
-    // Fallback super-sederhana kalau crypto.subtle tidak tersedia (harusnya
-    // tidak pernah terjadi di browser modern). Tetap deterministic.
     let h = 0;
     for (let i = 0; i < text.length; i++) {
       h = (h << 5) - h + text.charCodeAt(i);
@@ -66,20 +60,6 @@ async function sha256Hex(text: string): Promise<string> {
   }
 }
 
-/**
- * Bangun teks QR TTE dengan format:
- *
- *   TTE oleh:
- *   <nama penandatangan>
- *   <tanggal Indonesia>
- *
- *   Perihal:
- *   <jenis> — <kode/periode>
- *
- *   Hashing:
- *   <hash baris 1 (40 char)>
- *   <hash baris 2 (24 char)>
- */
 async function buildQrTteText(opts: {
   penandatangan: string;
   perihal: string;
@@ -105,7 +85,6 @@ async function buildQrTteText(opts: {
   ].join("\n");
 }
 
-// Menghapus gelar "Dr." di depan nama penandatangan
 function stripGelarDr(nama: string): string {
   return nama.replace(/^\s*dr\.?\s+/i, "").trim();
 }
@@ -147,7 +126,18 @@ const BASE_CSS = `
   thead tr { background:#4d5e71; color:#fff; }
   thead th { padding:6px 5px; text-align:center; font-weight:700; border:1px solid #3a4d5e; }
   tbody tr:nth-child(even) { background:#f8fafc; }
-  tbody td { padding:5px; border:1px solid #e2e8f0; vertical-align:top; line-height:1.4; overflow-wrap:break-word; }
+
+  /* ✅ FIX: sel tabel — rata kiri-kanan + jarak antar paragraf */
+  tbody td {
+    padding:5px;
+    border:1px solid #e2e8f0;
+    vertical-align:top;
+    line-height:1.6;
+    overflow-wrap:break-word;
+    word-wrap:break-word;
+    text-align:justify;
+    white-space:pre-wrap;
+  }
 
   .center { text-align:center; }
   .badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:8pt; font-weight:bold; }
@@ -164,6 +154,20 @@ const BASE_CSS = `
   .ttd .qr-img { display:block; width:110px; height:110px; margin:8px auto 2px; }
   .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
 
+  /* ✅ FIX: kotak teks panjang — rata kiri-kanan + jarak antar paragraf */
+  .box {
+    border:1px solid #e2e8f0;
+    padding:8px 10px;
+    border-radius:4px;
+    background:#f8fafc;
+    font-size:9pt;
+    line-height:1.6;
+    min-height:40px;
+    text-align:justify;
+    white-space:pre-wrap;
+    word-wrap:break-word;
+  }
+
   .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px; padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
   .close-btn:hover { background:#3a4d5e; }
 
@@ -177,10 +181,6 @@ const BASE_CSS = `
   }
 `;
 
-/** ✅ BARU: panggil SINKRON di dalam onClick (sebelum await apa pun), lalu
- *  oper hasilnya ke exportPDFRekap. Kalau window.open baru dipanggil setelah
- *  await fetch, browser (terutama Safari/Chrome ketat) memblokirnya sebagai
- *  popup → PDF "tidak keluar / kosong sama sekali". */
 export function bukaJendelaCetak(): Window | null {
   const w = window.screen.availWidth;
   const h = window.screen.availHeight;
@@ -264,9 +264,6 @@ export async function exportPDFRekap(
 
   const filteredSelesai  = rekapData.filter((d) => isInRange(d.created_at ?? null));
   const filteredDipantau = dipantauData.filter((p) => isInRange(p.created_at ?? null));
-  // ✅ FIX: tanggal arsip berupa TEKS ("15 Juni 2025", "—") → new Date() menghasilkan
-  // Invalid Date, sehingga SEMUA arsip tersaring habis (data arsip tidak pernah masuk PDF).
-  // Backend sudah menyaring tahun/bulan; di sini hanya saring hari/minggu kalau tanggalnya terbaca.
   const filteredArsip = arsipData.filter((a) => {
     const dt = parseTglArsip(a.tgl_masuk) ?? parseTglArsip(a.tgl_pelaksanaan);
     if (!dt) return true;
@@ -325,7 +322,6 @@ export async function exportPDFRekap(
       penyebab: a.penyebab ?? "—",
       rencana: a.rencana_tindakan ?? "—",
       hasil: a.hasil_tindakan ?? "—",
-      // ✅ FIX: gambar arsip (hasil import) ikut dicetak
       lampiranAwal: a.lampiran_laporan ?? null,
       lampiranHasil: a.lampiran_hasil ?? null,
       tgl: tglP ? fmtTgl(tglP.toISOString()) : (a.tgl_pelaksanaan ?? "—"),
@@ -340,7 +336,6 @@ export async function exportPDFRekap(
   const jabatanPenandatanganRekap = stripGelarDr(penandatangan?.nama?.trim() || "Kepala P4M");
   const tglCetakRekap = fmtTglWaktu(new Date().toISOString());
 
-  // ✅ TTE format baru
   const qrTextRekap = await buildQrTteText({
     penandatangan: jabatanPenandatanganRekap,
     perihal: `Laporan Rekapitulasi TUNTAS — ${labelKat[kategori]}`,
@@ -425,7 +420,7 @@ ${PRINT_SCRIPT}
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 2. PDF PROSES MONITOR — per laporan individual
+// 2. PDF PROSES MONITOR
 // ═══════════════════════════════════════════════════════════════
 export interface ProsesDetailItem {
   kode_laporan: string;
@@ -454,7 +449,6 @@ export async function exportPDFProses(
   const jabatanPenandatanganProses = "Staff P4M";
   const tglCetakProses = fmtTglWaktu(new Date().toISOString());
 
-  // TTE format baru
   const qrTextProses = await buildQrTteText({
     penandatangan: jabatanPenandatanganProses,
     perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
@@ -476,7 +470,6 @@ export async function exportPDFProses(
   .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
   .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
   .field .val { color:#111; flex:1; }
-  .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
   .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
   .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
   @media print { @page { size:A4 portrait; margin:15mm; } }
@@ -588,7 +581,6 @@ export async function exportPDFRiwayatKepalaUnit(
     : "Dalam Proses";
   const tglCetak = fmtTglWaktu(new Date().toISOString());
 
-  // ✅ TTE format baru
   const qrText = await buildQrTteText({
     penandatangan: jabatanPenandatangan,
     perihal: `${item.jenis_laporan ?? "Laporan"} — ${item.kode_laporan}`,
@@ -606,7 +598,6 @@ export async function exportPDFRiwayatKepalaUnit(
   .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
   .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
   .field .val { color:#111; flex:1; }
-  .box { border:1px solid #e2e8f0; padding:8px 10px; border-radius:4px; background:#f8fafc; font-size:9pt; line-height:1.6; min-height:40px; }
   .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
   .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
   @media print { @page { size:A4 portrait; margin:15mm; } }
