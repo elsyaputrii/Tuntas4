@@ -208,7 +208,7 @@ export default function DataAkunPage() {
       <div className="flex items-center justify-center h-125">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500">Memuat data akun...</p>
+          <p className="text-blue-600">Memuat data akun...</p>
         </div>
       </div>
     );
@@ -217,8 +217,8 @@ export default function DataAkunPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-125">
-        <div className="text-center p-6 bg-red-50 rounded-xl max-w-md">
-          <p className="text-red-600 font-semibold mb-2">⚠️ {error}</p>
+        <div className="text-center p-6 bg-blue-50 rounded-xl max-w-md border border-blue-200">
+          <p className="text-blue-700 font-semibold mb-2">⚠️ {error}</p>
           <button
             onClick={fetchUsers}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
@@ -232,68 +232,72 @@ export default function DataAkunPage() {
 
   return (
     <>
-      <div className="p-6">
+      <div className="p-6 bg-blue-50/30 min-h-screen">
         {/* Header */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-700 dark:text-white mb-2">
+          <h2 className="text-2xl font-bold text-blue-800 dark:text-blue-200 mb-2">
             Kelola Akun Pengguna
           </h2>
-          <p className="text-slate-400 dark:text-slate-400">
+          <p className="text-blue-500 dark:text-blue-300">
             Kelola akun untuk Staff P4M, Kepala Unit, dan KA-P4M yang mengakses sistem
           </p>
         </div>
 
-        {/* Statistik Cards */}
+        {/* Statistik Cards — 5 variasi biru */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div
-            className="bg-linear-to-r from-slate-400 to-slate-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition shadow-blue-200"
             onClick={() => setSelectedRoleFilter("all")}
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-slate-100 text-sm">Seluruh Akun</p>
+                <p className="text-blue-100 text-sm">Seluruh Akun</p>
                 <p className="text-3xl font-bold">{stats.total}</p>
               </div>
-              <Users size={32} className="text-slate-200" />
+              <Users size={32} className="text-blue-200" />
             </div>
           </div>
+
           <div
-            className="bg-linear-to-r from-emerald-400 to-emerald-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            className="bg-gradient-to-r from-sky-400 to-sky-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition shadow-sky-200"
             onClick={() => setSelectedRoleFilter("staff_p4m")}
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-emerald-100 text-sm">Staff P4M</p>
+                <p className="text-sky-100 text-sm">Staff P4M</p>
                 <p className="text-3xl font-bold">{stats.staffP4M}</p>
               </div>
-              <Briefcase size={32} className="text-emerald-200" />
+              <Briefcase size={32} className="text-sky-200" />
             </div>
           </div>
+
           <div
-            className="bg-linear-to-r from-violet-400 to-violet-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            className="bg-gradient-to-r from-indigo-400 to-indigo-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition shadow-indigo-200"
             onClick={() => setSelectedRoleFilter("kepala_unit")}
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-violet-100 text-sm">Kepala Unit</p>
+                <p className="text-indigo-100 text-sm">Kepala Unit</p>
                 <p className="text-3xl font-bold">{stats.kepalaUnit}</p>
               </div>
-              <UserCog size={32} className="text-violet-200" />
+              <UserCog size={32} className="text-indigo-200" />
             </div>
           </div>
+
           <div
-            className="bg-linear-to-r from-amber-400 to-amber-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition"
+            className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition shadow-blue-300"
             onClick={() => setSelectedRoleFilter("ka_p4m")}
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-amber-100 text-sm">KA-P4M</p>
+                <p className="text-blue-200 text-sm">KA-P4M</p>
                 <p className="text-3xl font-bold">{stats.kaP4M}</p>
               </div>
-              <Crown size={32} className="text-amber-200" />
+              <Crown size={32} className="text-blue-300" />
             </div>
           </div>
-          <div className="bg-linear-to-r from-cyan-400 to-cyan-500 rounded-xl p-4 text-white">
+
+          <div className="bg-gradient-to-r from-cyan-400 to-cyan-500 rounded-xl p-4 text-white shadow-cyan-200">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-cyan-100 text-sm">Aktif</p>
@@ -309,7 +313,7 @@ export default function DataAkunPage() {
           <div className="flex-1 min-w-50px">
             <div className="relative">
               <Search
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-300"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400"
                 size={18}
               />
               <input
@@ -317,14 +321,14 @@ export default function DataAkunPage() {
                 placeholder="Cari nama, email, atau NIP..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="w-full pl-10 pr-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-950 text-blue-800 dark:text-blue-200 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
           </div>
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-950 text-blue-800 dark:text-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <option value="all">Semua Status</option>
             <option value="active">Aktif</option>
@@ -332,7 +336,7 @@ export default function DataAkunPage() {
           </select>
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md shadow-blue-200"
           >
             <UserPlus size={18} />
             Tambah Akun
@@ -340,89 +344,89 @@ export default function DataAkunPage() {
         </div>
 
         {/* Tabel */}
-        <div className="overflow-x-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm">
+        <div className="overflow-x-auto bg-white dark:bg-blue-950 rounded-xl shadow-md shadow-blue-100 border border-blue-100">
           <table className="w-full">
-            <thead className="bg-slate-50/80 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
+            <thead className="bg-blue-50 dark:bg-blue-900/50 border-b border-blue-200 dark:border-blue-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wider">
                   Nama / Kontak
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wider">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wider">
                   NIP
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wider">
                   Unit
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wider">
                   Last Login
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wider">
                   Aksi
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+            <tbody className="divide-y divide-blue-100 dark:divide-blue-800">
               {filteredUsers.map((user) => (
                 <tr
                   key={user.id}
-                  className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition duration-150"
+                  className="hover:bg-blue-50/60 dark:hover:bg-blue-900/40 transition duration-150"
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-linear-to-r from-blue-300 to-blue-400 flex items-center justify-center text-white font-semibold shadow-sm">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 flex items-center justify-center text-white font-semibold shadow-md shadow-blue-200">
                         {user.name.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-medium text-slate-700 dark:text-white">
+                        <p className="font-medium text-blue-800 dark:text-blue-100">
                           {user.name}
                         </p>
-                        <p className="text-sm text-slate-400 flex items-center gap-1">
-                          <Mail size={12} className="text-slate-300" /> {user.email}
+                        <p className="text-sm text-blue-400 flex items-center gap-1">
+                          <Mail size={12} className="text-blue-300" /> {user.email}
                         </p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full font-medium ${
+                      className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full font-medium border ${
                         user.role === "staff_p4m"
-                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                          ? "bg-sky-100 text-sky-700 border-sky-200"
                           : user.role === "kepala_unit"
-                          ? "bg-violet-50 text-violet-600 border border-violet-100"
-                          : "bg-amber-50 text-amber-600 border border-amber-100"
+                          ? "bg-indigo-100 text-indigo-700 border-indigo-200"
+                          : "bg-blue-100 text-blue-800 border-blue-300"
                       }`}
                     >
                       {getRoleIcon(user.role)}
                       {getRoleLabel(user.role)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{user.nip}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{user.unit}</td>
+                  <td className="px-6 py-4 text-sm text-blue-600 dark:text-blue-300">{user.nip}</td>
+                  <td className="px-6 py-4 text-sm text-blue-600 dark:text-blue-300">{user.unit}</td>
                   <td className="px-6 py-4">
                     <span
-                      className={`px-3 py-1 text-xs rounded-full font-medium ${
+                      className={`px-3 py-1 text-xs rounded-full font-medium border ${
                         user.status === "active"
-                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                          : "bg-rose-50 text-rose-600 border border-rose-100"
+                          ? "bg-blue-100 text-blue-800 border-blue-200"
+                          : "bg-sky-100 text-sky-700 border-sky-200"
                       }`}
                     >
                       {user.status === "active" ? "Aktif" : "Tidak Aktif"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-400">
+                  <td className="px-6 py-4 text-sm text-blue-400">
                     {user.lastLogin}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1">
                       <button
                         onClick={() => openEditModal(user)}
-                        className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                        className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-all duration-200"
                       >
                         <Edit size={16} />
                       </button>
@@ -431,7 +435,7 @@ export default function DataAkunPage() {
                           setSelectedUser(user);
                           setIsDeleteModalOpen(true);
                         }}
-                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200"
+                        className="p-2 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-all duration-200"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -442,7 +446,7 @@ export default function DataAkunPage() {
             </tbody>
           </table>
           {filteredUsers.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-blue-400">
               Tidak ada data akun yang ditemukan
             </div>
           )}
@@ -451,36 +455,30 @@ export default function DataAkunPage() {
 
       {/* Modal Tambah/Edit Akun */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+        <div className="fixed inset-0 bg-blue-950/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-blue-100">
+            <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-blue-600 border-b border-blue-300 px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <div className="flex items-center gap-3">
-                <div
-                  className={`p-2 rounded-lg ${
-                    selectedUser
-                      ? "bg-blue-50 text-blue-400"
-                      : "bg-emerald-50 text-emerald-400"
-                  }`}
-                >
+                <div className="p-2 rounded-lg bg-white/20 text-white">
                   {selectedUser ? <Edit size={20} /> : <UserPlus size={20} />}
                 </div>
-                <h3 className="text-xl font-semibold text-slate-700 dark:text-white">
+                <h3 className="text-xl font-semibold text-white">
                   {selectedUser ? "Edit Akun" : "Tambah Akun Baru"}
                 </h3>
               </div>
               <button
                 onClick={closeModal}
-                className="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
               >
-                <X size={20} className="text-slate-400" />
+                <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Nama Lengkap <span className="text-rose-400">*</span>
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-200 mb-2">
+                    Nama Lengkap <span className="text-blue-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -489,12 +487,12 @@ export default function DataAkunPage() {
                     onChange={handleInputChange}
                     required
                     placeholder="Masukkan nama lengkap"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900 text-blue-800 dark:text-blue-100 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Email <span className="text-rose-400">*</span>
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-200 mb-2">
+                    Email <span className="text-blue-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -503,19 +501,19 @@ export default function DataAkunPage() {
                     onChange={handleInputChange}
                     required
                     placeholder="Masukkan alamat email"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900 text-blue-800 dark:text-blue-100 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Role <span className="text-rose-400">*</span>
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-200 mb-2">
+                    Role <span className="text-blue-500">*</span>
                   </label>
                   <select
                     name="role"
                     value={formData.role || "staff_p4m"}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900 text-blue-800 dark:text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   >
                     <option value="staff_p4m">Staff P4M</option>
                     <option value="kepala_unit">Kepala Unit</option>
@@ -523,23 +521,23 @@ export default function DataAkunPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Status <span className="text-rose-400">*</span>
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-200 mb-2">
+                    Status <span className="text-blue-500">*</span>
                   </label>
                   <select
                     name="status"
                     value={formData.status || "active"}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900 text-blue-800 dark:text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   >
                     <option value="active">Aktif</option>
                     <option value="inactive">Tidak Aktif</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    NIP <span className="text-rose-400">*</span>
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-200 mb-2">
+                    NIP <span className="text-blue-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -548,12 +546,12 @@ export default function DataAkunPage() {
                     onChange={handleInputChange}
                     required
                     placeholder="Masukkan NIP"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900 text-blue-800 dark:text-blue-100 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Unit <span className="text-rose-400">*</span>
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-200 mb-2">
+                    Unit <span className="text-blue-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -562,14 +560,14 @@ export default function DataAkunPage() {
                     onChange={handleInputChange}
                     required
                     placeholder="Masukkan unit kerja"
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900 text-blue-800 dark:text-blue-100 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
-                    Password {!selectedUser && <span className="text-rose-400">*</span>}
+                  <label className="block text-sm font-medium text-blue-700 dark:text-blue-200 mb-2">
+                    Password {!selectedUser && <span className="text-blue-500">*</span>}
                     {selectedUser && (
-                      <span className="text-sm text-slate-400 ml-2">
+                      <span className="text-sm text-blue-400 ml-2">
                         (Kosongkan jika tidak diubah)
                       </span>
                     )}
@@ -585,22 +583,22 @@ export default function DataAkunPage() {
                         ? "Masukkan password baru (opsional)"
                         : "Masukkan password"
                     }
-                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900 text-blue-800 dark:text-blue-100 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-blue-100 dark:border-blue-800">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-6 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="px-6 py-2 border border-blue-300 dark:border-blue-700 rounded-lg text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-linear-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-colors shadow-sm flex items-center gap-2"
+                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-colors shadow-md shadow-blue-200 flex items-center gap-2"
                 >
                   {selectedUser ? <Edit size={18} /> : <UserPlus size={18} />}
                   {selectedUser ? "Simpan Perubahan" : "Tambah Akun"}
@@ -613,25 +611,25 @@ export default function DataAkunPage() {
 
       {/* Modal Konfirmasi Hapus */}
       {isDeleteModalOpen && selectedUser && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-blue-950/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl w-full max-w-md border border-blue-100">
             <div className="p-6">
               <div className="flex items-center justify-center mb-4">
-                <div className="p-3 bg-rose-50 dark:bg-rose-900/20 rounded-full">
-                  <Trash2 size={32} className="text-rose-400 dark:text-rose-400" />
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Trash2 size={32} className="text-blue-600" />
                 </div>
               </div>
-              <h3 className="text-xl font-semibold text-center text-slate-700 dark:text-white mb-2">
+              <h3 className="text-xl font-semibold text-center text-blue-800 dark:text-blue-100 mb-2">
                 Konfirmasi Hapus Akun
               </h3>
-              <p className="text-center text-slate-400 dark:text-slate-400 mb-6">
+              <p className="text-center text-blue-500 dark:text-blue-300 mb-6">
                 Apakah Anda yakin ingin menghapus akun <br />
-                <span className="font-semibold text-slate-600 dark:text-slate-300">
+                <span className="font-semibold text-blue-700 dark:text-blue-200">
                   {selectedUser.name}
                 </span>
                 ?
                 <br />
-                <span className="text-sm text-rose-400">
+                <span className="text-sm text-blue-400">
                   Tindakan ini tidak dapat dibatalkan!
                 </span>
               </p>
@@ -641,13 +639,13 @@ export default function DataAkunPage() {
                     setIsDeleteModalOpen(false);
                     setSelectedUser(null);
                   }}
-                  className="px-6 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="px-6 py-2 border border-blue-300 dark:border-blue-700 rounded-lg text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="px-6 py-2 bg-linear-to-r from-rose-400 to-rose-500 text-white rounded-lg hover:from-rose-500 hover:to-rose-600 transition-colors shadow-sm flex items-center gap-2"
+                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors shadow-md shadow-blue-200 flex items-center gap-2"
                 >
                   <Trash2 size={18} />
                   Hapus Akun
