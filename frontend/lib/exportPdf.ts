@@ -107,10 +107,45 @@ const BULAN_PANJANG = [
 const BASE_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:Arial,sans-serif; font-size:10pt; color:#111; padding:34px 30px; }
-  .header-borang { display:flex; flex-direction:row; align-items:center; gap:14px; width:100%; margin-bottom:18px; border-bottom:3px double #111; padding-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
-  .header-borang .logo { display:block; flex:0 0 80px; width:80px; height:80px; max-width:80px; object-fit:contain; }
-  .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}
-  .header-borang .doc-title { font-size:11pt; line-height:1.5; }
+
+  /* ✅ HEADER BORANG — 2 BARIS, FONT LEBIH BESAR */
+  .header-borang {
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    gap:20px;
+    width:100%;
+    margin-bottom:20px;
+    border-bottom:3px double #111;
+    padding:6px 8px 14px 16px;
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .header-borang .logo {
+    display:block;
+    flex:0 0 80px;
+    width:80px;
+    height:80px;
+    max-width:80px;
+    object-fit:contain;
+    margin-left:6px;
+  }
+  .header-borang .title-container {
+    flex:1;
+    min-width:0;
+    text-align:center;
+    font-weight:700;
+  }
+  .header-borang .doc-title {
+    font-size:13pt;              /* ✅ diperbesar karena teks lebih pendek */
+    line-height:1.5;
+    letter-spacing:0.1px;
+  }
+  .header-borang .doc-title .line-1,
+  .header-borang .doc-title .line-2 {
+    display:block;
+    white-space:nowrap;          /* ✅ paksa tetap 1 baris per span */
+  }
 
   .footer { margin-top:16px; display:flex; justify-content:space-between; align-items:flex-end; gap:16px; font-size:9pt; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:8px; }
   .ttd { text-align:center; flex-shrink:0; }
@@ -121,7 +156,6 @@ const BASE_CSS = `
   thead th { padding:6px 5px; text-align:center; font-weight:700; border:1px solid #3a4d5e; }
   tbody tr:nth-child(even) { background:#f8fafc; }
 
-  /* ✅ Sel tabel — rata kiri-kanan + jarak antar paragraf */
   tbody td {
     padding:5px;
     border:1px solid #e2e8f0;
@@ -147,7 +181,6 @@ const BASE_CSS = `
   .ttd .qr-img { display:block; width:110px; height:110px; margin:8px auto 2px; }
   .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
 
-  /* ✅ Kotak teks panjang — rata kiri-kanan + jarak antar paragraf */
   .box {
     border:1px solid #e2e8f0;
     padding:8px 10px;
@@ -173,18 +206,15 @@ const BASE_CSS = `
   .close-btn:hover { background:#3a4d5e; }
 
   @media print {
-    /* ✅ HILANGKAN HEADER/FOOTER BROWSER */
     @page { 
       size: A4 portrait; 
       margin: 0; 
     }
-    
-    /* ✅ Beri padding pada body agar konten tidak menempel ke tepi */
     body { 
       padding: 15mm 15mm !important; 
       margin: 0 !important;
     }
-    
+    .header-borang { padding:6px 8px 14px 16px; }
     tr { page-break-inside:auto; break-inside:auto; }
     .header-borang { page-break-inside:avoid; break-inside:avoid; }
     .footer, .ttd { page-break-inside:avoid; break-inside:avoid; }
@@ -231,15 +261,15 @@ const PRINT_SCRIPT = `
 
 const CLOSE_BUTTON = `<button class="close-btn" onclick="window.close()" title="Tutup halaman ini">✕ Tutup</button>`;
 
+// ✅ HEADER BORANG — 2 BARIS, "Permintaan" disambung ke baris 2
 function renderHeaderBorang() {
   return `
   <div class="header-borang">
     <img src="${LOGO_POLIBATAM_URL}" alt="Logo Polibatam" class="logo" />
     <div class="title-container">
       <div class="doc-title">
-        No.BO.34.3.1-V6 Borang Registrasi Ketidaksesuaian dan Permintaan
-        <br />
-        Tindakan Koreksi/Pencegahan
+        <span class="line-1">No.BO.34.3.1-V6 Borang Registrasi Ketidaksesuaian dan</span>
+        <span class="line-2">Permintaan Tindakan Koreksi/Pencegahan</span>
       </div>
     </div>
   </div>`;
