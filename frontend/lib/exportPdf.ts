@@ -1,9 +1,6 @@
 // FILE: frontend/lib/exportPdf.ts
-// Semua fungsi export PDF untuk Staf P4M
-// Dipakai oleh:
-//   - RecapitulationTable.tsx  → exportPDFRekap (per harian/mingguan/bulanan/tahunan)
-//   - ProcessMonitorTable.tsx  → exportPDFProses (per laporan individual)
-//   - RiwayatTable.tsx         → exportPDFRiwayatKepalaUnit (per laporan individual Kepala Unit)
+// Export PDF pakai window.print() — versi yang sudah jalan.
+// Header/footer browser di PDF hanya bisa dihilangkan lewat setting print user.
 
 import QRCode from "qrcode";
 import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
@@ -106,17 +103,14 @@ const BULAN_PANJANG = [
   "Juli","Agustus","September","Oktober","November","Desember",
 ];
 
-// ─── CSS bersama untuk semua PDF ────────────────────────────
+// ─── CSS untuk PDF ──────────────────────────────────────────
 const BASE_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:Arial,sans-serif; font-size:10pt; color:#111; padding:34px 30px; }
   .header-borang { display:flex; flex-direction:row; align-items:center; gap:14px; width:100%; margin-bottom:18px; border-bottom:3px double #111; padding-bottom:12px; page-break-inside:avoid; break-inside:avoid; }
   .header-borang .logo { display:block; flex:0 0 80px; width:80px; height:80px; max-width:80px; object-fit:contain; }
   .header-borang .title-container { flex:1; min-width:0; text-align:center; font-weight:700;}
-  .header-borang .doc-number { font-weight:700; white-space:nowrap; }
-  .header-borang .doc-title-text { text-decoration:underline; line-height: 1.5; }
-  .header-borang .doc-date { font-size:9pt; font-weight:700; color:#000; margin-top:4px; }
-  .header-borang .doc-subtitle { font-size:8.5pt; color:#555; margin-top:3px; line-height:1.4; }
+  .header-borang .doc-title { font-size:11pt; line-height:1.5; }
 
   .footer { margin-top:16px; display:flex; justify-content:space-between; align-items:flex-end; gap:16px; font-size:9pt; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:8px; }
   .ttd { text-align:center; flex-shrink:0; }
@@ -127,7 +121,7 @@ const BASE_CSS = `
   thead th { padding:6px 5px; text-align:center; font-weight:700; border:1px solid #3a4d5e; }
   tbody tr:nth-child(even) { background:#f8fafc; }
 
-  /* ✅ FIX: sel tabel — rata kiri-kanan + jarak antar paragraf */
+  /* ✅ Sel tabel — rata kiri-kanan + jarak antar paragraf */
   tbody td {
     padding:5px;
     border:1px solid #e2e8f0;
@@ -149,12 +143,11 @@ const BASE_CSS = `
 
   .hasil-img { display:block; margin-top:5px; max-width:90px; max-height:70px; object-fit:cover; border:1px solid #cbd5e1; border-radius:3px; }
   .hasil-img-cap { display:block; font-size:7.5pt; color:#94a3b8; font-style:italic; margin-top:1px; }
-  .ttd .signature-img { display:block; max-height:58px; max-width:170px; margin:8px auto 2px; object-fit:contain; }
   .ttd .signature-placeholder { height:64px; }
   .ttd .qr-img { display:block; width:110px; height:110px; margin:8px auto 2px; }
   .ttd .qr-cap { display:block; font-size:7pt; color:#94a3b8; font-style:italic; margin-top:2px; }
 
-  /* ✅ FIX: kotak teks panjang — rata kiri-kanan + jarak antar paragraf */
+  /* ✅ Kotak teks panjang — rata kiri-kanan + jarak antar paragraf */
   .box {
     border:1px solid #e2e8f0;
     padding:8px 10px;
@@ -168,12 +161,30 @@ const BASE_CSS = `
     word-wrap:break-word;
   }
 
+  .section { margin-bottom:14px; }
+  .section-title { font-size:10pt; font-weight:bold; color:#4d5e71; border-bottom:2px solid #4d5e71; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase; }
+  .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
+  .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
+  .field .val { color:#111; flex:1; }
+  .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
+  .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
+
   .close-btn { position:fixed; top:14px; right:16px; z-index:999; display:flex; align-items:center; gap:6px; padding:8px 14px; background:#4d5e71; color:#fff; border:none; border-radius:6px; font-size:9pt; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); font-family:Arial,sans-serif; }
   .close-btn:hover { background:#3a4d5e; }
 
   @media print {
-    body { padding:0 15px; margin:0; }
-    @page { size:A4 landscape; margin:15mm 16mm; }
+    /* ✅ HILANGKAN HEADER/FOOTER BROWSER */
+    @page { 
+      size: A4 portrait; 
+      margin: 0; 
+    }
+    
+    /* ✅ Beri padding pada body agar konten tidak menempel ke tepi */
+    body { 
+      padding: 15mm 15mm !important; 
+      margin: 0 !important;
+    }
+    
     tr { page-break-inside:auto; break-inside:auto; }
     .header-borang { page-break-inside:avoid; break-inside:avoid; }
     .footer, .ttd { page-break-inside:avoid; break-inside:avoid; }
@@ -220,7 +231,7 @@ const PRINT_SCRIPT = `
 
 const CLOSE_BUTTON = `<button class="close-btn" onclick="window.close()" title="Tutup halaman ini">✕ Tutup</button>`;
 
-function renderHeaderBorang(subtitleInfo?: string) {
+function renderHeaderBorang() {
   return `
   <div class="header-borang">
     <img src="${LOGO_POLIBATAM_URL}" alt="Logo Polibatam" class="logo" />
@@ -230,7 +241,6 @@ function renderHeaderBorang(subtitleInfo?: string) {
         <br />
         Tindakan Koreksi/Pencegahan
       </div>
-      ${subtitleInfo ? `<div class="doc-subtitle">${subtitleInfo}</div>` : ""}
     </div>
   </div>`;
 }
@@ -380,7 +390,7 @@ export async function exportPDFRekap(
 <style>${BASE_CSS}</style>
 </head><body>
 ${CLOSE_BUTTON}
-${renderHeaderBorang(`Periode: <strong>${labelKat[kategori]}</strong> | Dicetak: ${tglCetakRekap}`)}
+${renderHeaderBorang()}
 <table>
   <thead><tr>
     <th style="width:28px">No</th>
@@ -400,7 +410,7 @@ ${renderHeaderBorang(`Periode: <strong>${labelKat[kategori]}</strong> | Dicetak:
 <div class="footer">
   <div>
     <p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p>
-    <p>Periode: ${labelKat[kategori]}</p>
+    <p>Periode: ${labelKat[kategori]} | Dicetak: ${tglCetakRekap}</p>
   </div>
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
@@ -457,26 +467,19 @@ export async function exportPDFProses(
   const qrDataUrlProses = await generateQrDataUrl(qrTextProses);
 
   const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
-  ? item.hasil_tindakan
-  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+    ? item.hasil_tindakan
+    : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const html = `<!DOCTYPE html>
 <html lang="id"><head><meta charset="UTF-8"/>
 <title>Laporan ${item.kode_laporan}</title>
 <style>
   ${BASE_CSS}
-  .section { margin-bottom:14px; }
-  .section-title { font-size:10pt; font-weight:bold; color:#4d5e71; border-bottom:2px solid #4d5e71; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase; }
-  .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
-  .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
-  .field .val { color:#111; flex:1; }
-  .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
-  .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
-  @media print { @page { size:A4 portrait; margin:15mm; } }
+  @media print { @page { size:A4 portrait; margin:0; } }
 </style>
 </head><body>
 ${CLOSE_BUTTON}
-${renderHeaderBorang(`Kode Laporan: <strong>${item.kode_laporan}</strong> | Dicetak: ${tglCetakProses}`)}
+${renderHeaderBorang()}
 
 <div class="section">
   <div class="section-title">Identitas Laporan</div>
@@ -524,7 +527,7 @@ ${item.aksi_masukan ? `
 </div>
 
 <div class="footer">
-  <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p></div>
+  <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam. | Dicetak: ${tglCetakProses}</p></div>
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
     <p style="margin-top:4px;">Staff P4M,</p>
@@ -573,8 +576,8 @@ export async function exportPDFRiwayatKepalaUnit(
   void penandatangan;
   const isSelesai = item.status_boxing === "selesai";
   const hasilTindakLanjutPdf = item.hasil_tindakan?.trim()
-  ? item.hasil_tindakan
-  : `<em style="color:#9ca3af">Belum ada hasil</em>`;
+    ? item.hasil_tindakan
+    : `<em style="color:#9ca3af">Belum ada hasil</em>`;
 
   const statusLabel = isSelesai
     ? "Selesai — Disetujui Staf P4M"
@@ -593,18 +596,11 @@ export async function exportPDFRiwayatKepalaUnit(
 <title>Riwayat ${item.kode_laporan}</title>
 <style>
   ${BASE_CSS}
-  .section { margin-bottom:14px; }
-  .section-title { font-size:10pt; font-weight:bold; color:#4d5e71; border-bottom:2px solid #4d5e71; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase; }
-  .field { display:flex; gap:8px; margin-bottom:6px; font-size:9pt; }
-  .field .lbl { min-width:140px; font-weight:bold; color:#374151; }
-  .field .val { color:#111; flex:1; }
-  .box-img { display:block; margin-top:10px; max-width:260px; max-height:200px; object-fit:cover; border:1px solid #cbd5e1; border-radius:4px; }
-  .box-img-cap { display:block; font-size:8pt; color:#94a3b8; font-style:italic; margin-top:4px; }
-  @media print { @page { size:A4 portrait; margin:15mm; } }
+  @media print { @page { size:A4 portrait; margin:0; } }
 </style>
 </head><body>
 ${CLOSE_BUTTON}
-${renderHeaderBorang(`Kode: <strong>${item.kode_laporan}</strong> | Dicetak: ${tglCetak}`)}
+${renderHeaderBorang()}
 
 <div class="section">
   <div class="section-title">Identitas Laporan</div>
@@ -644,7 +640,7 @@ ${item.aksi_masukan ? `
     ? `<div class="field"><span class="lbl">Tanggal Pelaksanaan</span><span class="val">${fmtTgl(item.tanggal_pelaksanaan)}</span></div>`
     : ""}
   <div class="box">
-  ${hasilTindakLanjutPdf}
+    ${hasilTindakLanjutPdf}
     ${gambarHasilUrl ? `
       <img src="${gambarHasilUrl}" class="box-img" alt="Foto hasil perbaikan" onerror="this.style.display='none';this.nextElementSibling.style.display='none'"/>
       <span class="box-img-cap">Foto bukti pelaksanaan dari Kepala Unit</span>
@@ -659,7 +655,7 @@ ${isSelesai && item.catatan_approval ? `
 </div>` : ""}
 
 <div class="footer">
-  <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam.</p></div>
+  <div><p>Dokumen digenerate otomatis oleh sistem TUNTAS Polibatam. | Dicetak: ${tglCetak}</p></div>
   <div class="ttd">
     <p>Batam, ${fmtTgl(new Date().toISOString())}</p>
     <p style="margin-top:4px;">${jabatanPenandatangan},</p>
