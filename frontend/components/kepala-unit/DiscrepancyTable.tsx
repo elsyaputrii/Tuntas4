@@ -65,9 +65,8 @@ export default function DiscrepancyTable() {
     try {
       const result = await kepalaUnitApi.getLaporanMasuk();
       if (result.success) {
-        const laporanBaru = (result.data as LaporanItem[]).filter(
-          (item) => item.approval_staf !== "ditolak"
-        );
+        const laporanBaru = result.data as LaporanItem[];
+
         setLaporanList(laporanBaru);
         const initP: Record<number, string> = {};
         const initInitial: Record<number, string> = {};
