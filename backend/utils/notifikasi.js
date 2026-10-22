@@ -5,19 +5,17 @@
 //
 // PENTING: semua fungsi di sini sengaja TIDAK melempar error ke pemanggil.
 // Gagal kirim notifikasi/email tidak boleh bikin proses utama ikut gagal.
+//
+// ✅ FIX email tidak masuk ke staf:
+// Sebelumnya email baru dikirim SETELAH insert ke tabel `notifikasi` berhasil.
+// Kalau insert gagal (mis. kolom `jenis` ENUM tidak punya nilai yang dipakai),
+// error cuma masuk log dan email tidak pernah dikirim. Sekarang email dan
+// notifikasi in-app dijalankan terpisah, jadi gagal satu tidak membatalkan
+// yang lain. Ditambah log jumlah penerima supaya gampang dilacak.
 
 const nodemailer = require("nodemailer");
 const { pool } = require("../config/db");
 
-// ✅ FIX email lambat masuk:
-// Sebelumnya transporter dibuat TANPA pooling, jadi SETIAP email membuka
-// koneksi TLS + login baru ke smtp.gmail.com (lambat, dan kalau ada beberapa
-// penerima sekaligus, puluhan koneksi baru dibuka bersamaan → Gmail sering
-// menahan/menolak sementara). Tanpa timeout & tanpa retry juga, email yang
-// tersangkut hilang begitu saja.
-//
-// Sekarang: koneksi dipakai ulang (pool), jumlah koneksi dibatasi, ada
-// timeout supaya tidak menggantung, dan kirim ulang otomatis kalau gagal.
 const transporter = nodemailer.createTransport({
   service: "gmail",
   pool: true,
@@ -33,8 +31,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Cek login SMTP sekali saat server start, supaya kalau EMAIL_USER/EMAIL_PASS
-// (App Password Gmail) salah atau port diblokir, langsung kelihatan di log —
-// bukan baru ketahuan saat ada yang protes email tidak masuk.
+// (App Password Gmail) salah atau port diblokir, langsung kelihatan di log.
 transporter
   .verify()
   .then(() => console.log("✅ SMTP Gmail siap mengirim email."))
@@ -82,7 +79,7 @@ if (/localhost|127\.0\.0\.1/.test(FRONTEND_URL)) {
 }
 
 // Mode uji coba: email HANYA dikirim ke alamat di EMAIL_ALLOWLIST.
-// Kalau EMAIL_TEST_MODE=false, email dikirim ke semua akun seperti biasa.
+// Kalau EMAIL_TEST_MODE=false (atau tidak diisi), email dikirim ke semua akun.
 const EMAIL_TEST_MODE = process.env.EMAIL_TEST_MODE === "true";
 const EMAIL_ALLOWLIST = (process.env.EMAIL_ALLOWLIST || "")
   .split(",")
@@ -99,12 +96,15 @@ if (EMAIL_TEST_MODE) {
 // KIRIM EMAIL (dipanggil internal, tidak melempar error)
 // ============================================================
 async function kirimEmail(to, judul, pesan, link) {
-  if (!to) return;
+  if (!to) {
+    console.warn(`⚠️ Email "${judul}" dilewati: alamat email penerima kosong.`);
+    return;
+  }
 
   let subject = judul;
 
   if (EMAIL_TEST_MODE) {
-    if (!EMAIL_ALLOWLIST.includes(String(to).toLowerCase())) {
+    if (!EMAIL_ALLOWLIST.includes(String(to).trim().toLowerCase())) {
       console.log(`[TEST MODE] Email ke ${to} dilewati (tidak ada di EMAIL_ALLOWLIST).`);
       return;
     }
@@ -141,22 +141,30 @@ async function kirimEmail(to, judul, pesan, link) {
 async function notifikasiUntukPengguna(id_pengguna, { judul, pesan, jenis, link }) {
   if (!id_pengguna) return;
 
+  // 1) Ambil email dulu, lalu kirim — terpisah dari insert notifikasi in-app
   try {
-    await pool.query(
-      `INSERT INTO notifikasi (id_pengguna, judul, pesan, jenis, link)
-       VALUES (?, ?, ?, ?, ?)`,
-      [id_pengguna, judul, pesan, jenis, link || null]
-    );
-
     const [rows] = await pool.query(
       `SELECT email FROM pengguna WHERE id_pengguna = ?`,
       [id_pengguna]
     );
     if (rows.length > 0) {
       kirimEmail(rows[0].email, judul, pesan, link);
+    } else {
+      console.warn(`⚠️ Notifikasi "${judul}": pengguna ${id_pengguna} tidak ditemukan.`);
     }
   } catch (error) {
-    console.error("❌ Gagal buat notifikasi (per pengguna):", error.message);
+    console.error("❌ Gagal ambil email penerima (per pengguna):", error.message);
+  }
+
+  // 2) Notifikasi in-app (lonceng)
+  try {
+    await pool.query(
+      `INSERT INTO notifikasi (id_pengguna, judul, pesan, jenis, link)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id_pengguna, judul, pesan, jenis, link || null]
+    );
+  } catch (error) {
+    console.error("❌ Gagal insert notifikasi in-app (per pengguna):", error.message);
   }
 }
 
@@ -164,25 +172,35 @@ async function notifikasiUntukPengguna(id_pengguna, { judul, pesan, jenis, link 
 // BUAT NOTIFIKASI untuk SEMUA akun dengan role tertentu
 // ============================================================
 async function notifikasiUntukRole(role, { judul, pesan, jenis, link }) {
+  let users = [];
   try {
-    const [users] = await pool.query(
+    const [rows] = await pool.query(
       `SELECT id_pengguna, email FROM pengguna WHERE role = ?`,
       [role]
     );
+    users = rows;
+  } catch (error) {
+    console.error("❌ Gagal ambil penerima notifikasi (per role):", error.message);
+    return;
+  }
 
-    if (users.length === 0) return;
+  console.log(`🔔 Notifikasi "${judul}" untuk role ${role}: ${users.length} penerima`);
+  if (users.length === 0) return;
 
+  // 1) Email dikirim lebih dulu, terpisah dari insert notifikasi in-app
+  for (const u of users) {
+    kirimEmail(u.email, judul, pesan, link);
+  }
+
+  // 2) Notifikasi in-app (lonceng)
+  try {
     const values = users.map((u) => [u.id_pengguna, judul, pesan, jenis, link || null]);
     await pool.query(
       `INSERT INTO notifikasi (id_pengguna, judul, pesan, jenis, link) VALUES ?`,
       [values]
     );
-
-    for (const u of users) {
-      kirimEmail(u.email, judul, pesan, link);
-    }
   } catch (error) {
-    console.error("❌ Gagal buat notifikasi (per role):", error.message);
+    console.error("❌ Gagal insert notifikasi in-app (per role):", error.message);
   }
 }
 

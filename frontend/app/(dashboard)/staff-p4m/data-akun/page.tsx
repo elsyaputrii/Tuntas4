@@ -244,7 +244,7 @@ export default function DataAkunPage() {
         {/* Statistik Cards — 5 warna berbeda, pastel */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div
-            className="bg-gradient-to-r from-blue-400 to-blue-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-blue-200 transition"
+            className="bg-linear-to-r from-blue-400 to-blue-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-blue-200 transition"
             onClick={() => setSelectedRoleFilter("all")}
           >
             <div className="flex justify-between items-start">
@@ -257,7 +257,7 @@ export default function DataAkunPage() {
           </div>
 
           <div
-            className="bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-emerald-200 transition"
+            className="bg-linear-to-r from-emerald-400 to-emerald-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-emerald-200 transition"
             onClick={() => setSelectedRoleFilter("staff_p4m")}
           >
             <div className="flex justify-between items-start">
@@ -270,7 +270,7 @@ export default function DataAkunPage() {
           </div>
 
           <div
-            className="bg-gradient-to-r from-violet-400 to-violet-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-violet-200 transition"
+            className="bg-linear-to-r from-violet-400 to-violet-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-violet-200 transition"
             onClick={() => setSelectedRoleFilter("kepala_unit")}
           >
             <div className="flex justify-between items-start">
@@ -283,7 +283,7 @@ export default function DataAkunPage() {
           </div>
 
           <div
-            className="bg-gradient-to-r from-pink-400 to-pink-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-pink-200 transition"
+            className="bg-linear-to-r from-pink-400 to-pink-500 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg hover:shadow-pink-200 transition"
             onClick={() => setSelectedRoleFilter("ka_p4m")}
           >
             <div className="flex justify-between items-start">
@@ -295,7 +295,7 @@ export default function DataAkunPage() {
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-amber-400 to-amber-500 rounded-xl p-4 text-white shadow-amber-200">
+          <div className="bg-linear-to-r from-amber-400 to-amber-500 rounded-xl p-4 text-white shadow-amber-200">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-amber-50 text-sm">Aktif</p>
@@ -334,7 +334,7 @@ export default function DataAkunPage() {
           </select>
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all shadow-md shadow-blue-200"
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all shadow-md shadow-blue-200"
           >
             <UserPlus size={18} />
             Tambah Akun
@@ -377,7 +377,7 @@ export default function DataAkunPage() {
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 flex items-center justify-center text-white font-semibold shadow-md shadow-blue-200">
+                      <div className="w-10 h-10 rounded-full bg-linear-to-r from-blue-400 to-blue-500 flex items-center justify-center text-white font-semibold shadow-md shadow-blue-200">
                         {user.name.charAt(0)}
                       </div>
                       <div>
@@ -457,7 +457,7 @@ export default function DataAkunPage() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-100">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-400 to-blue-500 border-b border-blue-300 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+            <div className="sticky top-0 bg-linear-to-r from-blue-400 to-blue-500 border-b border-blue-300 px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-white/20 text-white">
                   {selectedUser ? <Edit size={20} /> : <UserPlus size={20} />}
@@ -598,7 +598,7 @@ export default function DataAkunPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-colors shadow-md shadow-blue-200 flex items-center gap-2"
+                  className="px-6 py-2 bg-linear-to-r from-blue-400 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 transition-colors shadow-md shadow-blue-200 flex items-center gap-2"
                 >
                   {selectedUser ? <Edit size={18} /> : <UserPlus size={18} />}
                   {selectedUser ? "Simpan Perubahan" : "Tambah Akun"}
@@ -645,7 +645,7 @@ export default function DataAkunPage() {
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="px-6 py-2 bg-gradient-to-r from-rose-400 to-rose-500 text-white rounded-lg hover:from-rose-500 hover:to-rose-600 transition-colors shadow-md shadow-rose-200 flex items-center gap-2"
+                  className="px-6 py-2 bg-linear-to-r from-rose-400 to-rose-500 text-white rounded-lg hover:from-rose-500 hover:to-rose-600 transition-colors shadow-md shadow-rose-200 flex items-center gap-2"
                 >
                   <Trash2 size={18} />
                   Hapus Akun
