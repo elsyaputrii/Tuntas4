@@ -87,12 +87,19 @@ async function getLaporanMasuk(req, res) {
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       WHERE b.unit_tujuan = ?
-        AND b.status NOT IN ('selesai')
+        AND b.status <> 'selesai'
         AND (
-          -- (a) Belum pernah kirim: status masih 'terdistribusi' dari Staf P4M
+          -- Laporan baru didistribusikan ke unit
           b.status = 'terdistribusi'
-          -- (b) Ditolak Staf P4M, perlu revisi penyebab/rencana
-          OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
+
+          -- Laporan ditolak Staf P4M dan perlu direvisi
+          OR b.approval_staf = 'ditolak'
+
+          -- Laporan sudah dikirim, tetapi Ka P4M belum memberi keputusan
+          OR COALESCE(r.status_review, '') IN (
+            '',
+            'menunggu_keputusan_ka'
+          )
         )
       ORDER BY b.created_at DESC`,
       [kepala.unit],
