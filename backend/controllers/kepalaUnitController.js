@@ -87,19 +87,12 @@ async function getLaporanMasuk(req, res) {
       JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
       LEFT JOIN rancangan_tindakan r ON r.id_boxing = b.id_boxing
       WHERE b.unit_tujuan = ?
-        AND b.status <> 'selesai'
+        AND b.status NOT IN ('selesai')
         AND (
-          -- Laporan baru didistribusikan ke unit
+          -- (a) Belum pernah kirim: status masih 'terdistribusi' dari Staf P4M
           b.status = 'terdistribusi'
-
-          -- Laporan ditolak Staf P4M dan perlu direvisi
-          OR b.approval_staf = 'ditolak'
-
-          -- Laporan sudah dikirim, tetapi Ka P4M belum memberi keputusan
-          OR COALESCE(r.status_review, '') IN (
-            '',
-            'menunggu_keputusan_ka'
-          )
+          -- (b) Ditolak Staf P4M, perlu revisi penyebab/rencana
+          OR (b.status = 'di_staff' AND b.approval_staf = 'ditolak')
         )
       ORDER BY b.created_at DESC`,
       [kepala.unit],
@@ -261,17 +254,7 @@ async function getLaporanHasil(req, res) {
       LEFT JOIN pelaksanaan_tindakan p ON p.id_boxing = b.id_boxing
       WHERE b.unit_tujuan = ?
         AND r.status_review IN ('ditindaklanjuti', 'tidak_ditindaklanjuti')
-        AND (
-          b.status = 'menunggu_pelaksanaan'
-          -- Sudah dikirim ke Staf P4M tapi belum diputuskan: tetap tampil
-          -- & masih bisa diedit. Hilang hanya setelah Staf memutuskan
-          -- (diterima -> 'selesai'; ditolak -> balik 'menunggu_pelaksanaan').
-          OR (
-            b.status = 'di_staff'
-            AND b.approval_staf = 'menunggu'
-            AND p.id_pelaksanaan IS NOT NULL
-          )
-        )
+        AND b.status = 'menunggu_pelaksanaan'
       ORDER BY b.created_at DESC`,
       [kepala.unit],
     );
@@ -296,6 +279,13 @@ async function submitPelaksanaan(req, res) {
     });
   }
 
+  if (!lampiran) {
+    return res.status(400).json({
+      success: false,
+      message: "Gambar bukti pelaksanaan wajib diunggah.",
+    });
+  }
+
   try {
     const kepala = await getKepalaInfo(req);
     if (!kepala) {
@@ -313,10 +303,7 @@ async function submitPelaksanaan(req, res) {
        JOIN laporan_ketidaksesuaian l ON l.id_laporan = b.id_laporan
        WHERE b.id_boxing = ? AND b.unit_tujuan = ?
          AND r.status_review IN ('ditindaklanjuti', 'tidak_ditindaklanjuti')
-         AND (
-           b.status = 'menunggu_pelaksanaan'
-           OR (b.status = 'di_staff' AND b.approval_staf = 'menunggu')
-         )`,
+         AND b.status = 'menunggu_pelaksanaan'`,
       [id_boxing, kepala.unit],
     );
 
@@ -324,7 +311,7 @@ async function submitPelaksanaan(req, res) {
       return res.status(403).json({
         success: false,
         message:
-          "Laporan tidak bisa diubah: tidak ditemukan, belum disetujui Ka P4M, atau sudah diputuskan oleh Staf P4M.",
+          "Laporan tidak ditemukan atau belum disetujui untuk ditindaklanjuti oleh Ka P4M.",
       });
     }
 
@@ -348,35 +335,22 @@ async function submitPelaksanaan(req, res) {
     }
 
     const [existingPelaksanaan] = await pool.query(
-      `SELECT id_pelaksanaan, lampiran FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
+      `SELECT id_pelaksanaan FROM pelaksanaan_tindakan WHERE id_boxing = ?`,
       [id_boxing],
     );
-
-    // Saat mengedit laporan yang sudah dikirim, lampiran lama dipertahankan
-    // kalau tidak ada file baru. Lampiran hanya wajib untuk pengiriman pertama.
-    const lampiranFinal =
-      lampiran ||
-      (existingPelaksanaan.length > 0 ? existingPelaksanaan[0].lampiran : null);
-
-    if (!lampiranFinal) {
-      return res.status(400).json({
-        success: false,
-        message: "Gambar bukti pelaksanaan wajib diunggah.",
-      });
-    }
 
     if (existingPelaksanaan.length > 0) {
       await pool.query(
         `UPDATE pelaksanaan_tindakan
          SET deskripsi = ?, tanggal = ?, lampiran = ?, updated_at = NOW()
          WHERE id_boxing = ?`,
-        [deskripsi, tanggal, lampiranFinal, id_boxing],
+        [deskripsi, tanggal, lampiran, id_boxing],
       );
     } else {
       await pool.query(
         `INSERT INTO pelaksanaan_tindakan (id_boxing, id_kepala, deskripsi, lampiran, tanggal)
          VALUES (?, ?, ?, ?, ?)`,
-        [id_boxing, kepala.id_kepala, deskripsi, lampiranFinal, tanggal],
+        [id_boxing, kepala.id_kepala, deskripsi, lampiran, tanggal],
       );
     }
 
@@ -388,6 +362,13 @@ async function submitPelaksanaan(req, res) {
       `UPDATE laporan_ketidaksesuaian SET status = 'diproses' WHERE id_laporan = ?`,
       [id_laporan],
     );
+
+    notifikasiUntukRole("staf_p4m", {
+      judul: "Hasil Tindak Lanjut Perlu Dinilai",
+      pesan: `Unit ${kepala.unit} mengirim hasil pelaksanaan tindak lanjut. Mohon dinilai selesai atau belum.`,
+      jenis: "pelaksanaan_masuk",
+      link: "/staff-p4m/proses-pantau",
+    });
 
     return res.status(200).json({
       success: true,

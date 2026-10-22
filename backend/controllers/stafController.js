@@ -291,6 +291,34 @@ async function syncStatusLaporan(id_laporan) {
 }
 
 // ============================================================
+// HELPER: kabari Kepala Unit pemilik laporan (boxing) tertentu.
+// Unit P4M tidak punya akun kepala unit terpisah (id_kepala NULL) →
+// yang dikabari semua akun Ka P4M.
+// ============================================================
+async function notifKepalaUnitBoxing(id_boxing, { judul, pesan, jenis, path }) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT b.unit_tujuan, k.id_pengguna AS id_pengguna_kepala
+       FROM boxing_ketidaksesuaian b
+       LEFT JOIN kepala_unit k ON k.id_kepala = b.id_kepala
+       WHERE b.id_boxing = ?`,
+      [id_boxing]
+    );
+    if (rows.length === 0) return;
+    const { unit_tujuan, id_pengguna_kepala } = rows[0];
+    const isi = { judul, pesan: pesan.replace("{unit}", unit_tujuan), jenis };
+
+    if (id_pengguna_kepala) {
+      notifikasiUntukPengguna(id_pengguna_kepala, { ...isi, link: `/kepala-unit/${path}` });
+    } else if (unit_tujuan === "P4M") {
+      notifikasiUntukRole("ka_p4m", { ...isi, link: `/ka-p4m/kepala-unit/${path}` });
+    }
+  } catch (error) {
+    console.error("❌ Gagal kirim notifikasi ke kepala unit:", error.message);
+  }
+}
+
+// ============================================================
 // 5b. SET KEPUTUSAN BOXING (reopen — "Buka ke Unit")
 // ============================================================
 async function setKeputusanBoxing(req, res) {
@@ -351,6 +379,13 @@ async function setKeputusanBoxing(req, res) {
     } finally {
       conn.release();
     }
+
+    notifKepalaUnitBoxing(id_boxing, {
+      judul: "Laporan Dibuka Kembali oleh Staf P4M",
+      pesan: "Laporan untuk unit {unit} dibuka kembali oleh Staf P4M. Mohon tinjau dan perbarui rancangan tindakan.",
+      jenis: "laporan_dibuka_kembali",
+      path: "ketidaksesuaian-masuk",
+    });
 
     return res.status(200).json({
       success: true, message: "Laporan dibuka kembali ke Unit — Penyebab & Rencana sebelumnya tetap tersimpan dan siap diedit ulang oleh Kepala Unit.", });
@@ -1084,6 +1119,16 @@ async function setApprovalStaf(req, res) {
         [row.id_laporan]
       );
     }
+
+    notifKepalaUnitBoxing(id_boxing, {
+      judul: approval === "diterima" ? "Hasil Tindak Lanjut Diterima" : "Hasil Tindak Lanjut Perlu Revisi",
+      pesan:
+        approval === "diterima"
+          ? "Hasil tindak lanjut unit {unit} DITERIMA oleh Staf P4M. Laporan ditandai selesai."
+          : `Hasil tindak lanjut unit {unit} DITOLAK oleh Staf P4M. Mohon revisi di tab Laporan Hasil. Catatan: ${catatan.trim()}`,
+      jenis: "approval_staf",
+      path: "laporan-hasil",
+    });
 
     const pesan =
       approval === "diterima"
