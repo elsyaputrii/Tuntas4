@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   MessageSquare,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 
 interface LaporanHasilItem {
@@ -91,6 +92,13 @@ function parseRencana(rencana: string | null | undefined): RencanaItem[] {
   return items;
 }
 
+function lampiranUrl(filename: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
+    "http://localhost:5000";
+  return `${base}/uploads/${filename}`;
+}
+
 export default function ResultReportTable() {
   const [laporanList, setLaporanList] = useState<LaporanHasilItem[]>([]);
   const [tanggal, setTanggal] = useState<Record<number, string>>({});
@@ -116,6 +124,7 @@ export default function ResultReportTable() {
         });
         setTanggal(initT);
         setUraian(initU);
+        setFiles({});
       }
     } catch (err: unknown) {
       setErrMsg(err instanceof Error ? err.message : "Gagal memuat data.");
@@ -128,7 +137,11 @@ export default function ResultReportTable() {
     fetchData();
   }, [fetchData]);
 
-  const handleSubmit = async (id_boxing: number) => {
+  const handleSubmit = async (item: LaporanHasilItem) => {
+    const id_boxing = item.id_boxing;
+    const sudahDikirim =
+      !!item.id_pelaksanaan && item.status_boxing === "di_staff";
+
     if (!tanggal[id_boxing]) {
       alert("Tanggal pelaksanaan harus diisi.");
       return;
@@ -145,7 +158,8 @@ export default function ResultReportTable() {
       alert("Uraian hasil harus diisi.");
       return;
     }
-    if (!files[id_boxing]) {
+    // Lampiran wajib hanya jika belum pernah ada lampiran tersimpan.
+    if (!files[id_boxing] && !item.lampiran_hasil) {
       alert("Gambar bukti wajib diunggah.");
       return;
     }
@@ -158,7 +172,11 @@ export default function ResultReportTable() {
       if (files[id_boxing]) formData.append("lampiran", files[id_boxing] as File);
       const result = await kepalaUnitApi.submitPelaksanaan(formData);
       if (result.success) {
-        alert("Laporan hasil berhasil disimpan!");
+        alert(
+          sudahDikirim
+            ? "Perubahan laporan hasil berhasil disimpan!"
+            : "Laporan hasil berhasil disimpan!"
+        );
         fetchData();
       }
     } catch (err: unknown) {
@@ -215,17 +233,15 @@ export default function ResultReportTable() {
       </div>
 
       {laporanList.map((item, idx) => {
-        const sudahTerkirim =
-          !!item.id_pelaksanaan &&
-          item.status_boxing !== "menunggu_pelaksanaan" &&
-          item.approval_staf !== "ditolak";
-        const showForm = !sudahTerkirim;
-        const perluRevisi = showForm && item.approval_staf === "ditolak";
+        // Sudah dikirim ke Staf P4M & belum diputuskan: form TETAP tampil dan
+        // bisa diedit. Item baru hilang dari halaman ini setelah Staf P4M
+        // memutuskan (diterima -> selesai; ditolak -> kembali ke revisi).
+        const sudahDikirim =
+          !!item.id_pelaksanaan && item.status_boxing === "di_staff";
+        const perluRevisi = item.approval_staf === "ditolak";
 
         const isSesuai = item.status_review === "tidak_ditindaklanjuti";
         const isTindakLanjut = item.status_review === "ditindaklanjuti";
-
-        const showAksiMasukan = showForm && !!item.aksi_masukan;
 
         const rencanaItems = parseRencana(item.rencana_tindakan);
 
@@ -279,43 +295,41 @@ export default function ResultReportTable() {
             {/* Kolom Form / Hasil */}
             <div className="flex-1 p-5">
               {/* Badge Keputusan Ka P4M */}
-              {showForm && (
-                <div
-                  className={`mb-3 p-2 border text-[11px] inline-flex items-center gap-2 w-full ${
-                    isSesuai
-                      ? "bg-green-50 border-green-300 text-green-800"
-                      : isTindakLanjut
-                      ? "bg-red-50 border-red-300 text-red-800"
-                      : "bg-gray-50 border-gray-300 text-gray-700"
-                  }`}
-                >
-                  {isSesuai ? (
-                    <>
-                      <CheckCircle2 size={14} className="shrink-0" />
-                      <span>
-                        <span className="font-bold">Keputusan Ka P4M:</span>{" "}
-                        <span className="font-semibold">Sesuai</span>
-                      </span>
-                    </>
-                  ) : isTindakLanjut ? (
-                    <>
-                      <RefreshCw size={14} className="shrink-0" />
-                      <span>
-                        <span className="font-bold">Keputusan Ka P4M:</span>{" "}
-                        <span className="font-semibold">Tindak Lanjut</span>
-                      </span>
-                    </>
-                  ) : (
+              <div
+                className={`mb-3 p-2 border text-[11px] inline-flex items-center gap-2 w-full ${
+                  isSesuai
+                    ? "bg-green-50 border-green-300 text-green-800"
+                    : isTindakLanjut
+                    ? "bg-red-50 border-red-300 text-red-800"
+                    : "bg-gray-50 border-gray-300 text-gray-700"
+                }`}
+              >
+                {isSesuai ? (
+                  <>
+                    <CheckCircle2 size={14} className="shrink-0" />
                     <span>
                       <span className="font-bold">Keputusan Ka P4M:</span>{" "}
-                      {item.status_review || "-"}
+                      <span className="font-semibold">Sesuai</span>
                     </span>
-                  )}
-                </div>
-              )}
+                  </>
+                ) : isTindakLanjut ? (
+                  <>
+                    <RefreshCw size={14} className="shrink-0" />
+                    <span>
+                      <span className="font-bold">Keputusan Ka P4M:</span>{" "}
+                      <span className="font-semibold">Tindak Lanjut</span>
+                    </span>
+                  </>
+                ) : (
+                  <span>
+                    <span className="font-bold">Keputusan Ka P4M:</span>{" "}
+                    {item.status_review || "-"}
+                  </span>
+                )}
+              </div>
 
               {/* Kotak "Masukan Ka P4M" */}
-              {showAksiMasukan && (
+              {!!item.aksi_masukan && (
                 <div className="mb-3 p-2 bg-blue-50 border border-blue-200 text-[11px] inline-flex items-start gap-2 w-full">
                   <MessageSquare size={14} className="text-blue-800 shrink-0 mt-0.5" />
                   <span>
@@ -348,108 +362,106 @@ export default function ResultReportTable() {
                 </div>
               )}
 
-              {sudahTerkirim ? (
-                <div className="space-y-2">
-                  <div className="text-[11px] text-gray-600">
-                    <span className="font-medium">Tanggal:</span>{" "}
-                    {item.tanggal_pelaksanaan
-                      ? new Date(item.tanggal_pelaksanaan).toLocaleDateString(
-                          "id-ID",
-                          { day: "2-digit", month: "long", year: "numeric" }
-                        )
-                      : "-"}
-                  </div>
-                  <p className="text-[11px] text-black leading-relaxed text-justify whitespace-pre-wrap break-words">
-                    {item.hasil_tindakan}
-                  </p>
-                  {item.lampiran_hasil && (
-                    <a
-                      href={`${
-                        process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-                        "http://localhost:5000"
-                      }/uploads/${item.lampiran_hasil}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-blue-polibatam hover:underline inline-flex items-center gap-1"
-                    >
-                      <ImageIcon size={12} /> Lihat Lampiran
-                    </a>
-                  )}
-                  <div className="text-[10px] text-green-500 font-medium inline-flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Laporan telah dikirim ke Staf P4M
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <input
-                    type="date"
-                    className="w-full border border-black p-2 text-[11px] outline-none focus:border-blue-polibatam"
-                    value={tanggal[item.id_boxing] || ""}
-                    max={getTodayLocalDate()}
-                    onChange={(e) =>
-                      setTanggal((prev) => ({
-                        ...prev,
-                        [item.id_boxing]: e.target.value,
-                      }))
-                    }
-                  />
-
-                  <AutoResizeTextarea
-                    minHeight={96}
-                    className="w-full border border-black p-3 text-[11px] text-black outline-none focus:border-blue-polibatam leading-relaxed"
-                    placeholder="Tambahkan Uraian Hasil Tindak Lanjut..."
-                    value={uraian[item.id_boxing] || ""}
-                    onChange={(e) =>
-                      setUraian((prev) => ({
-                        ...prev,
-                        [item.id_boxing]: e.target.value,
-                      }))
-                    }
-                  />
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        id={`upload-${item.id_boxing}`}
-                        className="hidden"
-                        accept="image/*,application/pdf"
-                        onChange={(e) =>
-                          setFiles((prev) => ({
-                            ...prev,
-                            [item.id_boxing]: e.target.files?.[0] || null,
-                          }))
-                        }
-                      />
-                      <label
-                        htmlFor={`upload-${item.id_boxing}`}
-                        className="border border-black px-3 py-1 text-[10px] cursor-pointer hover:bg-gray-100 inline-flex items-center gap-2"
-                      >
-                        <ImageIcon size={12} />
-                        {files[item.id_boxing]
-                          ? files[item.id_boxing]!.name
-                          : "Tambahkan Bukti Lampiran (Wajib)"}
-                      </label>
-                    </div>
-
-                    <p className="text-[10px] text-gray-500">
-                      * Format yang diizinkan:{" "}
-                      <strong>JPG, PNG, PDF</strong> (Maksimal{" "}
-                      <strong>5 MB</strong>)
-                    </p>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => handleSubmit(item.id_boxing)}
-                      disabled={submitting[item.id_boxing]}
-                      className="bg-blue-polibatam text-white px-6 py-1.5 rounded font-bold uppercase text-[10px] hover:bg-blue-600 shadow transition-all disabled:opacity-50"
-                    >
-                      {submitting[item.id_boxing] ? "Menyimpan..." : "Kirim"}
-                    </button>
-                  </div>
+              {/* Info: sudah dikirim, masih bisa diedit */}
+              {sudahDikirim && (
+                <div className="mb-3 p-2 bg-green-50 border border-green-300 text-[11px] inline-flex items-start gap-2 w-full text-green-800">
+                  <Info size={14} className="shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">
+                    <span className="font-bold">
+                      Laporan telah dikirim ke Staf P4M.
+                    </span>{" "}
+                    Anda masih dapat mengubahnya sampai Staf P4M memberi
+                    keputusan.
+                  </span>
                 </div>
               )}
+
+              <div className="space-y-3">
+                <input
+                  type="date"
+                  className="w-full border border-black p-2 text-[11px] outline-none focus:border-blue-polibatam"
+                  value={tanggal[item.id_boxing] || ""}
+                  max={getTodayLocalDate()}
+                  onChange={(e) =>
+                    setTanggal((prev) => ({
+                      ...prev,
+                      [item.id_boxing]: e.target.value,
+                    }))
+                  }
+                />
+
+                <AutoResizeTextarea
+                  minHeight={96}
+                  className="w-full border border-black p-3 text-[11px] text-black outline-none focus:border-blue-polibatam leading-relaxed"
+                  placeholder="Tambahkan Uraian Hasil Tindak Lanjut..."
+                  value={uraian[item.id_boxing] || ""}
+                  onChange={(e) =>
+                    setUraian((prev) => ({
+                      ...prev,
+                      [item.id_boxing]: e.target.value,
+                    }))
+                  }
+                />
+
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="file"
+                      id={`upload-${item.id_boxing}`}
+                      className="hidden"
+                      accept="image/*,application/pdf"
+                      onChange={(e) =>
+                        setFiles((prev) => ({
+                          ...prev,
+                          [item.id_boxing]: e.target.files?.[0] || null,
+                        }))
+                      }
+                    />
+                    <label
+                      htmlFor={`upload-${item.id_boxing}`}
+                      className="border border-black px-3 py-1 text-[10px] cursor-pointer hover:bg-gray-100 inline-flex items-center gap-2"
+                    >
+                      <ImageIcon size={12} />
+                      {files[item.id_boxing]
+                        ? files[item.id_boxing]!.name
+                        : item.lampiran_hasil
+                        ? "Ganti Bukti Lampiran (Opsional)"
+                        : "Tambahkan Bukti Lampiran (Wajib)"}
+                    </label>
+
+                    {item.lampiran_hasil && !files[item.id_boxing] && (
+                      <a
+                        href={lampiranUrl(item.lampiran_hasil)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-blue-polibatam hover:underline inline-flex items-center gap-1"
+                      >
+                        <ImageIcon size={12} /> Lihat Lampiran Saat Ini
+                      </a>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] text-gray-500">
+                    * Format yang diizinkan:{" "}
+                    <strong>JPG, PNG, PDF</strong> (Maksimal{" "}
+                    <strong>5 MB</strong>)
+                  </p>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleSubmit(item)}
+                    disabled={submitting[item.id_boxing]}
+                    className="bg-blue-polibatam text-white px-6 py-1.5 rounded font-bold uppercase text-[10px] hover:bg-blue-600 shadow transition-all disabled:opacity-50"
+                  >
+                    {submitting[item.id_boxing]
+                      ? "Menyimpan..."
+                      : sudahDikirim
+                      ? "Simpan Perubahan"
+                      : "Kirim"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         );
