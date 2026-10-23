@@ -252,7 +252,7 @@ export default function DiscrepancyTable() {
                     )}
                   </div>
                   <AutoResizeTextarea
-                    minHeight={80}
+                    minHeight={12}
                     className={`w-full border border-black p-2 text-xs outline-none focus:border-blue-polibatam rounded leading-relaxed text-justify ${penyebabReadOnly ? "bg-gray-50 text-gray-600 cursor-not-allowed" : ""}`}
                     placeholder="Ketik penyebab di sini..."
                     value={penyebab[item.id_boxing] || ""}
