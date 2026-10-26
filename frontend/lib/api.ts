@@ -23,7 +23,27 @@ async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<an
   }
 
   const response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
-  const data     = await response.json();
+
+  // Baca respons sebagai teks agar respons HTML tidak
+  // langsung memunculkan error parsing JSON kepada pengguna.
+  const responseText = await response.text();
+
+  let data: any;
+
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch (error) {
+    console.error("Respons API bukan JSON:", {
+      endpoint,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      error,
+    });
+
+    throw new Error(
+      "Terjadi kendala saat menghubungi server. Silakan coba lagi."
+    );
+  }
 
   if (!response.ok) {
     throw new Error(data.message || "Terjadi kesalahan pada server");
