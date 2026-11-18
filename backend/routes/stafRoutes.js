@@ -7,6 +7,7 @@ const upload      = require("../middleware/uploadMiddleware");
 const {
   getLaporanMasuk,
   getKepalaUnit,
+  getDaftarUnit,
   distribusiLaporan,
   getProsesMonitor,
   inputHasilPemantauan,
@@ -27,6 +28,7 @@ router.use(authMiddleware);
 // ── Tab Laporan Masuk (khusus Staf P4M) ──────────────────
 router.get("/laporan",     roleMiddleware("staf_p4m"), getLaporanMasuk);
 router.get("/kepala-unit", roleMiddleware("staf_p4m"), getKepalaUnit);
+router.get("/daftar-unit", roleMiddleware("staf_p4m"), getDaftarUnit);
 router.post("/boxing",     roleMiddleware("staf_p4m"), distribusiLaporan);
 // Tambah data laporan manual oleh staf → langsung masuk ke Laporan Masuk unit tujuan
 router.post("/laporan/tambah", roleMiddleware("staf_p4m"), upload.single("lampiran"), tambahLaporanManual);

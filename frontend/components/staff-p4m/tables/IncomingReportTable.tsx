@@ -17,7 +17,9 @@ import { toLocalDate, fmtTgl } from "@/lib/exportHelpers";
 import { createPortal } from "react-dom";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
-const DAFTAR_UNIT = DAFTAR_UNIT_UMUM;
+const DAFTAR_UNIT_DEFAULT = DAFTAR_UNIT_UMUM;
+
+type UnitItem = { grup: string; unit: string };
 
 interface LaporanMasuk {
   id_laporan: number;
@@ -72,9 +74,11 @@ function formatTanggal(item: LaporanMasuk): string {
 function MultiSelectUnit({
   selected,
   onChange,
+  daftarUnit,
 }: {
   selected: string[];
   onChange: (units: string[]) => void;
+  daftarUnit: UnitItem[];
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -126,7 +130,7 @@ function MultiSelectUnit({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filtered = DAFTAR_UNIT.filter((d) =>
+  const filtered = daftarUnit.filter((d) =>
     d.unit.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -254,9 +258,11 @@ function MultiSelectUnit({
 function TambahDataModal({
   onClose,
   onSuccess,
+  daftarUnit,
 }: {
   onClose: () => void;
   onSuccess: (pesan: string) => void;
+  daftarUnit: UnitItem[];
 }) {
   const hariIni = new Date().toISOString().slice(0, 10);
   const [statusPelapor, setStatusPelapor] = useState("mahasiswa");
@@ -371,7 +377,7 @@ function TambahDataModal({
 
           <div>
             <label className={labelCls}>Unit yang dituju</label>
-            <MultiSelectUnit selected={units} onChange={setUnits} />
+            <MultiSelectUnit selected={units} onChange={setUnits} daftarUnit={daftarUnit} />
           </div>
         </div>
 
@@ -410,10 +416,23 @@ export default function IncomingReportTable() {
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showTambah, setShowTambah] = useState(false);
+  const [daftarUnit, setDaftarUnit] = useState<UnitItem[]>(DAFTAR_UNIT_DEFAULT);
 
   useEffect(() => {
     fetchData();
+    fetchDaftarUnit();
   }, []);
+
+  // Ambil daftar unit dari server (bawaan + unit dari akun Kepala Unit).
+  // Kalau gagal, tetap pakai daftar bawaan.
+  async function fetchDaftarUnit() {
+    try {
+      const res = await stafApi.getDaftarUnit();
+      if (Array.isArray(res?.data) && res.data.length > 0) setDaftarUnit(res.data);
+    } catch (err) {
+      console.error("Gagal memuat daftar unit:", err);
+    }
+  }
 
   async function fetchData() {
     try {
@@ -500,6 +519,7 @@ export default function IncomingReportTable() {
 
       {showTambah && (
         <TambahDataModal
+          daftarUnit={daftarUnit}
           onClose={() => setShowTambah(false)}
           onSuccess={(pesan) => {
             setShowTambah(false);
@@ -596,6 +616,7 @@ export default function IncomingReportTable() {
                       Pilih Unit :
                     </label>
                     <MultiSelectUnit
+                      daftarUnit={daftarUnit}
                       selected={selectedUnit[item.id_laporan] || []}
                       onChange={(units) =>
                         setSelectedUnit((prev) => ({
@@ -655,6 +676,7 @@ export default function IncomingReportTable() {
                       Pilih Unit :
                     </label>
                     <MultiSelectUnit
+                      daftarUnit={daftarUnit}
                       selected={selectedUnit[item.id_laporan] || []}
                       onChange={(units) =>
                         setSelectedUnit((prev) => ({

@@ -77,6 +77,49 @@ async function getKepalaUnit(req, res) {
 }
 
 // ============================================================
+// 2b. DAFTAR UNIT TUJUAN (dinamis)
+// Gabungan daftar unit bawaan (constants/unitsUmum.js) + unit yang
+// diketik manual saat membuat akun Kepala Unit di menu Data Akun
+// (mis. "QE"), supaya unit baru otomatis muncul di dropdown.
+// ============================================================
+async function ambilUnitKepalaUnitDb(conn = pool) {
+  const [rows] = await conn.query(
+    `SELECT DISTINCT TRIM(unit) AS unit
+     FROM kepala_unit
+     WHERE unit IS NOT NULL AND TRIM(unit) <> ''
+     ORDER BY unit ASC`
+  );
+  return rows.map((r) => r.unit);
+}
+
+async function getDaftarUnit(req, res) {
+  try {
+    const { UNIT_GROUPS, ALL_UNITS } = require("../constants/unitsUmum");
+    const dariDb = await ambilUnitKepalaUnitDb();
+    const tambahan = dariDb.filter((u) => !ALL_UNITS.includes(u));
+
+    const data = UNIT_GROUPS.flatMap((g) =>
+      g.units.map((unit) => ({ grup: g.grup, unit }))
+    );
+    tambahan.forEach((unit) => data.push({ grup: "Unit Lainnya", unit }));
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Error getDaftarUnit:", error);
+    return res.status(500).json({ success: false, message: "Gagal mengambil daftar unit." });
+  }
+}
+
+// Unit valid = ada di daftar bawaan ATAU sudah punya akun Kepala Unit
+async function cariUnitTidakValid(conn, unitArray) {
+  const { ALL_UNITS } = require("../constants/unitsUmum");
+  const belumCocok = unitArray.filter((u) => !ALL_UNITS.includes(u));
+  if (belumCocok.length === 0) return [];
+  const dariDb = await ambilUnitKepalaUnitDb(conn);
+  return belumCocok.filter((u) => !dariDb.includes(u));
+}
+
+// ============================================================
 // 3. DISTRIBUSI LAPORAN (BOXING)
 // ============================================================
 async function distribusiLaporan(req, res) {
@@ -126,8 +169,7 @@ async function distribusiLaporan(req, res) {
       });
     }
 
-    const { ALL_UNITS } = require("../constants/unitsUmum");
-    const unitTidakValid = unitArray.filter((u) => !ALL_UNITS.includes(u));
+    const unitTidakValid = await cariUnitTidakValid(conn, unitArray);
     if (unitTidakValid.length > 0) {
       conn.release();
       return res.status(400).json({
@@ -1198,15 +1240,15 @@ async function tambahLaporanManual(req, res) {
     return tolak(400, "Tanggal kejadian tidak boleh lebih besar dari hari ini.");
   }
 
-  const { ALL_UNITS } = require("../constants/unitsUmum");
-  const unitTidakValid = unitArray.filter((u) => !ALL_UNITS.includes(u));
-  if (unitTidakValid.length > 0) {
-    return tolak(400, `Unit tidak valid: ${unitTidakValid.join(", ")}`);
-  }
-
   const lampiran = req.file ? req.file.filename : null;
   const conn = await pool.getConnection();
   try {
+    const unitTidakValid = await cariUnitTidakValid(conn, unitArray);
+    if (unitTidakValid.length > 0) {
+      conn.release();
+      return tolak(400, `Unit tidak valid: ${unitTidakValid.join(", ")}`);
+    }
+
     const [stafRows] = await conn.query(
       `SELECT id_staf FROM staf_p4m WHERE id_pengguna = ?`,
       [id_pengguna]
@@ -1302,6 +1344,7 @@ async function tambahLaporanManual(req, res) {
 module.exports = {
   getLaporanMasuk,
   getKepalaUnit,
+  getDaftarUnit,
   distribusiLaporan,
   getProsesMonitor,
   inputHasilPemantauan,

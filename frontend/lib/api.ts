@@ -114,6 +114,10 @@ export const stafApi = {
   getKepalaUnit: () =>
     apiFetch("/staf/kepala-unit"),
 
+  // Daftar unit tujuan dinamis (bawaan + unit dari akun Kepala Unit)
+  getDaftarUnit: () =>
+    apiFetch("/staf/daftar-unit"),
+
   // Tambah data laporan manual → langsung terdistribusi ke unit tujuan
   tambahLaporanManual: (formData: FormData) =>
     apiFetch("/staf/laporan/tambah", { method: "POST", body: formData }),
