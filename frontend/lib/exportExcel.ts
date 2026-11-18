@@ -3,48 +3,58 @@
 // Worksheet 1: Ringkasan
 // Worksheet 2: Laporan Masih Dipantau
 // Worksheet 3: Laporan Selesai
+// Worksheet 4+: Arsip per tahun
+//
+// ✅ Setiap worksheet laporan mengikuti form resmi
+//    "No.BO.34.3.1-V7 Borang Pengelolaan Ketidaksesuaian dan Tindakan
+//    Perbaikan/Pencegahan" (logo + header borang, judul + TAHUN, tabel 11
+//    kolom, blok tanda tangan Kepala P4M) dan SAMA dengan PDF rekap.
 
 import type { RekapItem, ProsesItem, ArsipItem } from "./exportTypes";
-import { fmtTgl, labelStatusReview, labelStatusBoxing, parseTglArsip } from "./exportHelpers";
+import {
+  fmtTgl,
+  labelStatusReview,
+  labelStatusBoxing,
+  parseTglArsip,
+  BORANG_REKAP_NOMOR,
+  BORANG_REKAP_JUDUL,
+  BORANG_REKAP_TANGGAL,
+  JUDUL_LAPORAN_REKAP,
+} from "./exportHelpers";
 
-// ─── Tipe kolom tabel ──────────────────────────────────────
+// ─── Kolom tabel (urutan & judul = form V7 = PDF rekap) ────
 interface KolomTabel {
   header: string;
-  key: string;
+  key: "no" | "tglMasuk" | "jenis" | "uraian" | "unit" | "penyebab" | "rencana" | "hasil" | "tglPelaks" | "statusReview" | "statusBoxing";
   width: number;
+  center?: boolean;
 }
 
-// ✅ RAPI v2: lebar kolom dilebarin lagi khusus untuk kolom-kolom yang
-// sebelumnya kepotong/wrap jadi 2 baris di header (mis. "Tgl Pelaksanaan",
-// "Status Review", "Status Proses") sehingga kelihatan sempit & berantakan.
-// Kolom teks panjang (Uraian/Penyebab/Rencana/Hasil) tetap dijaga secukupnya
-// supaya sheet tidak balik memanjang berlebihan ke samping.
 const KOLOM: KolomTabel[] = [
-  { header: "No",                    key: "no",          width: 5  },
-  { header: "Kode Laporan",          key: "kode",        width: 13 },
-  { header: "Jenis Laporan",         key: "jenis",       width: 13 },
-  { header: "Tgl Masuk",             key: "tglMasuk",    width: 13 },
-  { header: "Uraian Ketidaksesuaian",key: "uraian",      width: 28 },
-  { header: "Unit",                  key: "unit",        width: 14 },
-  { header: "Penyebab",              key: "penyebab",    width: 20 },
-  { header: "Rencana Tindakan",      key: "rencana",     width: 20 },
-  { header: "Hasil Tindak Lanjut",   key: "hasil",       width: 22 },
-  { header: "Tgl Pelaksanaan",       key: "tglPelaks",   width: 17 },
-  { header: "Status Review",         key: "statusReview",width: 18 },
-  { header: "Status Proses",         key: "statusBoxing",width: 17 },
-  { header: "Foto Laporan",          key: "fotoAwal",    width: 24 },
-  { header: "Foto Hasil",            key: "fotoHasil",   width: 24 },
+  { header: "No",                  key: "no",           width: 12, center: true },
+  { header: "Tanggal\nPelaporan",  key: "tglMasuk",     width: 16, center: true },
+  { header: "Jenis",               key: "jenis",        width: 14, center: true },
+  { header: "Uraian",              key: "uraian",       width: 42 },
+  { header: "Unit",                key: "unit",         width: 18, center: true },
+  { header: "Penyebab",            key: "penyebab",     width: 32 },
+  { header: "Rencana",             key: "rencana",      width: 32 },
+  { header: "Hasil",               key: "hasil",        width: 32 },
+  { header: "Tanggal\nSelesai",    key: "tglPelaks",    width: 16, center: true },
+  { header: "Status\nReview",      key: "statusReview", width: 18, center: true },
+  { header: "Status",              key: "statusBoxing", width: 14, center: true },
 ];
 
-// Kolom terakhir (dipakai untuk merge judul / baris kosong)
-const KOLOM_AKHIR = String.fromCharCode(64 + KOLOM.length); // 14 kolom -> "N"
-const IDX_FOTO_AWAL  = KOLOM.findIndex((k) => k.key === "fotoAwal");  // 0-based
-const IDX_FOTO_HASIL = KOLOM.findIndex((k) => k.key === "fotoHasil"); // 0-based
+const JUMLAH_KOLOM = KOLOM.length;                              // 11
+const KOLOM_AKHIR  = String.fromCharCode(64 + JUMLAH_KOLOM);    // "K"
+const IDX_TTD      = KOLOM.findIndex((k) => k.key === "tglPelaks") + 1; // kolom ke-9 (I) — blok TTD
+
+// Baris-baris template (sama dengan form)
+const BARIS_HEADER_TABEL = 8;
+const BARIS_DATA_AWAL    = BARIS_HEADER_TABEL + 1;
 
 // ─── Baris data laporan ────────────────────────────────────
 interface BarisLaporan {
   no:           number;
-  kode:         string;
   jenis:        string;
   uraian:       string;
   unit:         string;
@@ -55,12 +65,38 @@ interface BarisLaporan {
   statusReview: string;
   statusBoxing: string;
   tglMasuk:     string;
-  lampiranAwal: string | null;   // foto dari pelapor
-  lampiranHasil: string | null;  // foto hasil perbaikan Kepala Unit
-  sortKey?: number;              // timestamp untuk pengurutan (BUKAN dari teks tanggal)
+  lampiranAwal:  string | null; // foto dari pelapor → ditempel di bawah teks Uraian
+  lampiranHasil: string | null; // foto hasil perbaikan → ditempel di bawah teks Hasil
+  sortKey?:     number; // timestamp untuk pengurutan (BUKAN dari teks tanggal)
 }
 
-// ─── Helper gambar ─────────────────────────────────────────
+// ─── Helper logo ───────────────────────────────────────────
+const LOGO_URL = "/logo-polibatam.png";
+
+interface LogoSiap { buffer: ArrayBuffer; width: number; height: number }
+
+// Logo aslinya 2303×2048 px (berat). Diperkecil lewat canvas supaya file Excel tetap ringan.
+async function ambilLogo(): Promise<LogoSiap | null> {
+  try {
+    const res = await fetch(LOGO_URL);
+    if (!res.ok) return null;
+    const bmp = await createImageBitmap(await res.blob());
+    const skala = Math.min(1, 320 / bmp.width);
+    const width  = Math.round(bmp.width * skala);
+    const height = Math.round(bmp.height * skala);
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, width, height);
+    bmp.close();
+    const png: Blob | null = await new Promise((r) => canvas.toBlob(r, "image/png"));
+    if (!png) return null;
+    return { buffer: await png.arrayBuffer(), width, height };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Helper foto laporan / foto hasil (ditempel di dalam sel Uraian & Hasil, sama seperti PDF) ───
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
 
 function getUploadUrl(file: string | null | undefined): string | null {
@@ -70,31 +106,29 @@ function getUploadUrl(file: string | null | undefined): string | null {
   return `${BASE_URL}/uploads/${file}`;
 }
 
-interface GambarSiap { buffer: ArrayBuffer; ext: "png" | "jpeg"; width: number; height: number }
+interface GambarSiap { buffer: ArrayBuffer; width: number; height: number }
 
-// Download gambar -> buffer yang siap dipakai ExcelJS.
-// ExcelJS hanya mendukung png/jpeg/gif, jadi format lain (webp, dll)
-// dikonversi dulu ke PNG lewat canvas. Kalau gagal -> null (sel dikosongkan).
+// Download foto → diperkecil (maks 480px) & dijadikan JPEG lewat canvas supaya file Excel tetap ringan
+// dan format apa pun (webp, dll) tetap bisa ditempel. Gagal → null (foto dilewati).
 async function ambilGambar(url: string | null): Promise<GambarSiap | null> {
   if (!url) return null;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const blob = await res.blob();
-    const bmp  = await createImageBitmap(blob);
-    const { width, height } = bmp;
-
-    if (blob.type === "image/png" || blob.type === "image/jpeg" || blob.type === "image/jpg") {
-      bmp.close();
-      return { buffer: await blob.arrayBuffer(), ext: blob.type === "image/png" ? "png" : "jpeg", width, height };
-    }
+    const bmp = await createImageBitmap(await res.blob());
+    const skala  = Math.min(1, 480 / Math.max(bmp.width, bmp.height));
+    const width  = Math.max(1, Math.round(bmp.width * skala));
+    const height = Math.max(1, Math.round(bmp.height * skala));
     const canvas = document.createElement("canvas");
     canvas.width = width; canvas.height = height;
-    canvas.getContext("2d")!.drawImage(bmp, 0, 0);
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bmp, 0, 0, width, height);
     bmp.close();
-    const png: Blob | null = await new Promise((r) => canvas.toBlob(r, "image/png"));
-    if (!png) return null;
-    return { buffer: await png.arrayBuffer(), ext: "png", width, height };
+    const jpg: Blob | null = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    if (!jpg) return null;
+    return { buffer: await jpg.arrayBuffer(), width, height };
   } catch {
     return null;
   }
@@ -105,61 +139,48 @@ function buatBaris(item: RekapItem | ProsesItem, no: number, isRekap: boolean): 
     const d = item as RekapItem;
     return {
       no,
-      kode:         d.kode_laporan,
-      jenis:        d.jenis_laporan        ?? "—",
+      jenis:        d.jenis_laporan          ?? "—",
       uraian:       d.uraian_ketidaksesuaian ?? "—",
-      unit:         d.nama_unit            ?? "—",
-      penyebab:     d.penyebab             ?? "—",
-      rencana:      d.rencana_tindakan     ?? "—",
-      hasil:        d.hasil_tindakan       ?? "—",
+      unit:         d.nama_unit              ?? "—",
+      penyebab:     d.penyebab               ?? "—",
+      rencana:      d.rencana_tindakan       ?? "—",
+      hasil:        d.hasil_tindakan         ?? "—",
       tglPelaks:    fmtTgl(d.tanggal_pelaksanaan),
-      // ✅ Sheet "Laporan Selesai" isinya SUDAH PASTI laporan yang tuntas
-      // (id_boxing-nya ada di rekapData) — jadi Status Review-nya selalu
-      // "Ditindaklanjuti", nggak perlu lihat raw status_review lagi
-      // (yang sebelumnya malah bikin bingung karena satu sheet bisa
-      // kelihatan campur "Ditindaklanjuti"/"Tidak Ditindaklanjuti").
+      // Sheet "Laporan Selesai" isinya SUDAH PASTI laporan yang tuntas
+      // (id_boxing-nya ada di rekapData) — Status Review-nya selalu "Ditindaklanjuti".
       statusReview: "Ditindaklanjuti",
       statusBoxing: "Selesai",
       tglMasuk:     fmtTgl(d.created_at ?? null),
-      lampiranAwal: d.lampiran_laporan ?? null,
+      lampiranAwal:  d.lampiran_laporan ?? null,
       lampiranHasil: d.lampiran_hasil ?? null,
       sortKey:      d.created_at ? new Date(d.created_at).getTime() : 0,
     };
-  } else {
-    const p = item as ProsesItem;
-    return {
-      no,
-      kode:         p.kode_laporan,
-      jenis:        p.jenis_laporan    ?? "—",
-      uraian:       p.isi_laporan      ?? "—",
-      unit:         p.nama_unit        ?? "—",
-      penyebab:     p.penyebab         ?? "—",
-      rencana:      p.rencana_tindakan ?? "—",
-      hasil:        p.hasil_tindakan   ?? "—",
-      tglPelaks:    fmtTgl(p.tanggal_pelaksanaan),
-      // ✅ Sheet "Laporan Masih Dipantau" isinya laporan yang BELUM
-      // tuntas (masih ada tahap lanjutan, apa pun keputusan review-nya
-      // sejauh ini) — jadi Status Review-nya selalu "Menunggu / Proses".
-      // Progres detailnya (lagi di tahap mana persisnya: di unit, di
-      // Staf, dst) tetap kelihatan lengkap di kolom "Status Proses"
-      // sebelah kanannya lewat labelStatusBoxing().
-      statusReview: "Menunggu / Proses",
-      statusBoxing: labelStatusBoxing(p.status_boxing),
-      tglMasuk:     fmtTgl(p.created_at ?? null),
-      lampiranAwal: p.lampiran_laporan ?? null,
-      lampiranHasil: p.lampiran_hasil ?? null,
-      sortKey:      p.created_at ? new Date(p.created_at).getTime() : 0,
-    };
   }
+  const p = item as ProsesItem;
+  return {
+    no,
+    jenis:        p.jenis_laporan    ?? "—",
+    uraian:       p.isi_laporan      ?? "—",
+    unit:         p.nama_unit        ?? "—",
+    penyebab:     p.penyebab         ?? "—",
+    rencana:      p.rencana_tindakan ?? "—",
+    hasil:        p.hasil_tindakan   ?? "—",
+    tglPelaks:    fmtTgl(p.tanggal_pelaksanaan),
+    // Sheet "Laporan Masih Dipantau" = laporan yang BELUM tuntas → "Menunggu / Proses".
+    // Progres detailnya tetap kelihatan di kolom "Status" lewat labelStatusBoxing().
+    statusReview: "Menunggu / Proses",
+    statusBoxing: labelStatusBoxing(p.status_boxing),
+    tglMasuk:     fmtTgl(p.created_at ?? null),
+    lampiranAwal:  p.lampiran_laporan ?? null,
+    lampiranHasil: p.lampiran_hasil ?? null,
+    sortKey:      p.created_at ? new Date(p.created_at).getTime() : 0,
+  };
 }
 
-// ✅ BARU: baris arsip (hasil upload Excel data tahun lalu) dipetakan ke
-// bentuk BarisLaporan yang sama supaya bisa dirender pakai fungsi
-// buatWorksheetLaporan yang sudah ada, tanpa mengubah tampilan tabel.
+// Baris arsip (hasil upload Excel data tahun lalu) dipetakan ke bentuk BarisLaporan yang sama.
 function buatBarisArsip(item: ArsipItem, no: number): BarisLaporan {
   return {
     no,
-    kode:         item.kode_laporan ?? "—",
     jenis:        item.jenis_laporan ?? "—",
     uraian:       item.uraian_ketidaksesuaian ?? "—",
     unit:         item.unit ?? "—",
@@ -173,25 +194,42 @@ function buatBarisArsip(item: ArsipItem, no: number): BarisLaporan {
       : "—",
     statusBoxing: item.status_boxing ?? "—",
     tglMasuk:     item.tgl_masuk ?? "—",
-    lampiranAwal: item.lampiran_laporan ?? null,
+    lampiranAwal:  item.lampiran_laporan ?? null,
     lampiranHasil: item.lampiran_hasil ?? null,
     sortKey:      parseTglArsip(item.tgl_masuk)?.getTime() ?? 0,
   };
 }
 
+// Isi "TAHUN ...." pada judul form: pakai override kalau ada, kalau tidak
+// ambil dari tahun tanggal pelaporan di data (1 tahun → "2026", beberapa → "2024 – 2026").
+function labelTahun(baris: BarisLaporan[], tahunOverride?: number): string {
+  if (tahunOverride) return String(tahunOverride);
+  const tahun = new Set<number>();
+  baris.forEach((b) => { if (b.sortKey) tahun.add(new Date(b.sortKey).getFullYear()); });
+  const urut = [...tahun].sort((a, b) => a - b);
+  if (urut.length === 0) return String(new Date().getFullYear());
+  return urut.length === 1 ? String(urut[0]) : `${urut[0]} – ${urut[urut.length - 1]}`;
+}
+
+// Perkiraan tinggi baris (ExcelJS tidak auto-fit teks yang di-wrap).
+function tinggiBaris(nilai: string[]): number {
+  let maxBaris = 1;
+  nilai.forEach((t, i) => {
+    const perBaris = Math.max(1, Math.floor(KOLOM[i].width * 1.0));
+    const jml = String(t ?? "")
+      .split(/\r?\n/)
+      .reduce((s, p) => s + Math.max(1, Math.ceil(p.length / perBaris)), 0);
+    if (jml > maxBaris) maxBaris = jml;
+  });
+  return Math.min(409, Math.max(20, maxBaris * 13 + 6));
+}
+
 // ─── Fungsi utama export ────────────────────────────────────
-// arsipData: opsional — data tahun-tahun lalu hasil "Upload Data Lama"
-// (lihat tombol Upload di sebelah tombol Excel pada RecapitulationTable).
-// Setiap tahun yang ada di data ini akan dibuatkan 1 worksheet sendiri,
-// diurutkan dari tahun terbaru ke terlama, supaya rapi dan mudah dicari.
+// arsipData: opsional — data tahun-tahun lalu hasil "Upload Data Lama".
+// Setiap tahun yang ada di data ini dibuatkan 1 worksheet sendiri (terbaru → terlama).
 //
-// tahunFilter: opsional — kalau diisi (mode filter "Tahunan" lagi aktif
-// dan user milih 1 tahun tertentu, misal 2024), maka rekapData/prosesData/
-// arsipData yang masuk ke sini DIANGGAP SUDAH di-filter tahun itu oleh
-// pemanggil, dan hasil export-nya akan digabung jadi SATU worksheet
-// "Laporan Tahun {tahun}" (bukan dipecah Selesai/Dipantau/Arsip terpisah),
-// serta nama file-nya otomatis dikasih tahun tsb supaya jelas ini
-// memang file khusus tahun itu.
+// tahunFilter: opsional — kalau diisi (mode filter dengan 1 tahun tertentu),
+// semua data digabung jadi SATU worksheet dan "TAHUN ...." pada judul diisi tahun itu.
 export async function exportExcel(
   rekapData: RekapItem[],
   prosesData: ProsesItem[],
@@ -199,7 +237,6 @@ export async function exportExcel(
   tahunFilter?: number,
   labelPeriode?: string // mis. "Juni 2026" — dipakai untuk nama sheet & file kalau ada filter
 ): Promise<void> {
-  // Import ExcelJS secara dinamis (browser bundle via CDN atau npm)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ExcelJS = (await import("exceljs")) as any;
   const workbook = new ExcelJS.Workbook();
@@ -209,19 +246,12 @@ export async function exportExcel(
   workbook.modified = new Date();
 
   // ── Data persiapan ──────────────────────────────────────
-  const selesaiBoxingIds    = new Set(rekapData.map((d) => d.id_boxing));
-  const dipantauData        = prosesData.filter((p) => !selesaiBoxingIds.has(p.id_boxing));
+  const selesaiBoxingIds = new Set(rekapData.map((d) => d.id_boxing));
+  const dipantauData     = prosesData.filter((p) => !selesaiBoxingIds.has(p.id_boxing));
 
-  const totalSemua          = rekapData.length + dipantauData.length;
-  // ✅ Disamakan persis dengan isi sheet "Laporan Selesai" (=rekapData)
-  // dan "Laporan Masih Dipantau" (=dipantauData): "Ditindaklanjuti" =
-  // jumlah baris di sheet Selesai, "Menunggu / Proses" = jumlah baris di
-  // sheet Masih Dipantau. TIDAK lagi lihat raw status_review per-item,
-  // supaya angka Ringkasan selalu pas kalau dijumlah sama baris di dua
-  // sheet lainnya (sebelumnya bisa beda kalau ada laporan yang review-nya
-  // sudah "Sesuai" tapi boxing-nya belum ditutup Ka P4M di tab Hasil
-  // Tindak Lanjut — laporan itu tetap dihitung "Ditindaklanjuti" padahal
-  // masih nangkring di sheet Masih Dipantau).
+  const totalSemua            = rekapData.length + dipantauData.length;
+  // Disamakan persis dengan isi sheet "Laporan Selesai" (=rekapData) dan
+  // "Laporan Masih Dipantau" (=dipantauData).
   const jumlahDitindaklanjuti = rekapData.length;
   const jumlahMenunggu        = dipantauData.length;
 
@@ -233,8 +263,13 @@ export async function exportExcel(
   const ABU_TUA   = "FF4D5E71";
   const ABU_MUDA  = "FFD0D7DE";
   const PUTIH     = "FFFFFFFF";
-  const HIJAU_BG  = "FFD1FAE5";
+  const HITAM     = "FF000000";
   const KUNING_BG = "FFFEF9C3";
+
+  function semuaBorder() {
+    const garis = { style: "thin" as const, color: { argb: HITAM } };
+    return { top: garis, left: garis, bottom: garis, right: garis };
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function styleHeader(cell: any) {
@@ -244,41 +279,15 @@ export async function exportExcel(
     cell.border    = semuaBorder();
   }
 
-  function semuaBorder() {
-    const garis = { style: "thin" as const };
-    return { top: garis, left: garis, bottom: garis, right: garis };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function styleData(cell: any, warna?: string) {
-    cell.font      = { name: "Arial", size: 9 };
-    cell.alignment = { vertical: "top", wrapText: true };
-    cell.border    = semuaBorder();
-    if (warna) {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: warna } };
-    }
-  }
-
-  // ✅ BARU: supaya tabel tidak polos 1 warna rata dari atas ke bawah,
-  // baris genap dibuat lebih pudar (dicampur putih) dari warna dasarnya —
-  // jadi kelihatan selang-seling (zebra stripe) tapi tetap 1 tema warna
-  // per tab (kuning=dipantau, hijau=selesai, ungu=arsip).
-  function cerahkanWarna(argbWarna: string, faktor: number): string {
-    const hex = argbWarna.slice(2); // buang 2 karakter alpha "FF" di depan
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    const campur = (c: number) => Math.round(c + (255 - c) * faktor);
-    const keHex = (c: number) => c.toString(16).padStart(2, "0").toUpperCase();
-    return `FF${keHex(campur(r))}${keHex(campur(g))}${keHex(campur(b))}`;
-  }
+  // Logo dimuat sekali, dipakai ulang di semua worksheet laporan
+  const logo   = await ambilLogo();
+  const logoId = logo ? workbook.addImage({ buffer: logo.buffer, extension: "png" }) : null;
 
   // ══════════════════════════════════════════════════════════
   // WORKSHEET 1 — RINGKASAN
   // ══════════════════════════════════════════════════════════
   const wsRingkasan = workbook.addWorksheet("Ringkasan");
 
-  // Judul utama
   wsRingkasan.mergeCells("A1:C1");
   const judulCell = wsRingkasan.getCell("A1");
   judulCell.value     = "TUNTAS Polibatam — Ringkasan Rekapitulasi Ketidaksesuaian";
@@ -297,19 +306,13 @@ export async function exportExcel(
 
   wsRingkasan.addRow([]);
 
-  // Baris statistik ringkasan — sekarang PERSIS sama kategorinya dengan
-  // tabel "Rekap Status Tindak Lanjut" di halaman web (Ditindaklanjuti /
-  // Menunggu-Proses / Total), termasuk kolom persentase-nya, supaya angka
-  // di Excel nggak lagi kelihatan beda sendiri dari yang ditampilkan di
-  // layar.
   const pct = (n: number) => (totalSemua > 0 ? `${((n / totalSemua) * 100).toFixed(1)}%` : "—");
   const statistik: [string, number, string, string][] = [
-    ["Ditindaklanjuti",       jumlahDitindaklanjuti, pct(jumlahDitindaklanjuti), "FFD1FAE5"],
-    ["Menunggu / Proses",     jumlahMenunggu,        pct(jumlahMenunggu),        KUNING_BG ],
-    ["Total Semua Laporan",   totalSemua,            pct(totalSemua),           ABU_MUDA  ],
+    ["Ditindaklanjuti",     jumlahDitindaklanjuti, pct(jumlahDitindaklanjuti), "FFD1FAE5"],
+    ["Menunggu / Proses",   jumlahMenunggu,        pct(jumlahMenunggu),        KUNING_BG ],
+    ["Total Semua Laporan", totalSemua,            pct(totalSemua),            ABU_MUDA  ],
   ];
 
-  // Header tabel ringkasan
   const headerRing = wsRingkasan.addRow(["Status", "Jumlah", "Persentase"]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   headerRing.eachCell((cell: any) => styleHeader(cell));
@@ -338,182 +341,220 @@ export async function exportExcel(
   wsRingkasan.getColumn(3).width = 16;
 
   // ══════════════════════════════════════════════════════════
-  // FUNGSI PEMBANTU — buat worksheet tabel laporan
+  // FUNGSI PEMBANTU — worksheet laporan (layout form BO.34.3.1-V7)
   // ══════════════════════════════════════════════════════════
-  async function buatWorksheetLaporan(
-    nama: string,
-    baris: BarisLaporan[],
-    warnaBaris?: string
-  ) {
+  // Cache foto per URL (satu foto yang sama tidak diunduh berulang) — dipakai semua worksheet
+  const cacheFoto = new Map<string, Promise<GambarSiap | null>>();
+  const muatFoto = (file: string | null) => {
+    const u = getUploadUrl(file);
+    if (!u) return Promise.resolve(null);
+    if (!cacheFoto.has(u)) cacheFoto.set(u, ambilGambar(u));
+    return cacheFoto.get(u)!;
+  };
+
+  const IDX_URAIAN = KOLOM.findIndex((k) => k.key === "uraian");
+  const IDX_HASIL  = KOLOM.findIndex((k) => k.key === "hasil");
+  const FOTO_MAKS_TINGGI = 110; // px
+
+  async function buatWorksheetLaporan(nama: string, baris: BarisLaporan[], tahunOverride?: number) {
     const ws = workbook.addWorksheet(nama);
 
-    // Judul sheet
-    ws.mergeCells(`A1:${KOLOM_AKHIR}1`);
-    const jCell = ws.getCell("A1");
-    jCell.value     = `TUNTAS Polibatam — ${nama}`;
-    jCell.font      = { bold: true, size: 12, name: "Arial", color: { argb: ABU_TUA } };
-    jCell.alignment = { horizontal: "center" };
-
-    ws.mergeCells(`A2:${KOLOM_AKHIR}2`);
-    const tCell = ws.getCell("A2");
-    tCell.value     = `Tanggal Export: ${tglExport}  |  Total: ${baris.length} laporan`;
-    tCell.font      = { size: 9, italic: true, name: "Arial" };
-    tCell.alignment = { horizontal: "center" };
-
-    ws.addRow([]);
-
-    // Header tabel
-    const headerRow = ws.addRow(KOLOM.map((k) => k.header));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    headerRow.eachCell((cell: any) => styleHeader(cell));
-    headerRow.height = 28;
-
-    // ⚠️ Sengaja TIDAK pakai "freeze panes" (baris judul dibekukan pas
-    // scroll). Sebelumnya pakai ws.views = [{state:"frozen", ...}], tapi
-    // ternyata perilakunya nggak konsisten antar versi Excel — di
-    // sebagian Excel Desktop malah bikin baris judul & header kerender
-    // DOBEL secara visual pas file dibuka/discroll (bukan data asli yang
-    // dobel, cuma glitch tampilan, tapi tetap bikin bingung). Ganti
-    // topLeftCell juga sudah dicoba dan nggak konsisten (fix untuk satu
-    // versi Excel malah bikin versi lain dobel). Daripada gambling per
-    // versi Excel yang dipakai user, freeze-nya dihapus total — lebih
-    // aman & konsisten di semua versi, cuma judul & header jadi ikut
-    // scroll biasa (nggak nempel di atas lagi).
-
-    // Lebar kolom
-    KOLOM.forEach((k, i) => {
-      ws.getColumn(i + 1).width = k.width;
-    });
-
-    // Download semua gambar paralel di awal (dengan cache per URL)
-    const cache = new Map<string, Promise<GambarSiap | null>>();
-    const muat = (f: string | null) => {
-      const u = getUploadUrl(f);
-      if (!u) return Promise.resolve(null);
-      if (!cache.has(u)) cache.set(u, ambilGambar(u));
-      return cache.get(u)!;
-    };
-    const gambarBaris = await Promise.all(
-      baris.map(async (b) => ({ awal: await muat(b.lampiranAwal), hasil: await muat(b.lampiranHasil) }))
+    // Unduh semua foto laporan sheet ini sekaligus (paralel)
+    const foto = await Promise.all(
+      baris.map(async (b) => {
+        const [awal, hasil] = await Promise.all([muatFoto(b.lampiranAwal), muatFoto(b.lampiranHasil)]);
+        return { awal, hasil };
+      })
     );
 
-    const BOX_W = 150, BOX_H = 105; // px, muat di kolom lebar 24 & tinggi baris 85pt
-    const tempelGambar = (g: GambarSiap | null, kolom: number, rowNumber: number) => {
-      if (!g) return;
-      const skala = Math.min(BOX_W / g.width, BOX_H / g.height, 1);
-      const id = workbook.addImage({ buffer: g.buffer, extension: g.ext });
-      ws.addImage(id, {
-        tl: { col: kolom + 0.05, row: rowNumber - 1 + 0.05 },
-        ext: { width: Math.round(g.width * skala), height: Math.round(g.height * skala) },
+    // Lebar kolom
+    KOLOM.forEach((k, i) => { ws.getColumn(i + 1).width = k.width; });
+
+    // Pengaturan cetak: A4 landscape, muat 1 halaman lebar, header tabel diulang tiap halaman
+    ws.pageSetup = {
+      paperSize: 9,
+      orientation: "landscape",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      horizontalCentered: true,
+      margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
+      printTitlesRow: `${BARIS_HEADER_TABEL}:${BARIS_HEADER_TABEL}`,
+    };
+    ws.views = [{ showGridLines: false }];
+
+    // ── Header borang (baris 1–2): logo + nomor/judul borang + tanggal borang ──
+    ws.getRow(1).height = 26;
+    ws.getRow(2).height = 26;
+
+    const b1 = ws.getCell("B1");
+    b1.value     = `${BORANG_REKAP_NOMOR} ${BORANG_REKAP_JUDUL}`;
+    b1.font      = { bold: true, size: 12, name: "Arial" };
+    b1.alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+
+    const b2 = ws.getCell("B2");
+    b2.value     = BORANG_REKAP_TANGGAL;
+    b2.font      = { bold: true, size: 12, name: "Arial" };
+    b2.alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+
+    // Garis ganda di bawah header borang
+    for (let c = 1; c <= JUMLAH_KOLOM; c++) {
+      ws.getCell(2, c).border = { bottom: { style: "double", color: { argb: HITAM } } };
+    }
+
+    if (logo && logoId !== null) {
+      const tinggiTampil = 58; // px, muat di 2 baris header (2 × 26pt ≈ 69px)
+      const lebarTampil  = Math.round((tinggiTampil * logo.width) / logo.height);
+      ws.addImage(logoId, {
+        tl: { col: 0.12, row: 0.08 },
+        ext: { width: lebarTampil, height: tinggiTampil },
         editAs: "oneCell",
       });
-    };
-
-    // Baris data
-    baris.forEach((b, idx) => {
-      const row = ws.addRow([
-        b.no, b.kode, b.jenis, b.tglMasuk, b.uraian, b.unit,
-        b.penyebab, b.rencana, b.hasil,
-        b.tglPelaks, b.statusReview, b.statusBoxing,
-        gambarBaris[idx].awal ? "" : (b.lampiranAwal ? "(gambar gagal dimuat)" : "—"),
-        gambarBaris[idx].hasil ? "" : (b.lampiranHasil ? "(gambar gagal dimuat)" : "—"),
-      ]);
-      const adaFoto = !!(gambarBaris[idx].awal || gambarBaris[idx].hasil);
-      row.height = adaFoto ? 85 : 40; // BOX_H 105px ≈ 79pt, muat di 85pt
-      tempelGambar(gambarBaris[idx].awal,  IDX_FOTO_AWAL,  row.number);
-      tempelGambar(gambarBaris[idx].hasil, IDX_FOTO_HASIL, row.number);
-      // Baris genap (idx 1, 3, 5, ...) dibuat lebih pudar supaya selang-seling,
-      // baris ganjil (idx 0, 2, 4, ...) tetap pakai warna dasar tab ini.
-      const warnaBarisIni =
-        warnaBaris && idx % 2 === 1 ? cerahkanWarna(warnaBaris, 0.55) : warnaBaris;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      row.eachCell((cell: any) => styleData(cell, warnaBarisIni));
-
-      // Kolom No rata tengah
-      row.getCell(1).alignment = { horizontal: "center", vertical: "top" };
-      // Kolom Kode rata tengah
-      row.getCell(2).alignment = { horizontal: "center", vertical: "top" };
-      // Kolom Tgl Masuk rata tengah
-      row.getCell(4).alignment  = { horizontal: "center", vertical: "top" };
-      // Kolom tanggal pelaksanaan rata tengah
-      row.getCell(10).alignment = { horizontal: "center", vertical: "top" };
-      row.getCell(11).alignment = { horizontal: "center", vertical: "top", wrapText: true };
-      row.getCell(12).alignment = { horizontal: "center", vertical: "top" };
-      row.getCell(IDX_FOTO_AWAL + 1).alignment  = { horizontal: "center", vertical: "middle" };
-      row.getCell(IDX_FOTO_HASIL + 1).alignment = { horizontal: "center", vertical: "middle" };
-    });
-
-    // Baris kosong jika tidak ada data
-    if (baris.length === 0) {
-      const emptyRow = ws.addRow(["Tidak ada data", ...Array(KOLOM.length - 1).fill("")]);
-      ws.mergeCells(`A${emptyRow.number}:${KOLOM_AKHIR}${emptyRow.number}`);
-      emptyRow.getCell(1).alignment = { horizontal: "center" };
-      emptyRow.getCell(1).font      = { italic: true, color: { argb: "FF9CA3AF" }, name: "Arial" };
-      emptyRow.getCell(1).border    = semuaBorder();
     }
+
+    // ── Judul laporan (baris 5–6) ──
+    ws.getRow(3).height = 8;
+
+    ws.mergeCells(`A5:${KOLOM_AKHIR}5`);
+    const judul = ws.getCell("A5");
+    judul.value     = JUDUL_LAPORAN_REKAP;
+    judul.font      = { bold: true, size: 11, name: "Arial" };
+    judul.alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(5).height = 20;
+
+    ws.mergeCells(`A6:${KOLOM_AKHIR}6`);
+    const tahun = ws.getCell("A6");
+    tahun.value     = `TAHUN ${labelTahun(baris, tahunOverride)}`;
+    tahun.font      = { bold: true, size: 11, name: "Arial" };
+    tahun.alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(6).height = 20;
+
+    // ── Header tabel (baris 8) ──
+    const headerRow = ws.getRow(BARIS_HEADER_TABEL);
+    KOLOM.forEach((k, i) => { headerRow.getCell(i + 1).value = k.header; });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    headerRow.eachCell({ includeEmpty: true }, (cell: any) => styleHeader(cell));
+    headerRow.height = 30;
+
+    // ── Baris data ──
+    let barisTerakhir: number;
+
+    if (baris.length > 0) {
+      baris.forEach((b, idx) => {
+        const r = BARIS_DATA_AWAL + idx;
+        const row = ws.getRow(r);
+        const nilai = KOLOM.map((k) => String(b[k.key] ?? ""));
+        KOLOM.forEach((k, i) => {
+          const cell = row.getCell(i + 1);
+          cell.value     = k.key === "no" ? b.no : nilai[i];
+          cell.font      = { name: "Arial", size: 10 };
+          cell.border    = semuaBorder();
+          cell.alignment = k.center
+            ? { horizontal: "center", vertical: "middle", wrapText: true }
+            : { horizontal: "left",   vertical: "top",    wrapText: true };
+        });
+
+        // Foto ditempel DI BAWAH teks sel (Uraian = foto laporan, Hasil = foto hasil), seperti PDF
+        const ukur = (g: GambarSiap | null, kolomIdx: number) => {
+          if (!g) return null;
+          const maksLebar = Math.min(KOLOM[kolomIdx].width * 7 - 14, 200);
+          const s = Math.min(maksLebar / g.width, FOTO_MAKS_TINGGI / g.height, 1);
+          return { w: Math.round(g.width * s), h: Math.round(g.height * s) };
+        };
+        const uAwal  = ukur(foto[idx].awal,  IDX_URAIAN);
+        const uHasil = ukur(foto[idx].hasil, IDX_HASIL);
+        const tinggiTeks = tinggiBaris(nilai);
+        const tinggiFotoPx = Math.max(uAwal?.h ?? 0, uHasil?.h ?? 0);
+        const tinggiTotal = Math.min(409, tinggiTeks + (tinggiFotoPx ? tinggiFotoPx * 0.75 + 6 : 0));
+        row.height = tinggiTotal;
+
+        const tempel = (g: GambarSiap | null, ukuran: { w: number; h: number } | null, kolomIdx: number) => {
+          if (!g || !ukuran) return;
+          const id = workbook.addImage({ buffer: g.buffer, extension: "jpeg" });
+          ws.addImage(id, {
+            tl: { col: kolomIdx + 0.04, row: r - 1 + (tinggiTeks + 2) / tinggiTotal },
+            ext: { width: ukuran.w, height: ukuran.h },
+            editAs: "oneCell",
+          });
+        };
+        tempel(foto[idx].awal,  uAwal,  IDX_URAIAN);
+        tempel(foto[idx].hasil, uHasil, IDX_HASIL);
+      });
+      barisTerakhir = BARIS_DATA_AWAL + baris.length - 1;
+    } else {
+      // Tidak ada laporan → 1 baris keterangan saja (tidak ada nomor 1–8 / "dst...." bawaan template).
+      // Baris tabel hanya muncul sebanyak laporan yang masuk.
+      ws.mergeCells(BARIS_DATA_AWAL, 1, BARIS_DATA_AWAL, JUMLAH_KOLOM);
+      for (let c = 1; c <= JUMLAH_KOLOM; c++) {
+        ws.getCell(BARIS_DATA_AWAL, c).border = semuaBorder();
+      }
+      const kosong = ws.getCell(BARIS_DATA_AWAL, 1);
+      kosong.value     = "Tidak ada data";
+      kosong.font      = { name: "Arial", size: 10, italic: true, color: { argb: "FF6B7280" } };
+      kosong.alignment = { horizontal: "center", vertical: "middle" };
+      ws.getRow(BARIS_DATA_AWAL).height = 22;
+      barisTerakhir = BARIS_DATA_AWAL;
+    }
+
+    // ── Blok tanda tangan Kepala P4M (sesuai template: dikosongkan untuk diisi/ditandatangani) ──
+    const barisTtd = barisTerakhir + 3;
+    const letakTtd = (r: number, teks: string) => {
+      ws.mergeCells(r, IDX_TTD, r, JUMLAH_KOLOM);
+      const cell = ws.getCell(r, IDX_TTD);
+      cell.value     = teks;
+      cell.font      = { name: "Arial", size: 10 };
+      cell.alignment = { horizontal: "left", vertical: "middle" };
+    };
+    letakTtd(barisTtd,     "Batam, ______________/20__");
+    letakTtd(barisTtd + 2, "Kepala P4M,");
+    letakTtd(barisTtd + 8, "____________________");
 
     return ws;
   }
 
   if (tahunFilter) {
     // ══════════════════════════════════════════════════════════
-    // MODE KHUSUS 1 TAHUN — semua data (laporan berjalan tahun ini +
-    // arsip tahun itu kalau ada) digabung jadi SATU worksheet, biar
-    // filenya bener-bener representasi "laporan tahun {tahunFilter}".
+    // MODE KHUSUS 1 TAHUN — semua data (laporan berjalan + arsip tahun itu)
+    // digabung jadi SATU worksheet.
     // ══════════════════════════════════════════════════════════
     const barisGabungan: BarisLaporan[] = [
       ...rekapData.map((d) => buatBaris(d, 0, true)),
       ...dipantauData.map((p) => buatBaris(p, 0, false)),
       ...arsipData.filter((a) => a.tahun === tahunFilter).map((a) => buatBarisArsip(a, 0)),
     ]
-      // ✅ FIX: urut berdasarkan timestamp, bukan membandingkan teks "15 Juni 2026"
+      // urut berdasarkan timestamp, bukan membandingkan teks "15 Juni 2026"
       .sort((a, b) => (b.sortKey ?? 0) - (a.sortKey ?? 0))
       .map((b, i) => ({ ...b, no: i + 1 }));
 
-    const warnaTahun = "FFD1FAE5"; // hijau muda, senada tema "Selesai"
     const namaSheet = (labelPeriode ? `Laporan ${labelPeriode}` : `Laporan Tahun ${tahunFilter}`)
       .replace(/[\\/?*\[\]:]/g, "-").slice(0, 31);
-    await buatWorksheetLaporan(namaSheet, barisGabungan, warnaTahun);
+    await buatWorksheetLaporan(namaSheet, barisGabungan, tahunFilter);
   } else {
-    // ══════════════════════════════════════════════════════════
     // WORKSHEET 2 — LAPORAN MASIH DIPANTAU
-    // ══════════════════════════════════════════════════════════
-    const barisDipantau = dipantauData.map((p, i) =>
-      buatBaris(p, i + 1, false)
-    );
-    await buatWorksheetLaporan("Laporan Masih Dipantau", barisDipantau, KUNING_BG);
+    const barisDipantau = dipantauData.map((p, i) => buatBaris(p, i + 1, false));
+    await buatWorksheetLaporan("Laporan Masih Dipantau", barisDipantau);
 
-    // ══════════════════════════════════════════════════════════
     // WORKSHEET 3 — LAPORAN SELESAI
-    // ══════════════════════════════════════════════════════════
-    const barisSelesai = rekapData.map((d, i) =>
-      buatBaris(d, i + 1, true)
-    );
-    await buatWorksheetLaporan("Laporan Selesai", barisSelesai, HIJAU_BG);
+    const barisSelesai = rekapData.map((d, i) => buatBaris(d, i + 1, true));
+    await buatWorksheetLaporan("Laporan Selesai", barisSelesai);
 
-    // ══════════════════════════════════════════════════════════
-    // WORKSHEET ARSIP — 1 sheet per tahun hasil "Upload Data Lama"
-    // (data 1–10 tahun ke belakang), diurutkan tahun terbaru dulu
-    // supaya tersusun rapi dan gampang dicari.
-    // ══════════════════════════════════════════════════════════
-    const UNGU_BG = "FFE9D5FF";
+    // WORKSHEET ARSIP — 1 sheet per tahun hasil "Upload Data Lama", tahun terbaru dulu
     const tahunTersedia = [...new Set(arsipData.map((a) => a.tahun))].sort((a, b) => b - a);
-
     for (const tahun of tahunTersedia) {
       const barisTahunIni = arsipData
         .filter((a) => a.tahun === tahun)
         .map((a, i) => buatBarisArsip(a, i + 1));
-      await buatWorksheetLaporan(`Arsip ${tahun}`, barisTahunIni, UNGU_BG);
+      await buatWorksheetLaporan(`Arsip ${tahun}`, barisTahunIni, tahun);
     }
   }
 
   // ── Download ────────────────────────────────────────────
-  const buffer   = await workbook.xlsx.writeBuffer();
-  const blob     = new Blob([buffer], {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob   = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  const url      = URL.createObjectURL(blob);
-  const anchor   = document.createElement("a");
+  const url    = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
   anchor.href     = url;
   anchor.download = tahunFilter
     ? `Rekapitulasi_TUNTAS_${(labelPeriode ?? `Tahun_${tahunFilter}`).replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`

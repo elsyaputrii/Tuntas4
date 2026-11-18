@@ -275,3 +275,13 @@ export function arsipSelesai(statusBoxing?: string | null, statusReview?: string
   if (/menunggu|proses|dipantau|open/.test(t) && !/selesai|close/.test(t)) return false;
   return /selesai|close|ditindaklanjuti|sesuai/.test(t);
 }
+
+// ─────────────────────────────────────────────────────────────
+// ✅ BARU: identitas borang REKAPITULASI (dipakai Excel & PDF rekap
+// supaya keduanya selalu sama persis dengan form resmi).
+// Kalau nomor/tanggal borang berubah, cukup ganti di sini.
+// ─────────────────────────────────────────────────────────────
+export const BORANG_REKAP_NOMOR   = "No.BO.34.3.1-V7";
+export const BORANG_REKAP_JUDUL   = "Borang Pengelolaan Ketidaksesuaian dan Tindakan Perbaikan/Pencegahan";
+export const BORANG_REKAP_TANGGAL = "27 Oktober 2026";
+export const JUDUL_LAPORAN_REKAP  = "LAPORAN KETIDAKSESUAIAN DAN TINDAKAN PERBAIKAN/PENCEGAHAN";
