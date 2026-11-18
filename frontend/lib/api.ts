@@ -28,6 +28,8 @@ async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<an
   // langsung memunculkan error parsing JSON kepada pengguna.
   const responseText = await response.text();
 
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: any;
 
   try {
@@ -111,6 +113,10 @@ export const stafApi = {
 
   getKepalaUnit: () =>
     apiFetch("/staf/kepala-unit"),
+
+  // Tambah data laporan manual → langsung terdistribusi ke unit tujuan
+  tambahLaporanManual: (formData: FormData) =>
+    apiFetch("/staf/laporan/tambah", { method: "POST", body: formData }),
 
   distribusiLaporan: (body: { id_laporan: number; unit_tujuan: string[] }) =>
     apiFetch("/staf/boxing", {

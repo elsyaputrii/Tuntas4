@@ -1146,6 +1146,157 @@ async function setApprovalStaf(req, res) {
 }
 
 // ============================================================
+// 13. TAMBAH DATA LAPORAN MANUAL (Staf P4M)
+// Staf menginput laporan sendiri + memilih unit tujuan. Laporan langsung
+// didistribusikan (boxing dibuat per unit) sehingga muncul di menu
+// "Ketidaksesuaian Masuk" milik Kepala Unit yang dituju.
+// ============================================================
+function hapusFileUpload(file) {
+  if (file && file.path) fs.unlink(file.path, () => {});
+}
+
+async function tambahLaporanManual(req, res) {
+  const { status_pelapor, jenis_laporan, deskripsi, tanggal_kejadian } = req.body;
+  const id_pengguna = req.user.id;
+
+  // unit_tujuan dikirim via multipart → bisa berupa JSON string / "A,B" / array
+  let unitArray = req.body.unit_tujuan;
+  if (typeof unitArray === "string") {
+    try {
+      const parsed = JSON.parse(unitArray);
+      unitArray = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      unitArray = unitArray.split(",");
+    }
+  }
+  unitArray = [...new Set((unitArray || []).map((u) => String(u).trim()).filter(Boolean))];
+
+  const tolak = (status, message) => {
+    hapusFileUpload(req.file);
+    return res.status(status).json({ success: false, message });
+  };
+
+  if (!jenis_laporan || !deskripsi || !String(deskripsi).trim() || !tanggal_kejadian) {
+    return tolak(400, "Jenis laporan, deskripsi, dan tanggal kejadian wajib diisi.");
+  }
+  if (unitArray.length === 0) {
+    return tolak(400, "Pilih minimal 1 unit tujuan.");
+  }
+  if (!["masukan", "kritik", "pengaduan"].includes(jenis_laporan)) {
+    return tolak(400, "Jenis laporan tidak valid. Pilih: masukan, kritik, atau pengaduan.");
+  }
+  const statusPelapor = status_pelapor || "mahasiswa";
+  if (!["mahasiswa", "dosen", "tendik", "masyarakat"].includes(statusPelapor)) {
+    return tolak(400, "Status pelapor tidak valid.");
+  }
+
+  const tgl = new Date(`${tanggal_kejadian}T00:00:00`);
+  if (isNaN(tgl.getTime())) return tolak(400, "Format tanggal kejadian tidak valid.");
+  const hariIni = new Date();
+  hariIni.setHours(0, 0, 0, 0);
+  if (tgl > hariIni) {
+    return tolak(400, "Tanggal kejadian tidak boleh lebih besar dari hari ini.");
+  }
+
+  const { ALL_UNITS } = require("../constants/unitsUmum");
+  const unitTidakValid = unitArray.filter((u) => !ALL_UNITS.includes(u));
+  if (unitTidakValid.length > 0) {
+    return tolak(400, `Unit tidak valid: ${unitTidakValid.join(", ")}`);
+  }
+
+  const lampiran = req.file ? req.file.filename : null;
+  const conn = await pool.getConnection();
+  try {
+    const [stafRows] = await conn.query(
+      `SELECT id_staf FROM staf_p4m WHERE id_pengguna = ?`,
+      [id_pengguna]
+    );
+    if (stafRows.length === 0) {
+      conn.release();
+      return tolak(403, "Data staf P4M tidak ditemukan untuk akun ini.");
+    }
+    const id_staf = stafRows[0].id_staf;
+
+    await conn.beginTransaction();
+
+    const { generateUniqueKodeLaporan } = require("../utils/kodeLaporan");
+    const kode_laporan = await generateUniqueKodeLaporan(conn);
+
+    // status langsung 'diproses' karena sekaligus didistribusikan ke unit
+    const [lap] = await conn.query(
+      `INSERT INTO laporan_ketidaksesuaian
+        (kode_laporan, id_civitas, nama_pelapor, status_pelapor, jenis_laporan,
+         deskripsi, lampiran, status, tanggal_kejadian)
+       VALUES (?, NULL, 'Anonim', ?, ?, ?, ?, 'diproses', ?)`,
+      [kode_laporan, statusPelapor, jenis_laporan, String(deskripsi).trim(), lampiran, tanggal_kejadian]
+    );
+    const id_laporan = lap.insertId;
+
+    const insertedIds = [];
+    const notifTargets = [];
+    for (const unit of unitArray) {
+      const [kepalaRows] = await conn.query(
+        `SELECT id_kepala, id_pengguna FROM kepala_unit WHERE unit = ? LIMIT 1`,
+        [unit]
+      );
+      const unitIniP4M = unit === "P4M";
+
+      if (kepalaRows.length === 0 && !unitIniP4M) {
+        await conn.rollback();
+        conn.release();
+        return tolak(
+          400,
+          `Kepala unit untuk "${unit}" belum terdaftar. Jalankan seed akun kepala unit terlebih dahulu.`
+        );
+      }
+
+      const id_kepala = kepalaRows[0]?.id_kepala ?? null;
+      const id_pengguna_kepala = kepalaRows[0]?.id_pengguna ?? null;
+
+      if (unitIniP4M) notifTargets.push({ role: "ka_p4m", unit });
+      if (id_pengguna_kepala) notifTargets.push({ id_pengguna: id_pengguna_kepala, unit });
+
+      const [box] = await conn.query(
+        `INSERT INTO boxing_ketidaksesuaian
+          (id_laporan, id_staf, id_kepala, unit_tujuan, id_standar, status)
+         VALUES (?, ?, ?, ?, NULL, 'terdistribusi')`,
+        [id_laporan, id_staf, id_kepala, unit]
+      );
+      insertedIds.push(box.insertId);
+    }
+
+    await conn.commit();
+
+    for (const k of notifTargets) {
+      const isi = {
+        judul: "Laporan Baru untuk Unit Anda",
+        pesan: `Ada laporan ketidaksesuaian baru (${kode_laporan}) yang didistribusikan ke unit ${k.unit}. Mohon segera ditindaklanjuti.`,
+        jenis: "distribusi_unit",
+        link:
+          k.role === "ka_p4m"
+            ? "/ka-p4m/kepala-unit/ketidaksesuaian-masuk"
+            : "/kepala-unit/ketidaksesuaian-masuk",
+      };
+      if (k.role) notifikasiUntukRole(k.role, isi);
+      else notifikasiUntukPengguna(k.id_pengguna, isi);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Data berhasil ditambahkan dan dikirim ke ${unitArray.length} unit.`,
+      data: { id_laporan, kode_laporan, id_boxing: insertedIds, unit_tujuan: unitArray },
+    });
+  } catch (error) {
+    try { await conn.rollback(); } catch {}
+    hapusFileUpload(req.file);
+    console.error("Error tambahLaporanManual:", error);
+    return res.status(500).json({ success: false, message: "Gagal menambahkan data laporan." });
+  } finally {
+    conn.release();
+  }
+}
+
+// ============================================================
 // EXPORT SEMUA FUNGSI
 // ============================================================
 module.exports = {
@@ -1160,4 +1311,5 @@ module.exports = {
   getArsipRekap,
   deleteArsipRekap,
   setApprovalStaf,
+  tambahLaporanManual,
 };

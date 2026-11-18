@@ -9,6 +9,7 @@ import {
   Calendar,
   Image as ImageIcon,
   CheckCircle2,
+  Plus,
 } from "lucide-react";
 import { DAFTAR_UNIT_UMUM } from "@/lib/unitsUmum";
 import { PeriodFilterBar, isInPeriodFilter, labelPeriodFilter, type FilterMode } from "@/components/shared/PeriodFilterBar";
@@ -153,7 +154,7 @@ function MultiSelectUnit({
       <div
         ref={triggerRef}
         onClick={() => setOpen(!open)}
-        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-[35px]"
+        className="border border-black p-2 flex justify-between items-center cursor-pointer bg-white min-h-8.75"
       >
         <div className="flex flex-wrap gap-1 flex-1">
           {selected.length > 0 ? (
@@ -177,7 +178,7 @@ function MultiSelectUnit({
               top: `${coords.top + 2}px`,
               left: `${coords.left}px`,
               width: `${coords.width}px`,
-            }} className="z-[9999] border border-black bg-white shadow-xl rounded-md overflow-hidden"
+            }} className="z-9999 border border-black bg-white shadow-xl rounded-md overflow-hidden"
           >
             <div className="p-2 border-b border-gray-200 bg-gray-50 relative">
               <input
@@ -246,6 +247,156 @@ function MultiSelectUnit({
 }
 
 // ============================================
+// MODAL TAMBAH DATA
+// Staf menginput laporan manual + unit tujuan. Setelah disimpan, laporan
+// langsung masuk ke "Ketidaksesuaian Masuk" milik unit yang dituju.
+// ============================================
+function TambahDataModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: (pesan: string) => void;
+}) {
+  const hariIni = new Date().toISOString().slice(0, 10);
+  const [statusPelapor, setStatusPelapor] = useState("mahasiswa");
+  const [jenis, setJenis] = useState("pengaduan");
+  const [deskripsi, setDeskripsi] = useState("");
+  const [tanggal, setTanggal] = useState(hariIni);
+  const [units, setUnits] = useState<string[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function handleSubmit() {
+    setErr("");
+    if (!deskripsi.trim()) return setErr("Deskripsi wajib diisi.");
+    if (!tanggal) return setErr("Tanggal kejadian wajib diisi.");
+    if (units.length === 0) return setErr("Pilih minimal 1 unit tujuan.");
+
+    const fd = new FormData();
+    fd.append("status_pelapor", statusPelapor);
+    fd.append("jenis_laporan", jenis);
+    fd.append("deskripsi", deskripsi.trim());
+    fd.append("tanggal_kejadian", tanggal);
+    fd.append("unit_tujuan", JSON.stringify(units));
+    if (file) fd.append("lampiran", file);
+
+    try {
+      setSaving(true);
+      const res = await stafApi.tambahLaporanManual(fd);
+      onSuccess(
+        `${res?.data?.kode_laporan ?? "Data"} berhasil ditambahkan dan dikirim ke: ${units.join(", ")}`
+      );
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Gagal menambahkan data.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const labelCls = "text-[11px] font-bold uppercase block mb-1";
+  const inputCls = "w-full border border-black p-2 text-xs bg-white outline-none";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3">
+      <div className="bg-white border-2 border-black w-full max-w-lg max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b-2 border-black p-3">
+          <h3 className="font-bold uppercase text-sm">Tambah Data Laporan</h3>
+          <button onClick={onClose} aria-label="Tutup" className="hover:text-red-500">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {err && (
+            <p className="text-red-500 text-xs font-bold p-2 bg-red-50 border border-red-200">{err}</p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Jenis Laporan</label>
+              <select className={inputCls} value={jenis} onChange={(e) => setJenis(e.target.value)}>
+                <option value="masukan">Masukan</option>
+                <option value="kritik">Kritik</option>
+                <option value="pengaduan">Pengaduan</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Status Pelapor</label>
+              <select
+                className={inputCls}
+                value={statusPelapor}
+                onChange={(e) => setStatusPelapor(e.target.value)}
+              >
+                <option value="mahasiswa">Mahasiswa</option>
+                <option value="dosen">Dosen</option>
+                <option value="tendik">Tendik</option>
+                <option value="masyarakat">Masyarakat Umum</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Tanggal Kejadian</label>
+            <input
+              type="date"
+              max={hariIni}
+              className={inputCls}
+              value={tanggal}
+              onChange={(e) => setTanggal(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>Deskripsi</label>
+            <textarea
+              rows={5}
+              className={`${inputCls} resize-y`}
+              placeholder="Tuliskan isi laporan..."
+              value={deskripsi}
+              onChange={(e) => setDeskripsi(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>Lampiran (opsional, PDF/PNG/JPG maks 5MB)</label>
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
+              className="text-xs"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>Unit yang dituju</label>
+            <MultiSelectUnit selected={units} onChange={setUnits} />
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end border-t-2 border-black p-3">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="border border-black px-4 py-2 text-xs font-bold uppercase hover:bg-gray-100 disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="bg-blue-600 text-white px-4 py-2 text-xs font-bold uppercase hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "MENYIMPAN..." : "SIMPAN & KIRIM"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 export default function IncomingReportTable() {
@@ -258,6 +409,7 @@ export default function IncomingReportTable() {
   const [modalSrc, setModalSrc] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("semua");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showTambah, setShowTambah] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -346,8 +498,28 @@ export default function IncomingReportTable() {
     <>
       {modalSrc && <ImageModal src={modalSrc} onClose={() => setModalSrc(null)} />}
 
+      {showTambah && (
+        <TambahDataModal
+          onClose={() => setShowTambah(false)}
+          onSuccess={(pesan) => {
+            setShowTambah(false);
+            setSuccessMsg(pesan);
+            setTimeout(() => setSuccessMsg(""), 5000);
+            fetchData();
+          }}
+        />
+      )}
+
       {/* FILTER PERIODE */}
       <div className="mb-3 px-3">
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={() => setShowTambah(true)}
+            className="bg-blue-600 text-white px-4 py-2 text-xs font-bold uppercase inline-flex items-center gap-1.5 hover:bg-blue-700 shadow-md"
+          >
+            <Plus size={14} /> Tambah Data
+          </button>
+        </div>
         <PeriodFilterBar
           filterMode={filterMode}
           onFilterModeChange={setFilterMode}
@@ -399,7 +571,7 @@ export default function IncomingReportTable() {
                       {item.kode_laporan} · {item.jenis_laporan}
                     </p>
                     {/* ✅ Teks rata kiri-kanan + jarak antar paragraf */}
-                    <div className="border border-gray-400 p-4 text-xs bg-gray-50 overflow-auto flex-1 min-h-[140px] leading-relaxed text-justify whitespace-pre-wrap break-words">
+                    <div className="border border-gray-400 p-4 text-xs bg-gray-50 overflow-auto flex-1 min-h-35 leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                       {item.deskripsi}
                     </div>
                     <p className="mt-3 text-[9px] text-gray-500 font-bold inline-flex items-center gap-1">
@@ -461,7 +633,7 @@ export default function IncomingReportTable() {
                     {item.kode_laporan} · {item.jenis_laporan}
                   </p>
                   {/* ✅ Teks rata kiri-kanan + jarak antar paragraf */}
-                  <div className="border border-gray-400 p-4 text-xs bg-gray-50 max-h-32 overflow-auto leading-relaxed text-justify whitespace-pre-wrap break-words">
+                  <div className="border border-gray-400 p-4 text-xs bg-gray-50 max-h-32 overflow-auto leading-relaxed text-justify whitespace-pre-wrap wrap-break-words">
                     {item.deskripsi}
                   </div>
                   <p className="text-[9px] text-gray-500 font-bold inline-flex items-center gap-1">

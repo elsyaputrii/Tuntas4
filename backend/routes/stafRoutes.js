@@ -3,6 +3,7 @@ const express = require("express");
 const router  = express.Router();
 const { authMiddleware, roleMiddleware } = require("../middleware/authMiddleware");
 const uploadExcel = require("../middleware/excelUploadMiddleware");
+const upload      = require("../middleware/uploadMiddleware");
 const {
   getLaporanMasuk,
   getKepalaUnit,
@@ -15,6 +16,7 @@ const {
   getArsipRekap,
   deleteArsipRekap,
   setApprovalStaf,
+  tambahLaporanManual,
 } = require("../controllers/stafController");
 
 // Semua route di bawah ini wajib:
@@ -26,6 +28,8 @@ router.use(authMiddleware);
 router.get("/laporan",     roleMiddleware("staf_p4m"), getLaporanMasuk);
 router.get("/kepala-unit", roleMiddleware("staf_p4m"), getKepalaUnit);
 router.post("/boxing",     roleMiddleware("staf_p4m"), distribusiLaporan);
+// Tambah data laporan manual oleh staf → langsung masuk ke Laporan Masuk unit tujuan
+router.post("/laporan/tambah", roleMiddleware("staf_p4m"), upload.single("lampiran"), tambahLaporanManual);
 router.get("/rekap",       roleMiddleware("staf_p4m"), getRekapitulasi);
 
 // ── Arsip data tahun lalu (upload Excel s/d 10 tahun ke belakang) ─
