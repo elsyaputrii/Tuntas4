@@ -349,7 +349,7 @@ export default function ResultReportTable() {
                   <AlertTriangle size={14} className="text-red-800 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold text-red-800">
-                      Alasan Ditolak Staf P4M:
+                      Alasan Direvisi Staf P4M:
                     </span>{" "}
                     <span className="whitespace-pre-wrap break-words leading-relaxed text-justify">
                       {item.catatan_approval}
