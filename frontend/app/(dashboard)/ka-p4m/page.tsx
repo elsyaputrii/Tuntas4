@@ -55,7 +55,7 @@ export default function DashboardKaP4MPage() {
 
   const [statusData, setStatusData] = useState([
     { name: "Disetujui", value: 0, color: "#10b981" },
-    { name: "Ditolak", value: 0, color: "#ef4444" },
+    { name: "Ditindak-lanjuti/Revisi", value: 0, color: "#ef4444" },
     { name: "Menunggu", value: 0, color: "#f59e0b" },
   ]);
 
@@ -112,7 +112,7 @@ export default function DashboardKaP4MPage() {
         const menunggu = data.filter((d: any) => d.status === "Review Ka-P4M").length;
         setStatusData([
           { name: "Disetujui", value: disetujui, color: "#10b981" },
-          { name: "Ditolak", value: ditolak, color: "#ef4444" },
+          { name: "Ditindak-lanjuti/Revisi", value: ditolak, color: "#ef4444" },
           { name: "Menunggu", value: menunggu, color: "#f59e0b" },
         ]);
 
@@ -170,7 +170,7 @@ export default function DashboardKaP4MPage() {
         <div className="bg-linear-to-br from-red-500 to-red-600 rounded-2xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-red-100 text-sm">Ditolak / Revisi</p>
+              <p className="text-red-100 text-sm">Perlu Ditindak-lanjuti/Revisi</p>
               <p className="text-3xl font-bold mt-2">{stats.ditolak}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl"><AlertCircle size={24} /></div>
@@ -204,7 +204,7 @@ export default function DashboardKaP4MPage() {
               <Legend />
               <Line type="monotone" dataKey="total" stroke="#3b82f6" name="Total Usulan" strokeWidth={2} />
               <Line type="monotone" dataKey="disetujui" stroke="#10b981" name="Disetujui" strokeWidth={2} />
-              <Line type="monotone" dataKey="ditolak" stroke="#ef4444" name="Ditolak" strokeWidth={2} />
+              <Line type="monotone" dataKey="ditolak" stroke="#ef4444" name="Ditindak-lanjuti/Revisi" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -244,7 +244,7 @@ export default function DashboardKaP4MPage() {
               <Legend />
               <Bar dataKey="total" fill="#3b82f6" name="Total" />
               <Bar dataKey="disetujui" fill="#10b981" name="Disetujui" />
-              <Bar dataKey="ditolak" fill="#ef4444" name="Ditolak" />
+              <Bar dataKey="ditolak" fill="#ef4444" name="Ditindak-lanjuti/Revisi" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -268,7 +268,7 @@ export default function DashboardKaP4MPage() {
               ✅ Setujui
             </div>
             <div className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg text-xs text-slate-500">
-              ❌ Tidak Setujui
+              ❌ Perlu Ditindak-lanjuti/Revisi
             </div>
             <div className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg text-xs text-slate-500">
               📝 Beri Alasan

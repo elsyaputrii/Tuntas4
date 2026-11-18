@@ -719,7 +719,7 @@ export default function ProcessMonitorTable() {
               <option value="semua">Status</option>
               <option value="menunggu">Menunggu Tindakan</option>
               <option value="diterima">Siap / Diterima</option>
-              <option value="ditolak">Belum Siap / Ditolak</option>
+              <option value="ditolak">Belum Siap / Direvisi</option>
             </select>
           </div>
         </div>

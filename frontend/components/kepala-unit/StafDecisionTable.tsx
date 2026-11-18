@@ -181,7 +181,7 @@ export default function StafDecisionTable({ onCountChange }: StafDecisionTablePr
     return (
       <div className="w-full border-2 border-black bg-white p-12 text-center">
         <p className="text-gray-400 text-sm italic">
-          Tidak ada laporan yang ditolak Staf P4M.
+          Tidak ada laporan yang direvisi Staf P4M.
         </p>
       </div>
     );
